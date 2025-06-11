@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  metadata-editor:
+    build: .
+    container_name: audio-metadata-editor
+    ports:
+      - "8338:8338"
+    volumes:
+      - /PATH/TO/YOUR/MUSIC:/music
+      - ./app.py:/app/app.py
+      - ./templates:/app/templates
+      - ./static:/app/static
+    environment:
+      - MUSIC_DIR=/music
+      - PUID=1000
+      - PGID=1000
+    restart: unless-stopped
