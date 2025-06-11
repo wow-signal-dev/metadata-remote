@@ -1,0 +1,2141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>mdrm</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        :root {
+            --bg-primary: #0a0a0a;
+            --bg-secondary: #0f0f0f;
+            --bg-tertiary: #141414;
+            --bg-card: #181818;
+            --bg-hover: #1f1f1f;
+            --bg-input: #0f0f0f;
+            --border-color: #252525;
+            --border-light: #333;
+            --text-primary: #f0f0f0;
+            --text-secondary: #b0b0b0;
+            --text-muted: #666;
+            --accent-primary: #4a7fff;
+            --accent-hover: #5a8fff;
+            --accent-glow: rgba(74, 127, 255, 0.3);
+            --success: #4ade80;
+            --success-bg: #1a3a1a;
+            --success-border: #2a5a2a;
+            --error: #ff6b6b;
+            --error-bg: #3a1a1a;
+            --error-border: #5a2a2a;
+            --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+            --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
+            --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
+            --transition-fast: 0.15s ease;
+            --transition-normal: 0.3s ease;
+        }
+        
+        html {
+            height: 100%;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            margin: 0;
+            font-size: 14px;
+            letter-spacing: 0.01em;
+        }
+        
+        body.resizing {
+            user-select: none;
+        }
+        
+        /* Header Styles */
+        .header {
+            background: linear-gradient(180deg, #1a1a1a 0%, #141414 100%);
+            color: var(--text-primary);
+            padding: 1rem 1.5rem;
+            text-align: center;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.8);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            flex-shrink: 0;
+            backdrop-filter: blur(10px);
+            position: relative;
+            z-index: 100;
+        }
+        
+        .header h1 {
+            font-weight: 300;
+            letter-spacing: 0.15em;
+            margin-bottom: 0.5rem;
+            font-size: 1.5rem;
+            background: linear-gradient(135deg, #fff 0%, #999 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .header-hint {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: 0.25rem;
+            opacity: 0.8;
+        }
+        
+        /* Container */
+        .container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        /* Divider styles */
+        .divider {
+            width: 4px;
+            background: linear-gradient(180deg, rgba(255,255,255,0.02) 0%, rgba(255,255,255,0.05) 50%, rgba(255,255,255,0.02) 100%);
+            cursor: col-resize;
+            position: relative;
+            flex-shrink: 0;
+            transition: all var(--transition-fast);
+            opacity: 0.5;
+        }
+        
+        .divider:hover {
+            opacity: 1;
+            background: linear-gradient(180deg, rgba(74,127,255,0.1) 0%, rgba(74,127,255,0.3) 50%, rgba(74,127,255,0.1) 100%);
+            width: 6px;
+        }
+        
+        .divider.dragging {
+            background: linear-gradient(180deg, rgba(74,127,255,0.2) 0%, rgba(74,127,255,0.5) 50%, rgba(74,127,255,0.2) 100%);
+            width: 6px;
+            opacity: 1;
+        }
+        
+        /* Folder Tree Column */
+        .folders {
+            flex: 0 0 25%;
+            min-width: 200px;
+            background: var(--bg-tertiary);
+            overflow-y: auto;
+            overflow-x: hidden;
+            outline: none;
+            height: 100%;
+            position: relative;
+        }
+        
+        .folders:focus-within {
+            box-shadow: inset 0 0 0 1px var(--accent-glow);
+        }
+        
+        .folders h3 {
+            padding: 1rem 1.25rem;
+            background: linear-gradient(180deg, #1f1f1f 0%, #1a1a1a 100%);
+            color: var(--text-primary);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            border-bottom: 1px solid var(--border-color);
+            font-weight: 500;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.9rem;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            backdrop-filter: blur(5px);
+        }
+        
+        .sort-controls {
+            display: flex;
+            gap: 0.5rem;
+            font-size: 0.75rem;
+            text-transform: none;
+        }
+        
+        .sort-option {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+            cursor: pointer;
+            user-select: none;
+            color: var(--text-muted);
+            transition: all var(--transition-fast);
+            padding: 0.35rem 0.75rem;
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid transparent;
+        }
+        
+        .sort-option:hover {
+            color: var(--text-primary);
+            background: rgba(255, 255, 255, 0.05);
+            border-color: rgba(255, 255, 255, 0.1);
+        }
+        
+        .sort-option.active {
+            color: var(--accent-primary);
+            background: rgba(74, 127, 255, 0.1);
+            border-color: rgba(74, 127, 255, 0.3);
+        }
+        
+        .sort-arrows {
+            display: flex;
+            flex-direction: column;
+            font-size: 0.5rem;
+            line-height: 0.5;
+        }
+        
+        .sort-arrow {
+            opacity: 0.3;
+            transition: all var(--transition-fast);
+        }
+        
+        .sort-arrow.active {
+            opacity: 1;
+            color: var(--accent-primary);
+            text-shadow: 0 0 8px var(--accent-glow);
+        }
+        
+        .tree {
+            padding: 0.5rem 0;
+        }
+        
+        .tree-item {
+            cursor: pointer;
+            user-select: none;
+            transition: all var(--transition-fast);
+        }
+        
+        .tree-item-content {
+            display: flex;
+            align-items: center;
+            padding: 0.6rem 1.25rem;
+            transition: all var(--transition-fast);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .tree-item-content::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 3px;
+            background: var(--accent-primary);
+            transform: translateX(-100%);
+            transition: transform var(--transition-fast);
+        }
+        
+        .tree-item-content:hover {
+            background: var(--bg-hover);
+            padding-left: 1.5rem;
+        }
+        
+        .tree-item.selected > .tree-item-content {
+            background: linear-gradient(90deg, rgba(74, 127, 255, 0.15) 0%, rgba(74, 127, 255, 0.05) 100%);
+            color: var(--text-primary);
+        }
+        
+        .tree-item.selected > .tree-item-content::before {
+            transform: translateX(0);
+        }
+        
+        .tree-item.keyboard-focus > .tree-item-content {
+            box-shadow: inset 0 0 0 1px var(--accent-primary);
+        }
+        
+        .tree-icon {
+            margin-right: 0.75rem;
+            font-size: 1.1rem;
+            filter: saturate(0.5);
+            transition: all var(--transition-fast);
+        }
+        
+        .tree-item:hover .tree-icon {
+            filter: saturate(1);
+            transform: scale(1.1);
+        }
+        
+        .tree-children {
+            display: none;
+            animation: slideDown var(--transition-normal);
+        }
+        
+        .tree-children.expanded {
+            display: block;
+        }
+        
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        /* Files Column */
+        .files {
+            flex: 0 0 35%;
+            min-width: 250px;
+            background: var(--bg-card);
+            overflow-y: auto;
+            overflow-x: hidden;
+            outline: none;
+            height: 100%;
+            position: relative;
+        }
+        
+        .files:focus-within {
+            box-shadow: inset 0 0 0 1px var(--accent-glow);
+        }
+        
+        .files h3 {
+            padding: 1rem 1.25rem;
+            background: linear-gradient(180deg, #1f1f1f 0%, #1a1a1a 100%);
+            color: var(--text-primary);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            border-bottom: 1px solid var(--border-color);
+            font-weight: 500;
+            font-size: 0.9rem;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            backdrop-filter: blur(5px);
+        }
+        
+        #file-count {
+            font-weight: 400;
+            color: var(--text-muted);
+            margin-left: 0.5rem;
+            font-size: 0.85rem;
+        }
+        
+        #file-list {
+            list-style: none;
+        }
+        
+        #file-list li {
+            padding: 0.9rem 1.25rem;
+            cursor: pointer;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+            transition: all var(--transition-fast);
+            color: var(--text-secondary);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        #file-list li::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 3px;
+            background: var(--accent-primary);
+            transform: translateX(-100%);
+            transition: transform var(--transition-fast);
+        }
+        
+        #file-list li:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+            padding-left: 1.5rem;
+        }
+        
+        #file-list li.selected {
+            background: linear-gradient(90deg, rgba(74, 127, 255, 0.15) 0%, rgba(74, 127, 255, 0.05) 100%);
+            color: var(--text-primary);
+        }
+        
+        #file-list li.selected::before {
+            transform: translateX(0);
+        }
+        
+        #file-list li.keyboard-focus {
+            box-shadow: inset 0 0 0 1px var(--accent-primary);
+        }
+        
+        .file-folder {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 0.35rem;
+            opacity: 0.7;
+        }
+        
+        /* Metadata Column */
+        .metadata {
+            flex: 1;
+            min-width: 300px;
+            padding: 2rem 2.5rem;
+            background: var(--bg-secondary);
+            overflow-y: auto;
+            height: 100%;
+        }
+        
+        .metadata h3 {
+            margin-bottom: 1.5rem;
+            color: var(--text-primary);
+            font-weight: 400;
+            font-size: 1.1rem;
+            letter-spacing: 0.02em;
+        }
+        
+        .filename-display {
+            cursor: pointer;
+            padding: 0.5rem 0.75rem;
+            border-radius: 6px;
+            transition: all var(--transition-fast);
+            display: inline-block;
+            font-weight: 500;
+            background: rgba(255, 255, 255, 0.02);
+        }
+        
+        .filename-display:hover {
+            background: rgba(74, 127, 255, 0.1);
+            color: var(--accent-primary);
+            transform: translateX(4px);
+        }
+        
+        .filename-edit {
+            display: none;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 1.5rem;
+            animation: fadeIn var(--transition-normal);
+        }
+        
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(-5px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .filename-edit input {
+            flex: 1;
+            padding: 0.75rem 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: var(--bg-input);
+            color: var(--text-primary);
+            font-size: 0.95rem;
+            transition: all var(--transition-fast);
+        }
+        
+        .filename-edit input:focus {
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 3px var(--accent-glow);
+        }
+        
+        .filename-edit button {
+            padding: 0.75rem 1.25rem;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 500;
+            transition: all var(--transition-fast);
+        }
+        
+        .filename-save {
+            background: linear-gradient(135deg, #2d5a2d 0%, #3a7a3a 100%);
+            color: white;
+        }
+        
+        .filename-save:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(45, 90, 45, 0.4);
+        }
+        
+        .filename-reset {
+            background: var(--bg-hover);
+            color: var(--text-secondary);
+        }
+        
+        .filename-reset:hover {
+            background: #2a2a2a;
+            color: var(--text-primary);
+        }
+        
+        .filename-cancel {
+            background: linear-gradient(135deg, #5a2a2a 0%, #7a3a3a 100%);
+            color: white;
+            padding: 0.75rem;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .filename-cancel:hover {
+            transform: rotate(90deg);
+        }
+        
+        /* Album Art Section */
+        .album-art-section {
+            margin: 2rem 0;
+            padding: 1.5rem;
+            background: linear-gradient(135deg, rgba(255,255,255,0.02) 0%, rgba(255,255,255,0.04) 100%);
+            border-radius: 12px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(5px);
+        }
+        
+        .album-art-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 1.5rem;
+        }
+        
+        .album-art {
+            max-width: 200px;
+            max-height: 200px;
+            border-radius: 8px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+            transition: all var(--transition-normal);
+        }
+        
+        .album-art:hover {
+            transform: scale(1.05);
+            box-shadow: 0 12px 36px rgba(0,0,0,0.8);
+        }
+        
+        .album-art-placeholder {
+            width: 200px;
+            height: 200px;
+            background: linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%);
+            border: 2px dashed rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            transition: all var(--transition-fast);
+        }
+        
+        .album-art-placeholder:hover {
+            border-color: rgba(255, 255, 255, 0.2);
+            background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.02) 100%);
+        }
+        
+        .album-art-controls {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+        
+        .album-art-controls button {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 500;
+            transition: all var(--transition-fast);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .album-art-controls button::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.3);
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+        
+        .album-art-controls button:hover::before {
+            width: 300px;
+            height: 300px;
+        }
+        
+        .upload-btn {
+            background: linear-gradient(135deg, #3a3a3a 0%, #4a4a4a 100%);
+            color: var(--text-primary);
+        }
+        
+        .save-image-btn {
+            background: linear-gradient(135deg, #2d5a2d 0%, #3a7a3a 100%);
+            color: white;
+        }
+        
+        .apply-folder-btn {
+            background: linear-gradient(135deg, #4a5d7a 0%, #5a6d8a 100%);
+            color: white;
+        }
+        
+        .delete-art-btn {
+            background: linear-gradient(135deg, #5a2a2a 0%, #7a3a3a 100%);
+            color: white;
+        }
+        
+        input[type="file"] {
+            display: none;
+        }
+        
+        #metadata-form {
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+        }
+        
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        
+        .form-group-with-button {
+            position: relative;
+            display: flex;
+            align-items: flex-end;
+            gap: 0.75rem;
+        }
+        
+        .form-group-wrapper {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        
+        .apply-to-folder-btn {
+            display: none;
+            padding: 0.85rem 1.25rem;
+            border: none;
+            border-radius: 8px;
+            background: linear-gradient(135deg, #4a5d7a 0%, #5a6d8a 100%);
+            color: white;
+            cursor: pointer;
+            font-size: 0.8rem;
+            font-weight: 500;
+            white-space: nowrap;
+            height: fit-content;
+            margin-bottom: 0;
+            transition: all var(--transition-fast);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .apply-to-folder-btn::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.3);
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+        
+        .apply-to-folder-btn:hover::before {
+            width: 300px;
+            height: 300px;
+        }
+        
+        .apply-to-folder-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(74, 93, 122, 0.5);
+        }
+        
+        .apply-to-folder-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .apply-to-folder-btn.visible {
+            display: block;
+            animation: slideIn var(--transition-normal);
+        }
+        
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+        
+        label {
+            font-weight: 500;
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+        }
+        
+        input[type="text"] {
+            padding: 0.85rem 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 0.95rem;
+            transition: all var(--transition-fast);
+            background: var(--bg-input);
+            color: var(--text-primary);
+        }
+        
+        input[type="text"]:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+            background: rgba(74, 127, 255, 0.05);
+            box-shadow: 0 0 0 3px var(--accent-glow);
+            transform: translateY(-1px);
+        }
+        
+        input[type="text"]::placeholder {
+            color: var(--text-muted);
+            opacity: 0.6;
+        }
+        
+        .buttons {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+        
+        button {
+            padding: 0.9rem 2rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            font-weight: 500;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .save-btn {
+            background: linear-gradient(135deg, #2d5a2d 0%, #3a7a3a 100%);
+            color: white;
+            flex: 1;
+        }
+        
+        .save-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(45, 90, 45, 0.5);
+        }
+        
+        .clear-btn {
+            background: linear-gradient(135deg, #3a3a3a 0%, #4a4a4a 100%);
+            color: var(--text-primary);
+        }
+        
+        .clear-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(58, 58, 58, 0.5);
+        }
+        
+        .status {
+            padding: 1rem 1.25rem;
+            margin-top: 1.5rem;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            display: none;
+            animation: statusSlide var(--transition-normal);
+            backdrop-filter: blur(5px);
+        }
+        
+        @keyframes statusSlide {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .status.success {
+            background: linear-gradient(135deg, var(--success-bg) 0%, rgba(26, 58, 26, 0.8) 100%);
+            color: var(--success);
+            border: 1px solid var(--success-border);
+            box-shadow: 0 4px 12px rgba(74, 222, 128, 0.2);
+        }
+        
+        .status.error {
+            background: linear-gradient(135deg, var(--error-bg) 0%, rgba(58, 26, 26, 0.8) 100%);
+            color: var(--error);
+            border: 1px solid var(--error-border);
+            box-shadow: 0 4px 12px rgba(255, 107, 107, 0.2);
+        }
+        
+        .no-file-selected {
+            text-align: center;
+            color: var(--text-muted);
+            margin-top: 4rem;
+            font-size: 0.95rem;
+            opacity: 0.7;
+        }
+        
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.2);
+            border-radius: 50%;
+            border-top-color: var(--accent-primary);
+            animation: spin 1s ease-in-out infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        /* Scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 12px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 6px;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: linear-gradient(180deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.15) 100%);
+            border-radius: 6px;
+            border: 2px solid transparent;
+            background-clip: padding-box;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(180deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.2) 100%);
+            background-clip: padding-box;
+        }
+        
+        /* Focus styles for accessibility */
+        *:focus-visible {
+            outline: 2px solid var(--accent-primary);
+            outline-offset: 2px;
+        }
+        
+        /* Button ripple effect */
+        button::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 5px;
+            height: 5px;
+            background: rgba(255, 255, 255, 0.5);
+            opacity: 0;
+            border-radius: 100%;
+            transform: scale(1, 1) translate(-50%);
+            transform-origin: 50% 50%;
+        }
+        
+        button:focus:not(:active)::after {
+            animation: ripple 1s ease-out;
+        }
+        
+        @keyframes ripple {
+            0% {
+                transform: scale(0, 0);
+                opacity: 1;
+            }
+            20% {
+                transform: scale(25, 25);
+                opacity: 1;
+            }
+            100% {
+                opacity: 0;
+                transform: scale(40, 40);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><b>metadata</b>&nbsp;<img src="{{ url_for('static', filename='favicon.ico') }}" alt="" style="width: 1.2em; height: 1.2em; vertical-align: middle; display: inline-block;">&nbsp;&nbsp;<b>remote</b></h1>
+        <div class="header-hint">Use ↑↓ arrow keys to navigate (auto-loads files), Enter to expand folders, Tab to switch panes</div>
+    </div>
+    
+    <div class="container">
+        <div class="folders">
+            <h3>
+                <span>Folders</span>
+                <div class="sort-controls">
+                    <div class="sort-option" onclick="setSortMethod('name')" id="sort-name">
+                        <span>Name</span>
+                        <div class="sort-arrows">
+                            <span class="sort-arrow" data-dir="asc">▲</span>
+                            <span class="sort-arrow" data-dir="desc">▼</span>
+                        </div>
+                    </div>
+                    <div class="sort-option" onclick="setSortMethod('date')" id="sort-date">
+                        <span>Date</span>
+                        <div class="sort-arrows">
+                            <span class="sort-arrow" data-dir="asc">▲</span>
+                            <span class="sort-arrow" data-dir="desc">▼</span>
+                        </div>
+                    </div>
+                </div>
+            </h3>
+            <div id="folder-tree" class="tree"></div>
+        </div>
+        
+        <div class="divider" id="divider1"></div>
+        
+        <div class="files">
+            <h3>Files <span id="file-count"></span></h3>
+            <ul id="file-list"></ul>
+        </div>
+        
+        <div class="divider" id="divider2"></div>
+        
+        <div class="metadata">
+            <div id="no-file-message" class="no-file-selected">
+                Select a file to edit its metadata
+            </div>
+            
+            <div id="metadata-section" style="display: none;">
+                <h3>Metadata for: <span id="current-filename" class="filename-display"></span></h3>
+                
+                <div class="filename-edit">
+                    <input type="text" id="filename-input" placeholder="Enter new filename">
+                    <button class="filename-save" onclick="saveFilename()">Save</button>
+                    <button class="filename-reset" onclick="resetFilename()">Reset</button>
+                    <button class="filename-cancel" onclick="cancelFilenameEdit()">✕</button>
+                </div>
+                
+                <div class="album-art-section">
+                    <div class="album-art-container">
+                        <div id="art-display">
+                            <div class="album-art-placeholder">No album art</div>
+                        </div>
+                        <div class="album-art-controls">
+                            <button class="upload-btn" onclick="document.getElementById('art-upload').click()">Upload Image</button>
+                            <button class="save-image-btn" onclick="saveAlbumArt()" style="display: none;">Save Image</button>
+                            <button class="apply-folder-btn" onclick="applyArtToFolder()" style="display: none;">Apply to All in Folder</button>
+                            <button class="delete-art-btn" onclick="deleteAlbumArt()" style="display: none;">Delete Image</button>
+                            <input type="file" id="art-upload" accept="image/*" onchange="handleArtUpload(event)">
+                        </div>
+                    </div>
+                </div>
+                
+                <form id="metadata-form">
+                    <div class="form-group-with-button">
+                        <div class="form-group-wrapper">
+                            <label for="title">Title</label>
+                            <input type="text" id="title" placeholder="Enter title" data-field="title">
+                        </div>
+                        <button type="button" class="apply-to-folder-btn" data-field="title" onclick="applyFieldToFolder('title')">Apply to Folder</button>
+                    </div>
+                    
+                    <div class="form-group-with-button">
+                        <div class="form-group-wrapper">
+                            <label for="artist">Artist</label>
+                            <input type="text" id="artist" placeholder="Enter artist" data-field="artist">
+                        </div>
+                        <button type="button" class="apply-to-folder-btn" data-field="artist" onclick="applyFieldToFolder('artist')">Apply to Folder</button>
+                    </div>
+                    
+                    <div class="form-group-with-button">
+                        <div class="form-group-wrapper">
+                            <label for="album">Album</label>
+                            <input type="text" id="album" placeholder="Enter album" data-field="album">
+                        </div>
+                        <button type="button" class="apply-to-folder-btn" data-field="album" onclick="applyFieldToFolder('album')">Apply to Folder</button>
+                    </div>
+                    
+                    <div class="form-group-with-button">
+                        <div class="form-group-wrapper">
+                            <label for="albumartist">Album Artist</label>
+                            <input type="text" id="albumartist" placeholder="Enter album artist" data-field="albumartist">
+                        </div>
+                        <button type="button" class="apply-to-folder-btn" data-field="albumartist" onclick="applyFieldToFolder('albumartist')">Apply to Folder</button>
+                    </div>
+                    
+                    <div class="form-group-with-button">
+                        <div class="form-group-wrapper">
+                            <label for="date">Year</label>
+                            <input type="text" id="date" placeholder="Enter year" data-field="date">
+                        </div>
+                        <button type="button" class="apply-to-folder-btn" data-field="date" onclick="applyFieldToFolder('date')">Apply to Folder</button>
+                    </div>
+                    
+                    <div class="form-group-with-button">
+                        <div class="form-group-wrapper">
+                            <label for="genre">Genre</label>
+                            <input type="text" id="genre" placeholder="Enter genre" data-field="genre">
+                        </div>
+                        <button type="button" class="apply-to-folder-btn" data-field="genre" onclick="applyFieldToFolder('genre')">Apply to Folder</button>
+                    </div>
+                    
+                    <div class="form-group-with-button">
+                        <div class="form-group-wrapper">
+                            <label for="track">Track Number</label>
+                            <input type="text" id="track" placeholder="Enter track number" data-field="track">
+                        </div>
+                        <button type="button" class="apply-to-folder-btn" data-field="track" onclick="applyFieldToFolder('track')">Apply to Folder</button>
+                    </div>
+                    
+                    <div class="form-group-with-button">
+                        <div class="form-group-wrapper">
+                            <label for="disc">CD Number</label>
+                            <input type="text" id="disc" placeholder="Enter CD number" data-field="disc">
+                        </div>
+                        <button type="button" class="apply-to-folder-btn" data-field="disc" onclick="applyFieldToFolder('disc')">Apply to Folder</button>
+                    </div>
+                    
+                    <div class="buttons">
+                        <button type="button" class="save-btn" onclick="save()">Save</button>
+                        <button type="button" class="clear-btn" onclick="resetForm()">Reset</button>
+                    </div>
+                </form>
+                
+                <div id="status" class="status"></div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let currentFile = null;
+        let currentPath = '';
+        let selectedListItem = null;
+        let selectedTreeItem = null;
+        let originalFilename = '';
+        let currentAlbumArt = null;
+        let pendingAlbumArt = null;
+        let shouldRemoveArt = false;
+        let treeData = {};  // Store tree data for re-sorting
+        let expandedFolders = new Set();  // Track which folders are expanded
+        let currentSort = { method: 'name', direction: 'asc' };
+        let focusedPane = 'folders'; // Track which pane has focus (default to folders)
+        let loadFileDebounceTimer = null; // Debounce timer for auto-loading files
+        let originalMetadata = {}; // Store original metadata values
+        
+        // Pane resize functionality
+        let isResizing = false;
+        let currentDivider = null;
+        let startX = 0;
+        let startWidths = {};
+        let savedPaneSizes = { folders: 25, files: 35 }; // Default sizes
+        
+        function initializePaneResize() {
+            const container = document.querySelector('.container');
+            const folders = document.querySelector('.folders');
+            const files = document.querySelector('.files');
+            const metadata = document.querySelector('.metadata');
+            const divider1 = document.getElementById('divider1');
+            const divider2 = document.getElementById('divider2');
+            
+            // Apply saved or default sizes
+            folders.style.flex = `0 0 ${savedPaneSizes.folders}%`;
+            files.style.flex = `0 0 ${savedPaneSizes.files}%`;
+            metadata.style.flex = `1`;
+            
+            // Add mouse event handlers for dividers
+            divider1.addEventListener('mousedown', (e) => startResize(e, 'divider1'));
+            divider2.addEventListener('mousedown', (e) => startResize(e, 'divider2'));
+            
+            function startResize(e, dividerId) {
+                isResizing = true;
+                currentDivider = dividerId;
+                startX = e.clientX;
+                
+                // Get current widths
+                const containerWidth = container.offsetWidth;
+                startWidths.folders = (folders.offsetWidth / containerWidth) * 100;
+                startWidths.files = (files.offsetWidth / containerWidth) * 100;
+                startWidths.metadata = (metadata.offsetWidth / containerWidth) * 100;
+                
+                // Add dragging class for visual feedback
+                document.getElementById(dividerId).classList.add('dragging');
+                
+                // Prevent text selection while dragging
+                document.body.style.userSelect = 'none';
+                document.body.style.cursor = 'col-resize';
+                
+                // Add global mouse event handlers
+                document.addEventListener('mousemove', handleResize);
+                document.addEventListener('mouseup', stopResize);
+            }
+            
+            function handleResize(e) {
+                if (!isResizing) return;
+                
+                const containerWidth = container.offsetWidth;
+                const deltaX = e.clientX - startX;
+                const deltaPercent = (deltaX / containerWidth) * 100;
+                
+                if (currentDivider === 'divider1') {
+                    // Resizing between folders and files
+                    const newFoldersWidth = Math.max(15, Math.min(40, startWidths.folders + deltaPercent));
+                    const newFilesWidth = Math.max(20, Math.min(50, startWidths.files - deltaPercent));
+                    
+                    folders.style.flex = `0 0 ${newFoldersWidth}%`;
+                    files.style.flex = `0 0 ${newFilesWidth}%`;
+                } else if (currentDivider === 'divider2') {
+                    // Resizing between files and metadata
+                    const newFilesWidth = Math.max(20, Math.min(50, startWidths.files + deltaPercent));
+                    const remainingWidth = 100 - startWidths.folders - newFilesWidth;
+                    
+                    if (remainingWidth >= 30) {  // Ensure metadata has at least 30%
+                        files.style.flex = `0 0 ${newFilesWidth}%`;
+                    }
+                }
+            }
+            
+            function stopResize() {
+                if (!isResizing) return;
+                
+                isResizing = false;
+                
+                // Remove dragging class
+                if (currentDivider) {
+                    document.getElementById(currentDivider).classList.remove('dragging');
+                }
+                
+                // Restore cursor and text selection
+                document.body.style.userSelect = '';
+                document.body.style.cursor = '';
+                
+                // Save pane sizes to memory
+                const containerWidth = container.offsetWidth;
+                savedPaneSizes.folders = (folders.offsetWidth / containerWidth) * 100;
+                savedPaneSizes.files = (files.offsetWidth / containerWidth) * 100;
+                
+                // Remove global event handlers
+                document.removeEventListener('mousemove', handleResize);
+                document.removeEventListener('mouseup', stopResize);
+                
+                currentDivider = null;
+            }
+        }
+        
+        // Setup metadata field input listeners
+        function setupMetadataFieldListeners() {
+            const fields = ['title', 'artist', 'album', 'albumartist', 'date', 'genre', 'track', 'disc'];
+            
+            fields.forEach(field => {
+                const input = document.getElementById(field);
+                const button = document.querySelector(`.apply-to-folder-btn[data-field="${field}"]`);
+                
+                input.addEventListener('input', () => {
+                    const hasValue = input.value.trim().length > 0;
+                    const hasChanged = input.value !== (originalMetadata[field] || '');
+                    
+                    if (hasValue && hasChanged) {
+                        button.classList.add('visible');
+                    } else {
+                        button.classList.remove('visible');
+                    }
+                });
+                
+                // Also check on focus in case value was set programmatically
+                input.addEventListener('focus', () => {
+                    const hasValue = input.value.trim().length > 0;
+                    const hasChanged = input.value !== (originalMetadata[field] || '');
+                    
+                    if (hasValue && hasChanged) {
+                        button.classList.add('visible');
+                    }
+                });
+            });
+        }
+        
+        // Apply a metadata field to all files in the folder
+        function applyFieldToFolder(field) {
+            if (!currentFile) return;
+            
+            const value = document.getElementById(field).value.trim();
+            if (!value) return;
+            
+            // Get folder path from current file
+            const folderPath = currentFile.substring(0, currentFile.lastIndexOf('/'));
+            const fieldLabel = document.querySelector(`label[for="${field}"]`).textContent;
+            
+            // Confirm action
+            if (!confirm(`Apply "${fieldLabel}" value "${value}" to all files in the folder "${folderPath || 'root'}"?`)) {
+                return;
+            }
+            
+            // Disable buttons while processing
+            const button = document.querySelector(`.apply-to-folder-btn[data-field="${field}"]`);
+            button.disabled = true;
+            setFormEnabled(false);
+            showStatus(`Applying ${fieldLabel} to all files in folder...`, 'success');
+            
+            // Send request to new endpoint
+            fetch('/apply-field-to-folder', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    folderPath: folderPath,
+                    field: field,
+                    value: value
+                })
+            })
+            .then(r => r.json())
+            .then(result => {
+                if (result.status === 'success') {
+                    showStatus(`${fieldLabel} applied to ${result.filesUpdated} files successfully!`, 'success');
+                    
+                    // Update original value for this field since it's now saved
+                    originalMetadata[field] = value;
+                    
+                    // Hide the button since the value is now the "original"
+                    button.classList.remove('visible');
+                } else {
+                    showStatus(result.error || `Error applying ${fieldLabel} to folder`, 'error');
+                }
+                button.disabled = false;
+                setFormEnabled(true);
+            })
+            .catch(err => {
+                console.error(`Error applying ${fieldLabel} to folder:`, err);
+                showStatus(`Error applying ${fieldLabel} to folder`, 'error');
+                button.disabled = false;
+                setFormEnabled(true);
+            });
+        }
+        
+        // Load folder tree on page load
+        window.addEventListener('DOMContentLoaded', () => {
+            loadTree();
+            updateSortUI();
+            setupKeyboardNavigation();
+            setupMetadataFieldListeners();
+            initializePaneResize();
+        });
+        
+        function setupKeyboardNavigation() {
+            // Add click handlers to track focused pane
+            document.querySelector('.folders').addEventListener('click', (e) => {
+                focusedPane = 'folders';
+                updatePaneFocus();
+                // Remove keyboard focus indicators on mouse click
+                document.querySelectorAll('.keyboard-focus').forEach(el => {
+                    el.classList.remove('keyboard-focus');
+                });
+            });
+            
+            document.querySelector('.files').addEventListener('click', (e) => {
+                focusedPane = 'files';
+                updatePaneFocus();
+                // Remove keyboard focus indicators on mouse click
+                document.querySelectorAll('.keyboard-focus').forEach(el => {
+                    el.classList.remove('keyboard-focus');
+                });
+                // Clear any pending file load
+                if (loadFileDebounceTimer) {
+                    clearTimeout(loadFileDebounceTimer);
+                }
+            });
+            
+            // Initial focus indicator
+            updatePaneFocus();
+            
+            // Global keyboard event handler
+            document.addEventListener('keydown', (e) => {
+                // Ignore if user is typing in an input field
+                if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+                    return;
+                }
+                
+                if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    navigateWithArrows(e.key === 'ArrowUp' ? 'up' : 'down');
+                } else if (e.key === 'Enter') {
+                    e.preventDefault();
+                    activateCurrentItem();
+                } else if (e.key === 'Tab') {
+                    e.preventDefault();
+                    // Switch between folders and files panes
+                    focusedPane = focusedPane === 'folders' ? 'files' : 'folders';
+                    updatePaneFocus();
+                }
+            });
+        }
+        
+        function updatePaneFocus() {
+            // Visual focus indicator is now handled by CSS :focus-within
+        }
+        
+        function navigateWithArrows(direction) {
+            if (focusedPane === 'folders') {
+                navigateFolders(direction);
+            } else if (focusedPane === 'files') {
+                navigateFiles(direction);
+            }
+        }
+        
+        function navigateFolders(direction) {
+            const visibleFolders = getVisibleFolders();
+            if (visibleFolders.length === 0) return;
+            
+            let currentIndex = -1;
+            if (selectedTreeItem) {
+                currentIndex = visibleFolders.findIndex(item => item === selectedTreeItem);
+            }
+            
+            let newIndex;
+            if (currentIndex === -1) {
+                // No selection, select first or last depending on direction
+                newIndex = direction === 'up' ? visibleFolders.length - 1 : 0;
+            } else if (direction === 'up') {
+                newIndex = currentIndex > 0 ? currentIndex - 1 : 0;
+            } else {
+                newIndex = currentIndex < visibleFolders.length - 1 ? currentIndex + 1 : visibleFolders.length - 1;
+            }
+            
+            if (visibleFolders[newIndex]) {
+                selectTreeItem(visibleFolders[newIndex], true);
+                visibleFolders[newIndex].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            }
+        }
+        
+        function navigateFiles(direction) {
+            const fileItems = Array.from(document.querySelectorAll('#file-list li'));
+            if (fileItems.length === 0) return;
+            
+            let currentIndex = -1;
+            if (selectedListItem) {
+                currentIndex = fileItems.findIndex(item => item === selectedListItem);
+            }
+            
+            let newIndex;
+            if (currentIndex === -1) {
+                // No selection, select first or last depending on direction
+                newIndex = direction === 'up' ? fileItems.length - 1 : 0;
+            } else if (direction === 'up') {
+                newIndex = currentIndex > 0 ? currentIndex - 1 : 0;
+            } else {
+                newIndex = currentIndex < fileItems.length - 1 ? currentIndex + 1 : fileItems.length - 1;
+            }
+            
+            if (fileItems[newIndex]) {
+                selectFileItem(fileItems[newIndex], true);
+                fileItems[newIndex].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            }
+        }
+        
+        function getVisibleFolders() {
+            const folders = [];
+            
+            function collectVisible(container) {
+                const items = container.children;
+                for (let item of items) {
+                    if (item.classList.contains('tree-item')) {
+                        folders.push(item);
+                        const children = item.querySelector('.tree-children');
+                        if (children && children.classList.contains('expanded')) {
+                            collectVisible(children);
+                        }
+                    }
+                }
+            }
+            
+            collectVisible(document.getElementById('folder-tree'));
+            return folders;
+        }
+        
+        function selectTreeItem(item, isKeyboard = false) {
+            if (selectedTreeItem) {
+                selectedTreeItem.classList.remove('selected');
+                selectedTreeItem.classList.remove('keyboard-focus');
+            }
+            item.classList.add('selected');
+            if (isKeyboard) {
+                item.classList.add('keyboard-focus');
+            }
+            selectedTreeItem = item;
+            focusedPane = 'folders';
+            updatePaneFocus();
+        }
+        
+        function selectFileItem(item, isKeyboard = false) {
+            if (selectedListItem) {
+                selectedListItem.classList.remove('selected');
+                selectedListItem.classList.remove('keyboard-focus');
+            }
+            item.classList.add('selected');
+            if (isKeyboard) {
+                item.classList.add('keyboard-focus');
+                
+                // Clear any pending file load
+                if (loadFileDebounceTimer) {
+                    clearTimeout(loadFileDebounceTimer);
+                }
+                
+                // Automatically load file metadata when navigating with keyboard (with small debounce)
+                const filepath = item.dataset.filepath;
+                if (filepath) {
+                    loadFileDebounceTimer = setTimeout(() => {
+                        loadFile(filepath, item);
+                    }, 150); // 150ms debounce
+                }
+            }
+            selectedListItem = item;
+            focusedPane = 'files';
+            updatePaneFocus();
+        }
+        
+        function activateCurrentItem() {
+            if (focusedPane === 'folders' && selectedTreeItem) {
+                // Simulate click on the folder content to expand/collapse
+                const content = selectedTreeItem.querySelector('.tree-item-content');
+                if (content) {
+                    content.click();
+                }
+            } else if (focusedPane === 'files' && selectedListItem) {
+                // For files, Enter reloads the metadata (useful if there was an error)
+                const filepath = selectedListItem.dataset.filepath;
+                if (filepath) {
+                    loadFile(filepath, selectedListItem);
+                }
+            }
+        }
+        
+        function updateSortUI() {
+            // Reset all sort options
+            document.querySelectorAll('.sort-option').forEach(opt => {
+                opt.classList.remove('active');
+                opt.querySelectorAll('.sort-arrow').forEach(arrow => {
+                    arrow.classList.remove('active');
+                });
+            });
+            
+            // Set active sort option
+            const activeOption = document.getElementById(`sort-${currentSort.method}`);
+            activeOption.classList.add('active');
+            activeOption.querySelector(`.sort-arrow[data-dir="${currentSort.direction}"]`).classList.add('active');
+        }
+        
+        function setSortMethod(method) {
+            if (currentSort.method === method) {
+                // Toggle direction if same method
+                currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+            } else {
+                // New method, default to ascending
+                currentSort.method = method;
+                currentSort.direction = 'asc';
+            }
+            
+            updateSortUI();
+            rebuildTree();
+        }
+        
+        function sortItems(items) {
+            return items.sort((a, b) => {
+                let comparison = 0;
+                
+                if (currentSort.method === 'name') {
+                    comparison = a.name.toLowerCase().localeCompare(b.name.toLowerCase());
+                } else if (currentSort.method === 'date') {
+                    comparison = (a.created || 0) - (b.created || 0);
+                }
+                
+                return currentSort.direction === 'asc' ? comparison : -comparison;
+            });
+        }
+        
+        function loadTree() {
+            fetch('/tree/')
+                .then(r => r.json())
+                .then(data => {
+                    treeData[''] = data.items;  // Store root items
+                    buildTreeFromData();
+                })
+                .catch(err => {
+                    console.error('Error loading tree:', err);
+                    showStatus('Error loading folders', 'error');
+                });
+        }
+        
+        function buildTreeFromData() {
+            const tree = document.getElementById('folder-tree');
+            tree.innerHTML = '';
+            
+            const sortedItems = sortItems(treeData[''] || []);
+            
+            sortedItems.forEach(item => {
+                if (item.type === 'folder') {
+                    tree.appendChild(createTreeItem(item, 0));
+                }
+            });
+        }
+        
+        function rebuildTree() {
+            // Rebuild the tree with current data and sorting
+            buildTreeFromData();
+            
+            // Re-expand only folders that are in the expandedFolders set
+            expandedFolders.forEach(path => {
+                const element = document.querySelector(`[data-path="${path}"]`);
+                if (element && treeData[path]) {
+                    const children = element.querySelector('.tree-children');
+                    if (children && treeData[path].length > 0) {
+                        rebuildChildren(path, children, getLevel(path) + 1);
+                        children.classList.add('expanded');
+                    }
+                }
+            });
+            
+            // Restore selection
+            if (selectedTreeItem) {
+                const path = selectedTreeItem.dataset.path;
+                const newSelected = document.querySelector(`[data-path="${path}"]`);
+                if (newSelected) {
+                    newSelected.classList.add('selected');
+                    selectedTreeItem = newSelected;
+                }
+            }
+        }
+        
+        function getLevel(path) {
+            return path ? path.split('/').length - 1 : 0;
+        }
+        
+        function rebuildChildren(path, container, level) {
+            container.innerHTML = '';
+            const sortedItems = sortItems(treeData[path] || []);
+            
+            sortedItems.forEach(item => {
+                if (item.type === 'folder') {
+                    container.appendChild(createTreeItem(item, level));
+                }
+            });
+        }
+        
+        function createTreeItem(item, level) {
+            const div = document.createElement('div');
+            div.className = 'tree-item';
+            div.dataset.path = item.path;
+            
+            const content = document.createElement('div');
+            content.className = 'tree-item-content';
+            content.style.paddingLeft = `${level * 1.5 + 1.25}rem`;
+            
+            const icon = document.createElement('span');
+            icon.className = 'tree-icon';
+            icon.innerHTML = expandedFolders.has(item.path) ? '📂' : '📁';
+            
+            const name = document.createElement('span');
+            name.textContent = item.name;
+            
+            content.appendChild(icon);
+            content.appendChild(name);
+            
+            const children = document.createElement('div');
+            children.className = 'tree-children';
+            
+            div.appendChild(content);
+            div.appendChild(children);
+            
+            // Click handler for folder
+            content.onclick = (e) => {
+                e.stopPropagation();
+                
+                // Update selection
+                selectTreeItem(div);
+                
+                // Toggle expansion
+                const isExpanded = children.classList.contains('expanded');
+                
+                if (!isExpanded) {
+                    // Expanding
+                    if (children.children.length === 0) {
+                        // Load children if not loaded
+                        loadTreeChildren(item.path, children, level + 1);
+                    }
+                    children.classList.add('expanded');
+                    expandedFolders.add(item.path);
+                    icon.innerHTML = '📂';
+                } else {
+                    // Collapsing
+                    children.classList.remove('expanded');
+                    expandedFolders.delete(item.path);
+                    icon.innerHTML = '📁';
+                }
+                
+                // Load files in this folder
+                loadFiles(item.path);
+            };
+            
+            // Check if we have cached children for this item and it should be expanded
+            if (treeData[item.path] && treeData[item.path].length > 0 && expandedFolders.has(item.path)) {
+                // If we have cached data and it should be expanded, populate children immediately
+                const sortedItems = sortItems(treeData[item.path]);
+                sortedItems.forEach(child => {
+                    if (child.type === 'folder') {
+                        children.appendChild(createTreeItem(child, level + 1));
+                    }
+                });
+                children.classList.add('expanded');
+                icon.innerHTML = '📂';
+            }
+            
+            return div;
+        }
+        
+        function loadTreeChildren(path, container, level) {
+            fetch(`/tree/${encodeURIComponent(path)}`)
+                .then(r => r.json())
+                .then(data => {
+                    treeData[path] = data.items;  // Store children data
+                    
+                    const sortedItems = sortItems(data.items);
+                    
+                    sortedItems.forEach(item => {
+                        if (item.type === 'folder') {
+                            container.appendChild(createTreeItem(item, level));
+                        }
+                    });
+                })
+                .catch(err => {
+                    console.error('Error loading tree children:', err);
+                });
+        }
+        
+        function loadFiles(folderPath) {
+            currentPath = folderPath;
+            document.getElementById('file-count').textContent = '(loading...)';
+            
+            fetch(`/files/${encodeURIComponent(folderPath)}`)
+                .then(r => r.json())
+                .then(data => {
+                    const list = document.getElementById('file-list');
+                    list.innerHTML = '';
+                    
+                    document.getElementById('file-count').textContent = `(${data.files.length})`;
+                    
+                    if (data.files.length === 0) {
+                        const li = document.createElement('li');
+                        li.textContent = 'No audio files found';
+                        li.style.color = '#999';
+                        li.style.cursor = 'default';
+                        list.appendChild(li);
+                        return;
+                    }
+                    
+                    data.files.forEach(file => {
+                        const li = document.createElement('li');
+                        li.dataset.filepath = file.path; // Store file path in dataset
+                        
+                        const nameDiv = document.createElement('div');
+                        nameDiv.innerHTML = `🎵 ${file.name}`;
+                        
+                        if (file.folder !== '.') {
+                            const folderDiv = document.createElement('div');
+                            folderDiv.className = 'file-folder';
+                            folderDiv.textContent = file.folder;
+                            li.appendChild(nameDiv);
+                            li.appendChild(folderDiv);
+                        } else {
+                            li.appendChild(nameDiv);
+                        }
+                        
+                        li.onclick = () => loadFile(file.path, li);
+                        list.appendChild(li);
+                    });
+                })
+                .catch(err => {
+                    console.error('Error loading files:', err);
+                    showStatus('Error loading files', 'error');
+                    document.getElementById('file-count').textContent = '(error)';
+                });
+        }
+        
+        function loadFile(filepath, listItem) {
+            // Clear any pending debounced loads
+            if (loadFileDebounceTimer) {
+                clearTimeout(loadFileDebounceTimer);
+                loadFileDebounceTimer = null;
+            }
+            
+            // Update UI selection
+            selectFileItem(listItem);
+            
+            currentFile = filepath;
+            originalFilename = filepath.split('/').pop();
+            document.getElementById('current-filename').textContent = originalFilename;
+            document.getElementById('no-file-message').style.display = 'none';
+            document.getElementById('metadata-section').style.display = 'block';
+            
+            // Reset filename edit
+            cancelFilenameEdit();
+            
+            // Clear previous status
+            hideStatus();
+            
+            // Hide all apply-to-folder buttons
+            document.querySelectorAll('.apply-to-folder-btn').forEach(btn => {
+                btn.classList.remove('visible');
+            });
+            
+            // Show loading status for keyboard navigation
+            if (listItem.classList.contains('keyboard-focus')) {
+                showStatus('Loading metadata...', 'success');
+            }
+            
+            // Reset album art state
+            currentAlbumArt = null;
+            pendingAlbumArt = null;
+            shouldRemoveArt = false;
+            
+            // Disable form while loading
+            setFormEnabled(false);
+            
+            fetch(`/metadata/${encodeURIComponent(filepath)}`)
+                .then(r => {
+                    if (!r.ok) throw new Error('Failed to load metadata');
+                    return r.json();
+                })
+                .then(data => {
+                    // Store original metadata values
+                    originalMetadata = {
+                        title: data.title || '',
+                        artist: data.artist || '',
+                        album: data.album || '',
+                        albumartist: data.albumartist || '',
+                        date: data.date || '',
+                        genre: data.genre || '',
+                        track: data.track || '',
+                        disc: data.disc || ''
+                    };
+                    
+                    // Set form values
+                    document.getElementById('title').value = originalMetadata.title;
+                    document.getElementById('artist').value = originalMetadata.artist;
+                    document.getElementById('album').value = originalMetadata.album;
+                    document.getElementById('albumartist').value = originalMetadata.albumartist;
+                    document.getElementById('date').value = originalMetadata.date;
+                    document.getElementById('genre').value = originalMetadata.genre;
+                    document.getElementById('track').value = originalMetadata.track;
+                    document.getElementById('disc').value = originalMetadata.disc;
+                    
+                    // Handle album art
+                    const artDisplay = document.getElementById('art-display');
+                    const deleteBtn = document.querySelector('.delete-art-btn');
+                    const saveImageBtn = document.querySelector('.save-image-btn');
+                    const applyFolderBtn = document.querySelector('.apply-folder-btn');
+                    
+                    if (data.hasArt && data.art) {
+                        currentAlbumArt = data.art;
+                        artDisplay.innerHTML = `<img src="data:image/jpeg;base64,${data.art}" class="album-art">`;
+                        deleteBtn.style.display = 'block';
+                        saveImageBtn.style.display = 'none';
+                        applyFolderBtn.style.display = 'none';
+                    } else {
+                        artDisplay.innerHTML = '<div class="album-art-placeholder">No album art</div>';
+                        deleteBtn.style.display = 'none';
+                        saveImageBtn.style.display = 'none';
+                        applyFolderBtn.style.display = 'none';
+                    }
+                    
+                    setFormEnabled(true);
+                    
+                    // Clear loading status if shown
+                    if (listItem.classList.contains('keyboard-focus')) {
+                        hideStatus();
+                    }
+                })
+                .catch(err => {
+                    console.error('Error loading metadata:', err);
+                    showStatus('Error loading metadata', 'error');
+                    setFormEnabled(true);
+                });
+        }
+        
+        // Filename editing functions
+        document.getElementById('current-filename').onclick = function() {
+            if (!currentFile) return;
+            
+            document.getElementById('current-filename').style.display = 'none';
+            document.querySelector('.filename-edit').style.display = 'flex';
+            document.getElementById('filename-input').value = originalFilename;
+            document.getElementById('filename-input').focus();
+        };
+        
+        function cancelFilenameEdit() {
+            document.getElementById('current-filename').style.display = 'inline';
+            document.querySelector('.filename-edit').style.display = 'none';
+        }
+        
+        function resetFilename() {
+            document.getElementById('filename-input').value = originalFilename;
+        }
+        
+        function saveFilename() {
+            const newName = document.getElementById('filename-input').value.trim();
+            if (!newName || newName === originalFilename) {
+                cancelFilenameEdit();
+                return;
+            }
+            
+            setFormEnabled(false);
+            showStatus('Renaming file...', 'success');
+            
+            fetch('/rename', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    oldPath: currentFile,
+                    newName: newName
+                })
+            })
+            .then(r => r.json())
+            .then(result => {
+                if (result.status === 'success') {
+                    currentFile = result.newPath;
+                    originalFilename = newName;
+                    document.getElementById('current-filename').textContent = newName;
+                    cancelFilenameEdit();
+                    showStatus('File renamed successfully!', 'success');
+                    
+                    // Update file list
+                    loadFiles(currentPath);
+                } else {
+                    showStatus(result.error || 'Error renaming file', 'error');
+                }
+                setFormEnabled(true);
+            })
+            .catch(err => {
+                console.error('Error renaming file:', err);
+                showStatus('Error renaming file', 'error');
+                setFormEnabled(true);
+            });
+        }
+        
+        // Album art functions
+        function handleArtUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                pendingAlbumArt = e.target.result;
+                shouldRemoveArt = false;
+                
+                // Display preview
+                const artDisplay = document.getElementById('art-display');
+                artDisplay.innerHTML = `<img src="${pendingAlbumArt}" class="album-art">`;
+                document.querySelector('.delete-art-btn').style.display = 'block';
+                document.querySelector('.save-image-btn').style.display = 'block';
+                document.querySelector('.apply-folder-btn').style.display = 'block';
+                
+                showStatus('Image loaded. Click "Save Image" to save only the image, or "Save" to save all changes.', 'success');
+            };
+            reader.readAsDataURL(file);
+            
+            // Clear file input
+            event.target.value = '';
+        }
+        
+        function deleteAlbumArt() {
+            shouldRemoveArt = true;
+            pendingAlbumArt = null;
+            
+            // Update display
+            const artDisplay = document.getElementById('art-display');
+            artDisplay.innerHTML = '<div class="album-art-placeholder">No album art</div>';
+            document.querySelector('.delete-art-btn').style.display = 'none';
+            document.querySelector('.save-image-btn').style.display = 'none';
+            document.querySelector('.apply-folder-btn').style.display = 'none';
+            
+            showStatus('Album art marked for deletion. Click Save to apply changes.', 'success');
+        }
+        
+        function saveAlbumArt() {
+            if (!currentFile || !pendingAlbumArt) return;
+            
+            // Disable buttons while saving
+            document.querySelector('.save-image-btn').disabled = true;
+            showStatus('Saving album art...', 'success');
+            
+            // Create minimal data object with only art
+            const data = { art: pendingAlbumArt };
+            
+            fetch(`/metadata/${encodeURIComponent(currentFile)}`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            })
+            .then(r => r.json())
+            .then(result => {
+                if (result.status === 'success') {
+                    showStatus('Album art saved successfully!', 'success');
+                    
+                    // Update current state
+                    currentAlbumArt = pendingAlbumArt;
+                    pendingAlbumArt = null;
+                    
+                    // Hide save image button since it's been saved
+                    document.querySelector('.save-image-btn').style.display = 'none';
+                    document.querySelector('.apply-folder-btn').style.display = 'none';
+                    document.querySelector('.save-image-btn').disabled = false;
+                } else {
+                    showStatus('Error saving album art', 'error');
+                    document.querySelector('.save-image-btn').disabled = false;
+                }
+            })
+            .catch(err => {
+                console.error('Error saving album art:', err);
+                showStatus('Error saving album art', 'error');
+                document.querySelector('.save-image-btn').disabled = false;
+            });
+        }
+        
+        function applyArtToFolder() {
+            if (!currentFile || (!pendingAlbumArt && !currentAlbumArt)) return;
+            
+            const artToApply = pendingAlbumArt || (currentAlbumArt ? `data:image/jpeg;base64,${currentAlbumArt}` : null);
+            if (!artToApply) {
+                showStatus('No album art to apply', 'error');
+                return;
+            }
+            
+            // Get folder path from current file
+            const folderPath = currentFile.substring(0, currentFile.lastIndexOf('/'));
+            
+            // Confirm action
+            if (!confirm(`Apply this album art to all files in the folder "${folderPath || 'root'}"? This will replace any existing album art.`)) {
+                return;
+            }
+            
+            // Disable buttons while processing
+            document.querySelector('.apply-folder-btn').disabled = true;
+            setFormEnabled(false);
+            showStatus('Applying album art to all files in folder...', 'success');
+            
+            // Send request to new endpoint
+            fetch('/apply-art-to-folder', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    folderPath: folderPath,
+                    art: artToApply
+                })
+            })
+            .then(r => r.json())
+            .then(result => {
+                if (result.status === 'success') {
+                    showStatus(`Album art applied to ${result.filesUpdated} files successfully!`, 'success');
+                    
+                    // If we applied pending art to current file too, update state
+                    if (pendingAlbumArt) {
+                        currentAlbumArt = pendingAlbumArt;
+                        pendingAlbumArt = null;
+                        document.querySelector('.save-image-btn').style.display = 'none';
+                        document.querySelector('.apply-folder-btn').style.display = 'none';
+                    }
+                } else {
+                    showStatus(result.error || 'Error applying album art to folder', 'error');
+                }
+                document.querySelector('.apply-folder-btn').disabled = false;
+                setFormEnabled(true);
+            })
+            .catch(err => {
+                console.error('Error applying album art to folder:', err);
+                showStatus('Error applying album art to folder', 'error');
+                document.querySelector('.apply-folder-btn').disabled = false;
+                setFormEnabled(true);
+            });
+        }
+        
+        function save() {
+            if (!currentFile) return;
+            
+            const data = {
+                title: document.getElementById('title').value,
+                artist: document.getElementById('artist').value,
+                album: document.getElementById('album').value,
+                albumartist: document.getElementById('albumartist').value,
+                date: document.getElementById('date').value,
+                genre: document.getElementById('genre').value,
+                track: document.getElementById('track').value,
+                disc: document.getElementById('disc').value
+            };
+            
+            // Handle album art changes
+            if (pendingAlbumArt) {
+                data.art = pendingAlbumArt;
+            } else if (shouldRemoveArt) {
+                data.removeArt = true;
+            }
+            
+            // Disable form while saving
+            setFormEnabled(false);
+            showStatus('Saving metadata...', 'success');
+            
+            fetch(`/metadata/${encodeURIComponent(currentFile)}`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            })
+            .then(r => r.json())
+            .then(result => {
+                if (result.status === 'success') {
+                    showStatus('Metadata saved successfully!', 'success');
+                    
+                    // Update original metadata values
+                    Object.keys(data).forEach(key => {
+                        if (key !== 'art' && key !== 'removeArt') {
+                            originalMetadata[key] = data[key];
+                        }
+                    });
+                    
+                    // Hide all apply-to-folder buttons since values are now "original"
+                    document.querySelectorAll('.apply-to-folder-btn').forEach(btn => {
+                        btn.classList.remove('visible');
+                    });
+                    
+                    // Update current state
+                    if (pendingAlbumArt) {
+                        currentAlbumArt = pendingAlbumArt;
+                        document.querySelector('.save-image-btn').style.display = 'none';
+                        document.querySelector('.apply-folder-btn').style.display = 'none';
+                    } else if (shouldRemoveArt) {
+                        currentAlbumArt = null;
+                    }
+                    pendingAlbumArt = null;
+                    shouldRemoveArt = false;
+                } else {
+                    showStatus('Error saving metadata', 'error');
+                }
+                setFormEnabled(true);
+            })
+            .catch(err => {
+                console.error('Error saving metadata:', err);
+                showStatus('Error saving metadata', 'error');
+                setFormEnabled(true);
+            });
+        }
+        
+        function resetForm() {
+            if (!currentFile) return;
+            
+            // Reload metadata from file
+            fetch(`/metadata/${encodeURIComponent(currentFile)}`)
+                .then(r => {
+                    if (!r.ok) throw new Error('Failed to load metadata');
+                    return r.json();
+                })
+                .then(data => {
+                    // Update original metadata values
+                    originalMetadata = {
+                        title: data.title || '',
+                        artist: data.artist || '',
+                        album: data.album || '',
+                        albumartist: data.albumartist || '',
+                        date: data.date || '',
+                        genre: data.genre || '',
+                        track: data.track || '',
+                        disc: data.disc || ''
+                    };
+                    
+                    // Set form values
+                    document.getElementById('title').value = originalMetadata.title;
+                    document.getElementById('artist').value = originalMetadata.artist;
+                    document.getElementById('album').value = originalMetadata.album;
+                    document.getElementById('albumartist').value = originalMetadata.albumartist;
+                    document.getElementById('date').value = originalMetadata.date;
+                    document.getElementById('genre').value = originalMetadata.genre;
+                    document.getElementById('track').value = originalMetadata.track;
+                    document.getElementById('disc').value = originalMetadata.disc;
+                    
+                    // Hide all apply-to-folder buttons
+                    document.querySelectorAll('.apply-to-folder-btn').forEach(btn => {
+                        btn.classList.remove('visible');
+                    });
+                    
+                    // Reset album art
+                    pendingAlbumArt = null;
+                    shouldRemoveArt = false;
+                    
+                    const artDisplay = document.getElementById('art-display');
+                    const deleteBtn = document.querySelector('.delete-art-btn');
+                    const saveImageBtn = document.querySelector('.save-image-btn');
+                    const applyFolderBtn = document.querySelector('.apply-folder-btn');
+                    
+                    if (data.hasArt && data.art) {
+                        currentAlbumArt = data.art;
+                        artDisplay.innerHTML = `<img src="data:image/jpeg;base64,${data.art}" class="album-art">`;
+                        deleteBtn.style.display = 'block';
+                        saveImageBtn.style.display = 'none';
+                        applyFolderBtn.style.display = 'none';
+                    } else {
+                        currentAlbumArt = null;
+                        artDisplay.innerHTML = '<div class="album-art-placeholder">No album art</div>';
+                        deleteBtn.style.display = 'none';
+                        saveImageBtn.style.display = 'none';
+                        applyFolderBtn.style.display = 'none';
+                    }
+                    
+                    hideStatus();
+                    showStatus('Form reset to original values', 'success');
+                    setTimeout(hideStatus, 2000);
+                })
+                .catch(err => {
+                    console.error('Error resetting form:', err);
+                    showStatus('Error resetting form', 'error');
+                });
+        }
+        
+        function setFormEnabled(enabled) {
+            const inputs = document.querySelectorAll('#metadata-form input');
+            const buttons = document.querySelectorAll('button');
+            
+            inputs.forEach(input => input.disabled = !enabled);
+            buttons.forEach(button => button.disabled = !enabled);
+        }
+        
+        function showStatus(message, type) {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = `status ${type}`;
+            status.style.display = 'block';
+        }
+        
+        function hideStatus() {
+            const status = document.getElementById('status');
+            status.style.display = 'none';
+        }
+    </script>
+</body>
+</html>
