@@ -14,7 +14,9 @@ A modern web-based metadata editor for audio files, designed for managing large 
 - 🔄 **File renaming**: Direct file management through the web interface
 - 🌙 **Modern dark UI**: Responsive design with resizable panes
 
-## Quick Start
+## Quick Start (Recommended)
+
+The easiest way to get started is using our pre-built Docker image.
 
 ### Prerequisites
 - Docker and Docker Compose
@@ -22,16 +24,15 @@ A modern web-based metadata editor for audio files, designed for managing large 
 
 ### Installation
 
-1. Clone this repository:
+1. Download the docker-compose.yml file:
 ```bash
-git clone https://github.com/wow-signal-dev/audio-metadata-editor.git
-cd audio-metadata-editor
+wget https://raw.githubusercontent.com/wow-signal-dev/metadata-remote/main/docker-compose.yml
 ```
 
-2. Update the music directory path in `docker-compose.yml`:
-```yaml
-volumes:
-  - /your/music/path:/music  # Change this line
+2. Edit the music directory path in `docker-compose.yml`:
+```bash
+nano docker-compose.yml
+# Change the line: /path/to/your/music:/music
 ```
 
 3. Start the application:
@@ -40,6 +41,72 @@ docker-compose up -d
 ```
 
 4. Open your browser to `http://localhost:8338`
+
+That's it! The container will automatically download and run the latest version.
+
+## For Portainer Users
+
+1. In Portainer, go to **Stacks** → **Add Stack**
+2. Name your stack: `metadata-remote`
+3. Paste this compose configuration:
+
+```yaml
+version: '3.8'
+
+services:
+  metadata-remote:
+    image: ghcr.io/wow-signal-dev/metadata-remote:latest
+    container_name: metadata-remote
+    ports:
+      - "8338:8338"
+    volumes:
+      - /path/to/your/music:/music  # CHANGE THIS LINE
+    environment:
+      - PUID=1000
+      - PGID=1000
+    restart: unless-stopped
+```
+
+4. Update the music volume path to your actual music directory
+5. Click **Deploy the stack**
+
+## Building from Source (For Developers)
+
+If you want to build the image locally or contribute to development:
+
+1. Clone this repository:
+```bash
+git clone https://github.com/wow-signal-dev/metadata-remote.git
+cd metadata-remote
+```
+
+2. Use the local development compose file:
+```bash
+# Copy the local compose file
+cp docker-compose.local.yml docker-compose.yml
+
+# Edit the music directory path
+nano docker-compose.yml
+```
+
+3. Build and start:
+```bash
+docker-compose up -d --build
+```
+
+## Updating
+
+### Using Pre-built Image
+```bash
+docker-compose pull
+docker-compose up -d
+```
+
+### Using Local Build
+```bash
+git pull
+docker-compose up -d --build
+```
 
 ## Usage
 
@@ -60,12 +127,39 @@ docker-compose up -d
 - FLAC library management
 - Batch metadata cleanup
 
+## Configuration
+
+### Environment Variables
+- `PUID`: User ID for file permissions (default: 1000)
+- `PGID`: Group ID for file permissions (default: 1000)
+
+### Ports
+- `8338`: Web interface (customizable in docker-compose.yml)
+
+### Volumes
+- `/music`: Your music directory (read/write access required)
+
 ## Technical Details
 
 - **Backend**: Python Flask with FFmpeg
 - **Frontend**: Vanilla JavaScript with modern CSS
 - **Audio Processing**: FFprobe for reading, FFmpeg for writing
-- **Deployment**: Docker with proper file permissions (UID 1000:1000)
+- **Deployment**: Docker with proper file permissions
+- **Container Registry**: GitHub Container Registry (ghcr.io)
+
+## Troubleshooting
+
+### Permission Issues
+If you encounter permission errors, ensure the PUID/PGID match your user:
+```bash
+id -u  # Your user ID
+id -g  # Your group ID
+```
+
+### Can't Access the Web Interface
+- Check if the container is running: `docker ps`
+- Check logs: `docker-compose logs`
+- Ensure port 8338 isn't already in use
 
 ## Contributing
 
