@@ -340,6 +340,9 @@
             color: var(--text-secondary);
             position: relative;
             overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
         }
         
         #file-list li::before {
@@ -373,11 +376,69 @@
             box-shadow: inset 0 0 0 1px var(--accent-primary);
         }
         
+        .file-info {
+            flex: 1;
+            min-width: 0;
+        }
+        
         .file-folder {
             font-size: 0.75rem;
             color: var(--text-muted);
             margin-top: 0.35rem;
             opacity: 0.7;
+        }
+        
+        /* Audio playback controls */
+        .play-button {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all var(--transition-fast);
+            flex-shrink: 0;
+            margin-left: 1rem;
+        }
+        
+        .play-button:hover {
+            background: rgba(74, 127, 255, 0.2);
+            border-color: rgba(74, 127, 255, 0.4);
+            transform: scale(1.1);
+        }
+        
+        .play-button.playing {
+            background: rgba(74, 127, 255, 0.3);
+            border-color: var(--accent-primary);
+        }
+        
+        #file-list li.selected .play-button {
+            display: flex;
+        }
+        
+        .play-icon, .pause-icon {
+            font-size: 14px;
+            color: var(--text-primary);
+        }
+        
+        .pause-icon {
+            display: none;
+        }
+        
+        .play-button.playing .play-icon {
+            display: none;
+        }
+        
+        .play-button.playing .pause-icon {
+            display: block;
+        }
+        
+        /* Hidden audio element */
+        #audio-player {
+            display: none;
         }
         
         /* Metadata Column */
@@ -1032,6 +1093,9 @@
         </div>
     </div>
     
+    <!-- Hidden audio player -->
+    <audio id="audio-player"></audio>
+    
     <script>
         let currentFile = null;
         let currentPath = '';
@@ -1047,6 +1111,21 @@
         let focusedPane = 'folders'; // Track which pane has focus (default to folders)
         let loadFileDebounceTimer = null; // Debounce timer for auto-loading files
         let originalMetadata = {}; // Store original metadata values
+        let currentlyPlayingFile = null; // Track which file is playing
+        
+        // Audio player reference
+        const audioPlayer = document.getElementById('audio-player');
+        
+        // Audio player event listeners
+        audioPlayer.addEventListener('ended', () => {
+            stopPlayback();
+        });
+        
+        audioPlayer.addEventListener('error', (e) => {
+            console.error('Audio playback error:', e);
+            stopPlayback();
+            showStatus('Error playing audio file', 'error');
+        });
         
         // Pane resize functionality
         let isResizing = false;
@@ -1231,6 +1310,44 @@
                 showStatus(`Error applying ${fieldLabel} to folder`, 'error');
                 button.disabled = false;
                 setFormEnabled(true);
+            });
+        }
+        
+        // Audio playback functions
+        function togglePlayback(filepath, button) {
+            if (currentlyPlayingFile === filepath && !audioPlayer.paused) {
+                // Currently playing this file, pause it
+                audioPlayer.pause();
+                button.classList.remove('playing');
+            } else {
+                // Stop any current playback
+                stopPlayback();
+                
+                // Start playing new file
+                currentlyPlayingFile = filepath;
+                audioPlayer.src = `/stream/${encodeURIComponent(filepath)}`;
+                audioPlayer.play()
+                    .then(() => {
+                        button.classList.add('playing');
+                    })
+                    .catch(err => {
+                        console.error('Error playing audio:', err);
+                        showStatus('Error playing audio file', 'error');
+                        stopPlayback();
+                    });
+            }
+        }
+        
+        function stopPlayback() {
+            if (!audioPlayer.paused) {
+                audioPlayer.pause();
+            }
+            audioPlayer.src = '';
+            currentlyPlayingFile = null;
+            
+            // Remove playing state from all buttons
+            document.querySelectorAll('.play-button.playing').forEach(btn => {
+                btn.classList.remove('playing');
             });
         }
         
@@ -1636,6 +1753,9 @@
             currentPath = folderPath;
             document.getElementById('file-count').textContent = '(loading...)';
             
+            // Stop any current playback when changing folders
+            stopPlayback();
+            
             fetch(`/files/${encodeURIComponent(folderPath)}`)
                 .then(r => r.json())
                 .then(data => {
@@ -1657,20 +1777,38 @@
                         const li = document.createElement('li');
                         li.dataset.filepath = file.path; // Store file path in dataset
                         
+                        const fileInfo = document.createElement('div');
+                        fileInfo.className = 'file-info';
+                        
                         const nameDiv = document.createElement('div');
                         nameDiv.innerHTML = `🎵 ${file.name}`;
+                        fileInfo.appendChild(nameDiv);
                         
                         if (file.folder !== '.') {
                             const folderDiv = document.createElement('div');
                             folderDiv.className = 'file-folder';
                             folderDiv.textContent = file.folder;
-                            li.appendChild(nameDiv);
-                            li.appendChild(folderDiv);
-                        } else {
-                            li.appendChild(nameDiv);
+                            fileInfo.appendChild(folderDiv);
                         }
                         
-                        li.onclick = () => loadFile(file.path, li);
+                        li.appendChild(fileInfo);
+                        
+                        // Add play button
+                        const playButton = document.createElement('div');
+                        playButton.className = 'play-button';
+                        playButton.innerHTML = '<span class="play-icon">▶</span><span class="pause-icon">❚❚</span>';
+                        playButton.onclick = (e) => {
+                            e.stopPropagation();
+                            togglePlayback(file.path, playButton);
+                        };
+                        li.appendChild(playButton);
+                        
+                        li.onclick = (e) => {
+                            // Don't trigger if clicking play button
+                            if (!e.target.closest('.play-button')) {
+                                loadFile(file.path, li);
+                            }
+                        };
                         list.appendChild(li);
                     });
                 })
