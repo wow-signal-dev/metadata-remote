@@ -24,7 +24,7 @@ A modern web-based metadata editor for audio files, designed for managing large 
 
 1. Clone this repository:
 ```bash
-git clone https://github.com/yourusername/audio-metadata-editor.git
+git clone https://github.com/wow-signal-dev/audio-metadata-editor.git
 cd audio-metadata-editor
 ```
 
