@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request, render_template, send_file
+from flask import Flask, jsonify, request, render_template, send_file, Response
 import subprocess
 import json
 import os
@@ -26,6 +26,77 @@ def fix_file_ownership(filepath):
         logger.info(f"Fixed ownership of {filepath} to 1000:1000")
     except Exception as e:
         logger.warning(f"Could not fix ownership of {filepath}: {e}")
+
+@app.route('/stream/<path:filepath>')
+def stream_audio(filepath):
+    """Stream audio file"""
+    try:
+        file_path = os.path.join(MUSIC_DIR, filepath)
+        
+        # Security check
+        if not os.path.abspath(file_path).startswith(os.path.abspath(MUSIC_DIR)):
+            return jsonify({'error': 'Invalid path'}), 403
+            
+        if not os.path.exists(file_path):
+            return jsonify({'error': 'File not found'}), 404
+            
+        # Get file size for range requests
+        file_size = os.path.getsize(file_path)
+        
+        # Handle range requests for seeking
+        range_header = request.headers.get('range', None)
+        if range_header:
+            # Parse range header
+            byte_start = 0
+            byte_end = file_size - 1
+            
+            if range_header:
+                match = re.search(r'bytes=(\d+)-(\d*)', range_header)
+                if match:
+                    byte_start = int(match.group(1))
+                    if match.group(2):
+                        byte_end = int(match.group(2))
+            
+            # Open file and seek to start position
+            def generate():
+                with open(file_path, 'rb') as f:
+                    f.seek(byte_start)
+                    remaining = byte_end - byte_start + 1
+                    chunk_size = 8192
+                    
+                    while remaining > 0:
+                        to_read = min(chunk_size, remaining)
+                        chunk = f.read(to_read)
+                        if not chunk:
+                            break
+                        remaining -= len(chunk)
+                        yield chunk
+            
+            # Return partial content
+            response = Response(
+                generate(),
+                status=206,
+                mimetype='audio/mpeg' if file_path.lower().endswith('.mp3') else 'audio/flac',
+                headers={
+                    'Content-Range': f'bytes {byte_start}-{byte_end}/{file_size}',
+                    'Accept-Ranges': 'bytes',
+                    'Content-Length': str(byte_end - byte_start + 1),
+                    'Content-Disposition': f'inline; filename="{os.path.basename(file_path)}"'
+                }
+            )
+            return response
+        else:
+            # Return full file
+            return send_file(
+                file_path,
+                mimetype='audio/mpeg' if file_path.lower().endswith('.mp3') else 'audio/flac',
+                as_attachment=False,
+                download_name=os.path.basename(file_path)
+            )
+            
+    except Exception as e:
+        logger.error(f"Error streaming file {filepath}: {e}")
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/tree/')
 @app.route('/tree/<path:subpath>')
@@ -780,6 +851,9 @@ def apply_field_to_folder():
 
 # Enable template auto-reloading
 app.config['TEMPLATES_AUTO_RELOAD'] = True
+
+# Add missing re import for range header parsing
+import re
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8338, debug=False)
