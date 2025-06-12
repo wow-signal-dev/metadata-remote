@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  metadata-remote:
+    build: .
+    container_name: metadata-remote-dev
+    ports:
+      - "8338:8338"
+    volumes:
+      - /path/to/your/music:/music  # Change this to your music directory
+    environment:
+      - PUID=1000
+      - PGID=1000
+    restart: unless-stopped
