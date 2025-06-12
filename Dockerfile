@@ -11,6 +11,7 @@ WORKDIR /app
 # Copy application files
 COPY app.py .
 COPY templates/ templates/
+COPY static/ static/
 
 # Install Python dependencies
 RUN pip install --no-cache-dir flask
