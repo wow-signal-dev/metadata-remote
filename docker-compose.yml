@@ -1,18 +1,15 @@
 version: '3.8'
 
 services:
-  metadata-editor:
-    build: .
-    container_name: audio-metadata-editor
+  metadata-remote:
+    image: ghcr.io/wow-signal-dev/metadata-remote:latest
+    container_name: metadata-remote
     ports:
       - "8338:8338"
     volumes:
-      - /PATH/TO/YOUR/MUSIC:/music
-      - ./app.py:/app/app.py
-      - ./templates:/app/templates
-      - ./static:/app/static
+      - /path/to/your/music:/music  # Users must change this
     environment:
-      - MUSIC_DIR=/music
       - PUID=1000
       - PGID=1000
     restart: unless-stopped
+    
