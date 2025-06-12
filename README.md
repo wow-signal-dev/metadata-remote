@@ -11,6 +11,7 @@ A modern web-based metadata editor for audio files, designed for managing large 
 - 📁 **Bulk operations**: Apply metadata to all files in a folder
 - ⌨️ **Keyboard navigation**: Arrow keys, tab switching, and shortcuts
 - 🎛️ **Three-pane interface**: Folders, files, and metadata editing
+- ▶️ **In-browser playback**: Files can be played through the web interface
 - 🔄 **File renaming**: Direct file management through the web interface
 - 🌙 **Modern dark UI**: Responsive design with resizable panes
 
@@ -115,6 +116,7 @@ docker-compose up -d --build
 - **Enter**: Expand/collapse folders or reload file metadata
 - **Tab**: Switch between folder and file panes
 - **Click filename**: Rename files directly
+- **Click 'play' icon**: Play the file
 
 ### Bulk Operations
 - **Apply to Folder**: Change any metadata field for all files in a folder
