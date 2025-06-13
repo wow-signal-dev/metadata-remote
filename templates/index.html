@@ -1097,668 +1097,582 @@
     <audio id="audio-player"></audio>
     
     <script>
-        let currentFile = null;
-        let currentPath = '';
-        let selectedListItem = null;
-        let selectedTreeItem = null;
-        let originalFilename = '';
-        let currentAlbumArt = null;
-        let pendingAlbumArt = null;
-        let shouldRemoveArt = false;
-        let treeData = {};  // Store tree data for re-sorting
-        let expandedFolders = new Set();  // Track which folders are expanded
-        let currentSort = { method: 'name', direction: 'asc' };
-        let focusedPane = 'folders'; // Track which pane has focus (default to folders)
-        let loadFileDebounceTimer = null; // Debounce timer for auto-loading files
-        let originalMetadata = {}; // Store original metadata values
-        let currentlyPlayingFile = null; // Track which file is playing
+        const AudioMetadataEditor = {
+            // Centralized state management
+            state: {
+                currentFile: null,
+                currentPath: '',
+                selectedListItem: null,
+                selectedTreeItem: null,
+                originalFilename: '',
+                currentAlbumArt: null,
+                pendingAlbumArt: null,
+                shouldRemoveArt: false,
+                treeData: {},
+                expandedFolders: new Set(),
+                currentSort: { method: 'name', direction: 'asc' },
+                focusedPane: 'folders',
+                loadFileDebounceTimer: null,
+                originalMetadata: {},
+                currentlyPlayingFile: null,
+                savedPaneSizes: { folders: 25, files: 35 },
+                isResizing: false,
+                currentDivider: null,
+                startX: 0,
+                startWidths: {}
+            },
         
-        // Audio player reference
-        const audioPlayer = document.getElementById('audio-player');
+            // Initialize the application
+            init() {
+                this.audioPlayer = document.getElementById('audio-player');
+                this.setupAudioPlayer();
+                this.loadTree();
+                this.updateSortUI();
+                this.setupKeyboardNavigation();
+                this.setupMetadataFieldListeners();
+                this.initializePaneResize();
+            },
         
-        // Audio player event listeners
-        audioPlayer.addEventListener('ended', () => {
-            stopPlayback();
-        });
+            // API helper with centralized error handling
+            async apiCall(url, options = {}) {
+                try {
+                    const response = await fetch(url, options);
+                    if (!response.ok) {
+                        const data = await response.json();
+                        throw new Error(data.error || 'Request failed');
+                    }
+                    return await response.json();
+                } catch (error) {
+                    console.error(`API error for ${url}:`, error);
+                    throw error;
+                }
+            },
         
-        audioPlayer.addEventListener('error', (e) => {
-            console.error('Audio playback error:', e);
-            stopPlayback();
-            showStatus('Error playing audio file', 'error');
-        });
+            // Audio player setup and controls
+            setupAudioPlayer() {
+                this.audioPlayer.addEventListener('ended', () => this.stopPlayback());
+                this.audioPlayer.addEventListener('error', (e) => {
+                    // Only show error if we're actually trying to play something
+                    if (this.state.currentlyPlayingFile && this.audioPlayer.src) {
+                        console.error('Audio playback error:', e);
+                        this.stopPlayback();
+                        this.showStatus('Error playing audio file', 'error');
+                    }
+                });
+            },
         
-        // Pane resize functionality
-        let isResizing = false;
-        let currentDivider = null;
-        let startX = 0;
-        let startWidths = {};
-        let savedPaneSizes = { folders: 25, files: 35 }; // Default sizes
+            togglePlayback(filepath, button) {
+                if (this.state.currentlyPlayingFile === filepath && !this.audioPlayer.paused) {
+                    this.audioPlayer.pause();
+                    button.classList.remove('playing');
+                } else {
+                    this.stopPlayback();
+                    this.state.currentlyPlayingFile = filepath;
+                    this.audioPlayer.src = `/stream/${encodeURIComponent(filepath)}`;
+                    this.audioPlayer.play()
+                        .then(() => button.classList.add('playing'))
+                        .catch(err => {
+                            console.error('Error playing audio:', err);
+                            this.showStatus('Error playing audio file', 'error');
+                            this.stopPlayback();
+                        });
+                }
+            },
         
-        function initializePaneResize() {
-            const container = document.querySelector('.container');
-            const folders = document.querySelector('.folders');
-            const files = document.querySelector('.files');
-            const metadata = document.querySelector('.metadata');
-            const divider1 = document.getElementById('divider1');
-            const divider2 = document.getElementById('divider2');
-            
-            // Apply saved or default sizes
-            folders.style.flex = `0 0 ${savedPaneSizes.folders}%`;
-            files.style.flex = `0 0 ${savedPaneSizes.files}%`;
-            metadata.style.flex = `1`;
-            
-            // Add mouse event handlers for dividers
-            divider1.addEventListener('mousedown', (e) => startResize(e, 'divider1'));
-            divider2.addEventListener('mousedown', (e) => startResize(e, 'divider2'));
-            
-            function startResize(e, dividerId) {
-                isResizing = true;
-                currentDivider = dividerId;
-                startX = e.clientX;
-                
-                // Get current widths
+            stopPlayback() {
+                if (!this.audioPlayer.paused) {
+                    this.audioPlayer.pause();
+                }
+                this.audioPlayer.src = '';
+                this.state.currentlyPlayingFile = null;
+                document.querySelectorAll('.play-button.playing').forEach(btn => {
+                    btn.classList.remove('playing');
+                });
+            },
+        
+            // Pane resize functionality
+            initializePaneResize() {
+                const container = document.querySelector('.container');
+                const folders = document.querySelector('.folders');
+                const files = document.querySelector('.files');
+                const metadata = document.querySelector('.metadata');
+                const divider1 = document.getElementById('divider1');
+                const divider2 = document.getElementById('divider2');
+        
+                // Apply saved or default sizes
+                folders.style.flex = `0 0 ${this.state.savedPaneSizes.folders}%`;
+                files.style.flex = `0 0 ${this.state.savedPaneSizes.files}%`;
+                metadata.style.flex = `1`;
+        
+                divider1.addEventListener('mousedown', (e) => this.startResize(e, 'divider1'));
+                divider2.addEventListener('mousedown', (e) => this.startResize(e, 'divider2'));
+            },
+        
+            startResize(e, dividerId) {
+                const container = document.querySelector('.container');
+                const folders = document.querySelector('.folders');
+                const files = document.querySelector('.files');
+                const metadata = document.querySelector('.metadata');
+        
+                this.state.isResizing = true;
+                this.state.currentDivider = dividerId;
+                this.state.startX = e.clientX;
+        
                 const containerWidth = container.offsetWidth;
-                startWidths.folders = (folders.offsetWidth / containerWidth) * 100;
-                startWidths.files = (files.offsetWidth / containerWidth) * 100;
-                startWidths.metadata = (metadata.offsetWidth / containerWidth) * 100;
-                
-                // Add dragging class for visual feedback
+                this.state.startWidths.folders = (folders.offsetWidth / containerWidth) * 100;
+                this.state.startWidths.files = (files.offsetWidth / containerWidth) * 100;
+                this.state.startWidths.metadata = (metadata.offsetWidth / containerWidth) * 100;
+        
                 document.getElementById(dividerId).classList.add('dragging');
-                
-                // Prevent text selection while dragging
                 document.body.style.userSelect = 'none';
                 document.body.style.cursor = 'col-resize';
-                
-                // Add global mouse event handlers
-                document.addEventListener('mousemove', handleResize);
-                document.addEventListener('mouseup', stopResize);
-            }
-            
-            function handleResize(e) {
-                if (!isResizing) return;
-                
+        
+                document.addEventListener('mousemove', this.handleResize.bind(this));
+                document.addEventListener('mouseup', this.stopResize.bind(this));
+            },
+        
+            handleResize(e) {
+                if (!this.state.isResizing) return;
+        
+                const container = document.querySelector('.container');
+                const folders = document.querySelector('.folders');
+                const files = document.querySelector('.files');
+        
                 const containerWidth = container.offsetWidth;
-                const deltaX = e.clientX - startX;
+                const deltaX = e.clientX - this.state.startX;
                 const deltaPercent = (deltaX / containerWidth) * 100;
-                
-                if (currentDivider === 'divider1') {
-                    // Resizing between folders and files
-                    const newFoldersWidth = Math.max(15, Math.min(40, startWidths.folders + deltaPercent));
-                    const newFilesWidth = Math.max(20, Math.min(50, startWidths.files - deltaPercent));
+        
+                if (this.state.currentDivider === 'divider1') {
+                    const newFoldersWidth = Math.max(15, Math.min(40, this.state.startWidths.folders + deltaPercent));
+                    const newFilesWidth = Math.max(20, Math.min(50, this.state.startWidths.files - deltaPercent));
                     
                     folders.style.flex = `0 0 ${newFoldersWidth}%`;
                     files.style.flex = `0 0 ${newFilesWidth}%`;
-                } else if (currentDivider === 'divider2') {
-                    // Resizing between files and metadata
-                    const newFilesWidth = Math.max(20, Math.min(50, startWidths.files + deltaPercent));
-                    const remainingWidth = 100 - startWidths.folders - newFilesWidth;
+                } else if (this.state.currentDivider === 'divider2') {
+                    const newFilesWidth = Math.max(20, Math.min(50, this.state.startWidths.files + deltaPercent));
+                    const remainingWidth = 100 - this.state.startWidths.folders - newFilesWidth;
                     
-                    if (remainingWidth >= 30) {  // Ensure metadata has at least 30%
+                    if (remainingWidth >= 30) {
                         files.style.flex = `0 0 ${newFilesWidth}%`;
                     }
                 }
-            }
-            
-            function stopResize() {
-                if (!isResizing) return;
-                
-                isResizing = false;
-                
-                // Remove dragging class
-                if (currentDivider) {
-                    document.getElementById(currentDivider).classList.remove('dragging');
+            },
+        
+            stopResize() {
+                if (!this.state.isResizing) return;
+        
+                this.state.isResizing = false;
+        
+                if (this.state.currentDivider) {
+                    document.getElementById(this.state.currentDivider).classList.remove('dragging');
                 }
-                
-                // Restore cursor and text selection
+        
                 document.body.style.userSelect = '';
                 document.body.style.cursor = '';
-                
-                // Save pane sizes to memory
+        
+                const container = document.querySelector('.container');
+                const folders = document.querySelector('.folders');
+                const files = document.querySelector('.files');
                 const containerWidth = container.offsetWidth;
-                savedPaneSizes.folders = (folders.offsetWidth / containerWidth) * 100;
-                savedPaneSizes.files = (files.offsetWidth / containerWidth) * 100;
-                
-                // Remove global event handlers
-                document.removeEventListener('mousemove', handleResize);
-                document.removeEventListener('mouseup', stopResize);
-                
-                currentDivider = null;
-            }
-        }
+                this.state.savedPaneSizes.folders = (folders.offsetWidth / containerWidth) * 100;
+                this.state.savedPaneSizes.files = (files.offsetWidth / containerWidth) * 100;
         
-        // Setup metadata field input listeners
-        function setupMetadataFieldListeners() {
-            const fields = ['title', 'artist', 'album', 'albumartist', 'date', 'genre', 'track', 'disc'];
-            
-            fields.forEach(field => {
-                const input = document.getElementById(field);
-                const button = document.querySelector(`.apply-to-folder-btn[data-field="${field}"]`);
+                document.removeEventListener('mousemove', this.handleResize.bind(this));
+                document.removeEventListener('mouseup', this.stopResize.bind(this));
+        
+                this.state.currentDivider = null;
+            },
+        
+            // Metadata field listeners
+            setupMetadataFieldListeners() {
+                const fields = ['title', 'artist', 'album', 'albumartist', 'date', 'genre', 'track', 'disc'];
                 
-                input.addEventListener('input', () => {
-                    const hasValue = input.value.trim().length > 0;
-                    const hasChanged = input.value !== (originalMetadata[field] || '');
+                fields.forEach(field => {
+                    const input = document.getElementById(field);
+                    const button = document.querySelector(`.apply-to-folder-btn[data-field="${field}"]`);
                     
-                    if (hasValue && hasChanged) {
-                        button.classList.add('visible');
-                    } else {
-                        button.classList.remove('visible');
-                    }
+                    const updateButtonVisibility = () => {
+                        const hasValue = input.value.trim().length > 0;
+                        const hasChanged = input.value !== (this.state.originalMetadata[field] || '');
+                        
+                        if (hasValue && hasChanged) {
+                            button.classList.add('visible');
+                        } else {
+                            button.classList.remove('visible');
+                        }
+                    };
+                    
+                    input.addEventListener('input', updateButtonVisibility);
+                    input.addEventListener('focus', updateButtonVisibility);
                 });
-                
-                // Also check on focus in case value was set programmatically
-                input.addEventListener('focus', () => {
-                    const hasValue = input.value.trim().length > 0;
-                    const hasChanged = input.value !== (originalMetadata[field] || '');
-                    
-                    if (hasValue && hasChanged) {
-                        button.classList.add('visible');
-                    }
-                });
-            });
-        }
+            },
         
-        // Apply a metadata field to all files in the folder
-        function applyFieldToFolder(field) {
-            if (!currentFile) return;
-            
-            const value = document.getElementById(field).value.trim();
-            if (!value) return;
-            
-            // Get folder path from current file
-            const folderPath = currentFile.substring(0, currentFile.lastIndexOf('/'));
-            const fieldLabel = document.querySelector(`label[for="${field}"]`).textContent;
-            
-            // Confirm action
-            if (!confirm(`Apply "${fieldLabel}" value "${value}" to all files in the folder "${folderPath || 'root'}"?`)) {
-                return;
-            }
-            
-            // Disable buttons while processing
-            const button = document.querySelector(`.apply-to-folder-btn[data-field="${field}"]`);
-            button.disabled = true;
-            setFormEnabled(false);
-            showStatus(`Applying ${fieldLabel} to all files in folder...`, 'success');
-            
-            // Send request to new endpoint
-            fetch('/apply-field-to-folder', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    folderPath: folderPath,
-                    field: field,
-                    value: value
-                })
-            })
-            .then(r => r.json())
-            .then(result => {
-                if (result.status === 'success') {
-                    showStatus(`${fieldLabel} applied to ${result.filesUpdated} files successfully!`, 'success');
-                    
-                    // Update original value for this field since it's now saved
-                    originalMetadata[field] = value;
-                    
-                    // Hide the button since the value is now the "original"
-                    button.classList.remove('visible');
-                } else {
-                    showStatus(result.error || `Error applying ${fieldLabel} to folder`, 'error');
-                }
-                button.disabled = false;
-                setFormEnabled(true);
-            })
-            .catch(err => {
-                console.error(`Error applying ${fieldLabel} to folder:`, err);
-                showStatus(`Error applying ${fieldLabel} to folder`, 'error');
-                button.disabled = false;
-                setFormEnabled(true);
-            });
-        }
-        
-        // Audio playback functions
-        function togglePlayback(filepath, button) {
-            if (currentlyPlayingFile === filepath && !audioPlayer.paused) {
-                // Currently playing this file, pause it
-                audioPlayer.pause();
-                button.classList.remove('playing');
-            } else {
-                // Stop any current playback
-                stopPlayback();
-                
-                // Start playing new file
-                currentlyPlayingFile = filepath;
-                audioPlayer.src = `/stream/${encodeURIComponent(filepath)}`;
-                audioPlayer.play()
-                    .then(() => {
-                        button.classList.add('playing');
-                    })
-                    .catch(err => {
-                        console.error('Error playing audio:', err);
-                        showStatus('Error playing audio file', 'error');
-                        stopPlayback();
+            // Keyboard navigation
+            setupKeyboardNavigation() {
+                // Pane click handlers
+                document.querySelector('.folders').addEventListener('click', (e) => {
+                    this.state.focusedPane = 'folders';
+                    this.updatePaneFocus();
+                    document.querySelectorAll('.keyboard-focus').forEach(el => {
+                        el.classList.remove('keyboard-focus');
                     });
-            }
-        }
-        
-        function stopPlayback() {
-            if (!audioPlayer.paused) {
-                audioPlayer.pause();
-            }
-            audioPlayer.src = '';
-            currentlyPlayingFile = null;
-            
-            // Remove playing state from all buttons
-            document.querySelectorAll('.play-button.playing').forEach(btn => {
-                btn.classList.remove('playing');
-            });
-        }
-        
-        // Load folder tree on page load
-        window.addEventListener('DOMContentLoaded', () => {
-            loadTree();
-            updateSortUI();
-            setupKeyboardNavigation();
-            setupMetadataFieldListeners();
-            initializePaneResize();
-        });
-        
-        function setupKeyboardNavigation() {
-            // Add click handlers to track focused pane
-            document.querySelector('.folders').addEventListener('click', (e) => {
-                focusedPane = 'folders';
-                updatePaneFocus();
-                // Remove keyboard focus indicators on mouse click
-                document.querySelectorAll('.keyboard-focus').forEach(el => {
-                    el.classList.remove('keyboard-focus');
                 });
-            });
-            
-            document.querySelector('.files').addEventListener('click', (e) => {
-                focusedPane = 'files';
-                updatePaneFocus();
-                // Remove keyboard focus indicators on mouse click
-                document.querySelectorAll('.keyboard-focus').forEach(el => {
-                    el.classList.remove('keyboard-focus');
+                
+                document.querySelector('.files').addEventListener('click', (e) => {
+                    this.state.focusedPane = 'files';
+                    this.updatePaneFocus();
+                    document.querySelectorAll('.keyboard-focus').forEach(el => {
+                        el.classList.remove('keyboard-focus');
+                    });
+                    if (this.state.loadFileDebounceTimer) {
+                        clearTimeout(this.state.loadFileDebounceTimer);
+                    }
                 });
-                // Clear any pending file load
-                if (loadFileDebounceTimer) {
-                    clearTimeout(loadFileDebounceTimer);
+                
+                this.updatePaneFocus();
+                
+                // Global keyboard handler
+                document.addEventListener('keydown', (e) => {
+                    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+                        return;
+                    }
+                    
+                    if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        this.navigateWithArrows(e.key === 'ArrowUp' ? 'up' : 'down');
+                    } else if (e.key === 'Enter') {
+                        e.preventDefault();
+                        this.activateCurrentItem();
+                    } else if (e.key === 'Tab') {
+                        e.preventDefault();
+                        this.state.focusedPane = this.state.focusedPane === 'folders' ? 'files' : 'folders';
+                        this.updatePaneFocus();
+                    }
+                });
+            },
+        
+            updatePaneFocus() {
+                // Visual focus indicator handled by CSS :focus-within
+            },
+        
+            navigateWithArrows(direction) {
+                if (this.state.focusedPane === 'folders') {
+                    this.navigateFolders(direction);
+                } else if (this.state.focusedPane === 'files') {
+                    this.navigateFiles(direction);
                 }
-            });
-            
-            // Initial focus indicator
-            updatePaneFocus();
-            
-            // Global keyboard event handler
-            document.addEventListener('keydown', (e) => {
-                // Ignore if user is typing in an input field
-                if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
-                    return;
+            },
+        
+            navigateFolders(direction) {
+                const visibleFolders = this.getVisibleFolders();
+                if (visibleFolders.length === 0) return;
+                
+                let currentIndex = -1;
+                if (this.state.selectedTreeItem) {
+                    currentIndex = visibleFolders.findIndex(item => item === this.state.selectedTreeItem);
                 }
                 
-                if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-                    e.preventDefault();
-                    navigateWithArrows(e.key === 'ArrowUp' ? 'up' : 'down');
-                } else if (e.key === 'Enter') {
-                    e.preventDefault();
-                    activateCurrentItem();
-                } else if (e.key === 'Tab') {
-                    e.preventDefault();
-                    // Switch between folders and files panes
-                    focusedPane = focusedPane === 'folders' ? 'files' : 'folders';
-                    updatePaneFocus();
+                let newIndex;
+                if (currentIndex === -1) {
+                    newIndex = direction === 'up' ? visibleFolders.length - 1 : 0;
+                } else if (direction === 'up') {
+                    newIndex = currentIndex > 0 ? currentIndex - 1 : 0;
+                } else {
+                    newIndex = currentIndex < visibleFolders.length - 1 ? currentIndex + 1 : visibleFolders.length - 1;
                 }
-            });
-        }
+                
+                if (visibleFolders[newIndex]) {
+                    this.selectTreeItem(visibleFolders[newIndex], true);
+                    visibleFolders[newIndex].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                }
+            },
         
-        function updatePaneFocus() {
-            // Visual focus indicator is now handled by CSS :focus-within
-        }
+            navigateFiles(direction) {
+                const fileItems = Array.from(document.querySelectorAll('#file-list li'));
+                if (fileItems.length === 0) return;
+                
+                let currentIndex = -1;
+                if (this.state.selectedListItem) {
+                    currentIndex = fileItems.findIndex(item => item === this.state.selectedListItem);
+                }
+                
+                let newIndex;
+                if (currentIndex === -1) {
+                    newIndex = direction === 'up' ? fileItems.length - 1 : 0;
+                } else if (direction === 'up') {
+                    newIndex = currentIndex > 0 ? currentIndex - 1 : 0;
+                } else {
+                    newIndex = currentIndex < fileItems.length - 1 ? currentIndex + 1 : fileItems.length - 1;
+                }
+                
+                if (fileItems[newIndex]) {
+                    this.selectFileItem(fileItems[newIndex], true);
+                    fileItems[newIndex].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                }
+            },
         
-        function navigateWithArrows(direction) {
-            if (focusedPane === 'folders') {
-                navigateFolders(direction);
-            } else if (focusedPane === 'files') {
-                navigateFiles(direction);
-            }
-        }
-        
-        function navigateFolders(direction) {
-            const visibleFolders = getVisibleFolders();
-            if (visibleFolders.length === 0) return;
-            
-            let currentIndex = -1;
-            if (selectedTreeItem) {
-                currentIndex = visibleFolders.findIndex(item => item === selectedTreeItem);
-            }
-            
-            let newIndex;
-            if (currentIndex === -1) {
-                // No selection, select first or last depending on direction
-                newIndex = direction === 'up' ? visibleFolders.length - 1 : 0;
-            } else if (direction === 'up') {
-                newIndex = currentIndex > 0 ? currentIndex - 1 : 0;
-            } else {
-                newIndex = currentIndex < visibleFolders.length - 1 ? currentIndex + 1 : visibleFolders.length - 1;
-            }
-            
-            if (visibleFolders[newIndex]) {
-                selectTreeItem(visibleFolders[newIndex], true);
-                visibleFolders[newIndex].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-            }
-        }
-        
-        function navigateFiles(direction) {
-            const fileItems = Array.from(document.querySelectorAll('#file-list li'));
-            if (fileItems.length === 0) return;
-            
-            let currentIndex = -1;
-            if (selectedListItem) {
-                currentIndex = fileItems.findIndex(item => item === selectedListItem);
-            }
-            
-            let newIndex;
-            if (currentIndex === -1) {
-                // No selection, select first or last depending on direction
-                newIndex = direction === 'up' ? fileItems.length - 1 : 0;
-            } else if (direction === 'up') {
-                newIndex = currentIndex > 0 ? currentIndex - 1 : 0;
-            } else {
-                newIndex = currentIndex < fileItems.length - 1 ? currentIndex + 1 : fileItems.length - 1;
-            }
-            
-            if (fileItems[newIndex]) {
-                selectFileItem(fileItems[newIndex], true);
-                fileItems[newIndex].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-            }
-        }
-        
-        function getVisibleFolders() {
-            const folders = [];
-            
-            function collectVisible(container) {
-                const items = container.children;
-                for (let item of items) {
-                    if (item.classList.contains('tree-item')) {
-                        folders.push(item);
-                        const children = item.querySelector('.tree-children');
-                        if (children && children.classList.contains('expanded')) {
-                            collectVisible(children);
+            getVisibleFolders() {
+                const folders = [];
+                
+                const collectVisible = (container) => {
+                    const items = container.children;
+                    for (let item of items) {
+                        if (item.classList.contains('tree-item')) {
+                            folders.push(item);
+                            const children = item.querySelector('.tree-children');
+                            if (children && children.classList.contains('expanded')) {
+                                collectVisible(children);
+                            }
                         }
                     }
-                }
-            }
-            
-            collectVisible(document.getElementById('folder-tree'));
-            return folders;
-        }
-        
-        function selectTreeItem(item, isKeyboard = false) {
-            if (selectedTreeItem) {
-                selectedTreeItem.classList.remove('selected');
-                selectedTreeItem.classList.remove('keyboard-focus');
-            }
-            item.classList.add('selected');
-            if (isKeyboard) {
-                item.classList.add('keyboard-focus');
-            }
-            selectedTreeItem = item;
-            focusedPane = 'folders';
-            updatePaneFocus();
-        }
-        
-        function selectFileItem(item, isKeyboard = false) {
-            if (selectedListItem) {
-                selectedListItem.classList.remove('selected');
-                selectedListItem.classList.remove('keyboard-focus');
-            }
-            item.classList.add('selected');
-            if (isKeyboard) {
-                item.classList.add('keyboard-focus');
+                };
                 
-                // Clear any pending file load
-                if (loadFileDebounceTimer) {
-                    clearTimeout(loadFileDebounceTimer);
+                collectVisible(document.getElementById('folder-tree'));
+                return folders;
+            },
+        
+            selectTreeItem(item, isKeyboard = false) {
+                if (this.state.selectedTreeItem) {
+                    this.state.selectedTreeItem.classList.remove('selected', 'keyboard-focus');
                 }
-                
-                // Automatically load file metadata when navigating with keyboard (with small debounce)
-                const filepath = item.dataset.filepath;
-                if (filepath) {
-                    loadFileDebounceTimer = setTimeout(() => {
-                        loadFile(filepath, item);
-                    }, 150); // 150ms debounce
+                item.classList.add('selected');
+                if (isKeyboard) {
+                    item.classList.add('keyboard-focus');
                 }
-            }
-            selectedListItem = item;
-            focusedPane = 'files';
-            updatePaneFocus();
-        }
+                this.state.selectedTreeItem = item;
+                this.state.focusedPane = 'folders';
+                this.updatePaneFocus();
+            },
         
-        function activateCurrentItem() {
-            if (focusedPane === 'folders' && selectedTreeItem) {
-                // Simulate click on the folder content to expand/collapse
-                const content = selectedTreeItem.querySelector('.tree-item-content');
-                if (content) {
-                    content.click();
+            selectFileItem(item, isKeyboard = false) {
+                if (this.state.selectedListItem) {
+                    this.state.selectedListItem.classList.remove('selected', 'keyboard-focus');
                 }
-            } else if (focusedPane === 'files' && selectedListItem) {
-                // For files, Enter reloads the metadata (useful if there was an error)
-                const filepath = selectedListItem.dataset.filepath;
-                if (filepath) {
-                    loadFile(filepath, selectedListItem);
-                }
-            }
-        }
-        
-        function updateSortUI() {
-            // Reset all sort options
-            document.querySelectorAll('.sort-option').forEach(opt => {
-                opt.classList.remove('active');
-                opt.querySelectorAll('.sort-arrow').forEach(arrow => {
-                    arrow.classList.remove('active');
-                });
-            });
-            
-            // Set active sort option
-            const activeOption = document.getElementById(`sort-${currentSort.method}`);
-            activeOption.classList.add('active');
-            activeOption.querySelector(`.sort-arrow[data-dir="${currentSort.direction}"]`).classList.add('active');
-        }
-        
-        function setSortMethod(method) {
-            if (currentSort.method === method) {
-                // Toggle direction if same method
-                currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
-            } else {
-                // New method, default to ascending
-                currentSort.method = method;
-                currentSort.direction = 'asc';
-            }
-            
-            updateSortUI();
-            rebuildTree();
-        }
-        
-        function sortItems(items) {
-            return items.sort((a, b) => {
-                let comparison = 0;
-                
-                if (currentSort.method === 'name') {
-                    comparison = a.name.toLowerCase().localeCompare(b.name.toLowerCase());
-                } else if (currentSort.method === 'date') {
-                    comparison = (a.created || 0) - (b.created || 0);
-                }
-                
-                return currentSort.direction === 'asc' ? comparison : -comparison;
-            });
-        }
-        
-        function loadTree() {
-            fetch('/tree/')
-                .then(r => r.json())
-                .then(data => {
-                    treeData[''] = data.items;  // Store root items
-                    buildTreeFromData();
-                })
-                .catch(err => {
-                    console.error('Error loading tree:', err);
-                    showStatus('Error loading folders', 'error');
-                });
-        }
-        
-        function buildTreeFromData() {
-            const tree = document.getElementById('folder-tree');
-            tree.innerHTML = '';
-            
-            const sortedItems = sortItems(treeData[''] || []);
-            
-            sortedItems.forEach(item => {
-                if (item.type === 'folder') {
-                    tree.appendChild(createTreeItem(item, 0));
-                }
-            });
-        }
-        
-        function rebuildTree() {
-            // Rebuild the tree with current data and sorting
-            buildTreeFromData();
-            
-            // Re-expand only folders that are in the expandedFolders set
-            expandedFolders.forEach(path => {
-                const element = document.querySelector(`[data-path="${path}"]`);
-                if (element && treeData[path]) {
-                    const children = element.querySelector('.tree-children');
-                    if (children && treeData[path].length > 0) {
-                        rebuildChildren(path, children, getLevel(path) + 1);
-                        children.classList.add('expanded');
-                    }
-                }
-            });
-            
-            // Restore selection
-            if (selectedTreeItem) {
-                const path = selectedTreeItem.dataset.path;
-                const newSelected = document.querySelector(`[data-path="${path}"]`);
-                if (newSelected) {
-                    newSelected.classList.add('selected');
-                    selectedTreeItem = newSelected;
-                }
-            }
-        }
-        
-        function getLevel(path) {
-            return path ? path.split('/').length - 1 : 0;
-        }
-        
-        function rebuildChildren(path, container, level) {
-            container.innerHTML = '';
-            const sortedItems = sortItems(treeData[path] || []);
-            
-            sortedItems.forEach(item => {
-                if (item.type === 'folder') {
-                    container.appendChild(createTreeItem(item, level));
-                }
-            });
-        }
-        
-        function createTreeItem(item, level) {
-            const div = document.createElement('div');
-            div.className = 'tree-item';
-            div.dataset.path = item.path;
-            
-            const content = document.createElement('div');
-            content.className = 'tree-item-content';
-            content.style.paddingLeft = `${level * 1.5 + 1.25}rem`;
-            
-            const icon = document.createElement('span');
-            icon.className = 'tree-icon';
-            icon.innerHTML = expandedFolders.has(item.path) ? '📂' : '📁';
-            
-            const name = document.createElement('span');
-            name.textContent = item.name;
-            
-            content.appendChild(icon);
-            content.appendChild(name);
-            
-            const children = document.createElement('div');
-            children.className = 'tree-children';
-            
-            div.appendChild(content);
-            div.appendChild(children);
-            
-            // Click handler for folder
-            content.onclick = (e) => {
-                e.stopPropagation();
-                
-                // Update selection
-                selectTreeItem(div);
-                
-                // Toggle expansion
-                const isExpanded = children.classList.contains('expanded');
-                
-                if (!isExpanded) {
-                    // Expanding
-                    if (children.children.length === 0) {
-                        // Load children if not loaded
-                        loadTreeChildren(item.path, children, level + 1);
-                    }
-                    children.classList.add('expanded');
-                    expandedFolders.add(item.path);
-                    icon.innerHTML = '📂';
-                } else {
-                    // Collapsing
-                    children.classList.remove('expanded');
-                    expandedFolders.delete(item.path);
-                    icon.innerHTML = '📁';
-                }
-                
-                // Load files in this folder
-                loadFiles(item.path);
-            };
-            
-            // Check if we have cached children for this item and it should be expanded
-            if (treeData[item.path] && treeData[item.path].length > 0 && expandedFolders.has(item.path)) {
-                // If we have cached data and it should be expanded, populate children immediately
-                const sortedItems = sortItems(treeData[item.path]);
-                sortedItems.forEach(child => {
-                    if (child.type === 'folder') {
-                        children.appendChild(createTreeItem(child, level + 1));
-                    }
-                });
-                children.classList.add('expanded');
-                icon.innerHTML = '📂';
-            }
-            
-            return div;
-        }
-        
-        function loadTreeChildren(path, container, level) {
-            fetch(`/tree/${encodeURIComponent(path)}`)
-                .then(r => r.json())
-                .then(data => {
-                    treeData[path] = data.items;  // Store children data
+                item.classList.add('selected');
+                if (isKeyboard) {
+                    item.classList.add('keyboard-focus');
                     
-                    const sortedItems = sortItems(data.items);
+                    if (this.state.loadFileDebounceTimer) {
+                        clearTimeout(this.state.loadFileDebounceTimer);
+                    }
+                    
+                    const filepath = item.dataset.filepath;
+                    if (filepath) {
+                        this.state.loadFileDebounceTimer = setTimeout(() => {
+                            this.loadFile(filepath, item);
+                        }, 150);
+                    }
+                }
+                this.state.selectedListItem = item;
+                this.state.focusedPane = 'files';
+                this.updatePaneFocus();
+            },
+        
+            activateCurrentItem() {
+                if (this.state.focusedPane === 'folders' && this.state.selectedTreeItem) {
+                    const content = this.state.selectedTreeItem.querySelector('.tree-item-content');
+                    if (content) {
+                        content.click();
+                    }
+                } else if (this.state.focusedPane === 'files' && this.state.selectedListItem) {
+                    const filepath = this.state.selectedListItem.dataset.filepath;
+                    if (filepath) {
+                        this.loadFile(filepath, this.state.selectedListItem);
+                    }
+                }
+            },
+        
+            // Sorting functionality
+            updateSortUI() {
+                document.querySelectorAll('.sort-option').forEach(opt => {
+                    opt.classList.remove('active');
+                    opt.querySelectorAll('.sort-arrow').forEach(arrow => {
+                        arrow.classList.remove('active');
+                    });
+                });
+                
+                const activeOption = document.getElementById(`sort-${this.state.currentSort.method}`);
+                activeOption.classList.add('active');
+                activeOption.querySelector(`.sort-arrow[data-dir="${this.state.currentSort.direction}"]`).classList.add('active');
+            },
+        
+            setSortMethod(method) {
+                if (this.state.currentSort.method === method) {
+                    this.state.currentSort.direction = this.state.currentSort.direction === 'asc' ? 'desc' : 'asc';
+                } else {
+                    this.state.currentSort.method = method;
+                    this.state.currentSort.direction = 'asc';
+                }
+                
+                this.updateSortUI();
+                this.rebuildTree();
+            },
+        
+            sortItems(items) {
+                return items.sort((a, b) => {
+                    let comparison = 0;
+                    
+                    if (this.state.currentSort.method === 'name') {
+                        comparison = a.name.toLowerCase().localeCompare(b.name.toLowerCase());
+                    } else if (this.state.currentSort.method === 'date') {
+                        comparison = (a.created || 0) - (b.created || 0);
+                    }
+                    
+                    return this.state.currentSort.direction === 'asc' ? comparison : -comparison;
+                });
+            },
+        
+            // Tree functionality
+            async loadTree() {
+                try {
+                    const data = await this.apiCall('/tree/');
+                    this.state.treeData[''] = data.items;
+                    this.buildTreeFromData();
+                } catch (err) {
+                    console.error('Error loading tree:', err);
+                    this.showStatus('Error loading folders', 'error');
+                }
+            },
+        
+            buildTreeFromData() {
+                const tree = document.getElementById('folder-tree');
+                tree.innerHTML = '';
+                
+                const sortedItems = this.sortItems(this.state.treeData[''] || []);
+                
+                sortedItems.forEach(item => {
+                    if (item.type === 'folder') {
+                        tree.appendChild(this.createTreeItem(item, 0));
+                    }
+                });
+            },
+        
+            rebuildTree() {
+                this.buildTreeFromData();
+                
+                this.state.expandedFolders.forEach(path => {
+                    const element = document.querySelector(`[data-path="${path}"]`);
+                    if (element && this.state.treeData[path]) {
+                        const children = element.querySelector('.tree-children');
+                        if (children && this.state.treeData[path].length > 0) {
+                            this.rebuildChildren(path, children, this.getLevel(path) + 1);
+                            children.classList.add('expanded');
+                        }
+                    }
+                });
+                
+                if (this.state.selectedTreeItem) {
+                    const path = this.state.selectedTreeItem.dataset.path;
+                    const newSelected = document.querySelector(`[data-path="${path}"]`);
+                    if (newSelected) {
+                        newSelected.classList.add('selected');
+                        this.state.selectedTreeItem = newSelected;
+                    }
+                }
+            },
+        
+            getLevel(path) {
+                return path ? path.split('/').length - 1 : 0;
+            },
+        
+            rebuildChildren(path, container, level) {
+                container.innerHTML = '';
+                const sortedItems = this.sortItems(this.state.treeData[path] || []);
+                
+                sortedItems.forEach(item => {
+                    if (item.type === 'folder') {
+                        container.appendChild(this.createTreeItem(item, level));
+                    }
+                });
+            },
+        
+            createTreeItem(item, level) {
+                const div = document.createElement('div');
+                div.className = 'tree-item';
+                div.dataset.path = item.path;
+                
+                const content = document.createElement('div');
+                content.className = 'tree-item-content';
+                content.style.paddingLeft = `${level * 1.5 + 1.25}rem`;
+                
+                const icon = document.createElement('span');
+                icon.className = 'tree-icon';
+                icon.innerHTML = this.state.expandedFolders.has(item.path) ? '📂' : '📁';
+                
+                const name = document.createElement('span');
+                name.textContent = item.name;
+                
+                content.appendChild(icon);
+                content.appendChild(name);
+                
+                const children = document.createElement('div');
+                children.className = 'tree-children';
+                
+                div.appendChild(content);
+                div.appendChild(children);
+                
+                content.onclick = (e) => {
+                    e.stopPropagation();
+                    this.selectTreeItem(div);
+                    
+                    const isExpanded = children.classList.contains('expanded');
+                    
+                    if (!isExpanded) {
+                        if (children.children.length === 0) {
+                            this.loadTreeChildren(item.path, children, level + 1);
+                        }
+                        children.classList.add('expanded');
+                        this.state.expandedFolders.add(item.path);
+                        icon.innerHTML = '📂';
+                    } else {
+                        children.classList.remove('expanded');
+                        this.state.expandedFolders.delete(item.path);
+                        icon.innerHTML = '📁';
+                    }
+                    
+                    this.loadFiles(item.path);
+                };
+                
+                if (this.state.treeData[item.path] && this.state.treeData[item.path].length > 0 && this.state.expandedFolders.has(item.path)) {
+                    const sortedItems = this.sortItems(this.state.treeData[item.path]);
+                    sortedItems.forEach(child => {
+                        if (child.type === 'folder') {
+                            children.appendChild(this.createTreeItem(child, level + 1));
+                        }
+                    });
+                    children.classList.add('expanded');
+                    icon.innerHTML = '📂';
+                }
+                
+                return div;
+            },
+        
+            async loadTreeChildren(path, container, level) {
+                try {
+                    const data = await this.apiCall(`/tree/${encodeURIComponent(path)}`);
+                    this.state.treeData[path] = data.items;
+                    
+                    const sortedItems = this.sortItems(data.items);
                     
                     sortedItems.forEach(item => {
                         if (item.type === 'folder') {
-                            container.appendChild(createTreeItem(item, level));
+                            container.appendChild(this.createTreeItem(item, level));
                         }
                     });
-                })
-                .catch(err => {
+                } catch (err) {
                     console.error('Error loading tree children:', err);
-                });
-        }
+                }
+            },
         
-        function loadFiles(folderPath) {
-            currentPath = folderPath;
-            document.getElementById('file-count').textContent = '(loading...)';
-            
-            // Stop any current playback when changing folders
-            stopPlayback();
-            
-            fetch(`/files/${encodeURIComponent(folderPath)}`)
-                .then(r => r.json())
-                .then(data => {
+            // File operations
+            async loadFiles(folderPath) {
+                this.state.currentPath = folderPath;
+                document.getElementById('file-count').textContent = '(loading...)';
+                
+                this.stopPlayback();
+                
+                try {
+                    const data = await this.apiCall(`/files/${encodeURIComponent(folderPath)}`);
                     const list = document.getElementById('file-list');
                     list.innerHTML = '';
                     
@@ -1775,7 +1689,7 @@
                     
                     data.files.forEach(file => {
                         const li = document.createElement('li');
-                        li.dataset.filepath = file.path; // Store file path in dataset
+                        li.dataset.filepath = file.path;
                         
                         const fileInfo = document.createElement('div');
                         fileInfo.className = 'file-info';
@@ -1793,80 +1707,68 @@
                         
                         li.appendChild(fileInfo);
                         
-                        // Add play button
                         const playButton = document.createElement('div');
                         playButton.className = 'play-button';
                         playButton.innerHTML = '<span class="play-icon">▶</span><span class="pause-icon">❚❚</span>';
                         playButton.onclick = (e) => {
                             e.stopPropagation();
-                            togglePlayback(file.path, playButton);
+                            this.togglePlayback(file.path, playButton);
                         };
                         li.appendChild(playButton);
                         
                         li.onclick = (e) => {
-                            // Don't trigger if clicking play button
                             if (!e.target.closest('.play-button')) {
-                                loadFile(file.path, li);
+                                this.loadFile(file.path, li);
                             }
                         };
                         list.appendChild(li);
                     });
-                })
-                .catch(err => {
+                } catch (err) {
                     console.error('Error loading files:', err);
-                    showStatus('Error loading files', 'error');
+                    this.showStatus('Error loading files', 'error');
                     document.getElementById('file-count').textContent = '(error)';
-                });
-        }
+                }
+            },
         
-        function loadFile(filepath, listItem) {
-            // Clear any pending debounced loads
-            if (loadFileDebounceTimer) {
-                clearTimeout(loadFileDebounceTimer);
-                loadFileDebounceTimer = null;
-            }
-            
-            // Update UI selection
-            selectFileItem(listItem);
-            
-            currentFile = filepath;
-            originalFilename = filepath.split('/').pop();
-            document.getElementById('current-filename').textContent = originalFilename;
-            document.getElementById('no-file-message').style.display = 'none';
-            document.getElementById('metadata-section').style.display = 'block';
-            
-            // Reset filename edit
-            cancelFilenameEdit();
-            
-            // Clear previous status
-            hideStatus();
-            
-            // Hide all apply-to-folder buttons
-            document.querySelectorAll('.apply-to-folder-btn').forEach(btn => {
-                btn.classList.remove('visible');
-            });
-            
-            // Show loading status for keyboard navigation
-            if (listItem.classList.contains('keyboard-focus')) {
-                showStatus('Loading metadata...', 'success');
-            }
-            
-            // Reset album art state
-            currentAlbumArt = null;
-            pendingAlbumArt = null;
-            shouldRemoveArt = false;
-            
-            // Disable form while loading
-            setFormEnabled(false);
-            
-            fetch(`/metadata/${encodeURIComponent(filepath)}`)
-                .then(r => {
-                    if (!r.ok) throw new Error('Failed to load metadata');
-                    return r.json();
-                })
-                .then(data => {
-                    // Store original metadata values
-                    originalMetadata = {
+            async loadFile(filepath, listItem) {
+                
+                // Stop any current playback when selecting a different file
+                this.stopPlayback();
+                
+                if (this.state.loadFileDebounceTimer) {
+                    clearTimeout(this.state.loadFileDebounceTimer);
+                    this.state.loadFileDebounceTimer = null;
+                }
+                
+                this.selectFileItem(listItem);
+                
+                this.state.currentFile = filepath;
+                this.state.originalFilename = filepath.split('/').pop();
+                document.getElementById('current-filename').textContent = this.state.originalFilename;
+                document.getElementById('no-file-message').style.display = 'none';
+                document.getElementById('metadata-section').style.display = 'block';
+                
+                this.cancelFilenameEdit();
+                this.hideStatus();
+                
+                document.querySelectorAll('.apply-to-folder-btn').forEach(btn => {
+                    btn.classList.remove('visible');
+                });
+                
+                if (listItem.classList.contains('keyboard-focus')) {
+                    this.showStatus('Loading metadata...', 'success');
+                }
+                
+                this.state.currentAlbumArt = null;
+                this.state.pendingAlbumArt = null;
+                this.state.shouldRemoveArt = false;
+                
+                this.setFormEnabled(false);
+                
+                try {
+                    const data = await this.apiCall(`/metadata/${encodeURIComponent(filepath)}`);
+                    
+                    this.state.originalMetadata = {
                         title: data.title || '',
                         artist: data.artist || '',
                         album: data.album || '',
@@ -1877,24 +1779,17 @@
                         disc: data.disc || ''
                     };
                     
-                    // Set form values
-                    document.getElementById('title').value = originalMetadata.title;
-                    document.getElementById('artist').value = originalMetadata.artist;
-                    document.getElementById('album').value = originalMetadata.album;
-                    document.getElementById('albumartist').value = originalMetadata.albumartist;
-                    document.getElementById('date').value = originalMetadata.date;
-                    document.getElementById('genre').value = originalMetadata.genre;
-                    document.getElementById('track').value = originalMetadata.track;
-                    document.getElementById('disc').value = originalMetadata.disc;
+                    Object.entries(this.state.originalMetadata).forEach(([field, value]) => {
+                        document.getElementById(field).value = value;
+                    });
                     
-                    // Handle album art
                     const artDisplay = document.getElementById('art-display');
                     const deleteBtn = document.querySelector('.delete-art-btn');
                     const saveImageBtn = document.querySelector('.save-image-btn');
                     const applyFolderBtn = document.querySelector('.apply-folder-btn');
                     
                     if (data.hasArt && data.art) {
-                        currentAlbumArt = data.art;
+                        this.state.currentAlbumArt = data.art;
                         artDisplay.innerHTML = `<img src="data:image/jpeg;base64,${data.art}" class="album-art">`;
                         deleteBtn.style.display = 'block';
                         saveImageBtn.style.display = 'none';
@@ -1906,374 +1801,428 @@
                         applyFolderBtn.style.display = 'none';
                     }
                     
-                    setFormEnabled(true);
+                    this.setFormEnabled(true);
                     
-                    // Clear loading status if shown
                     if (listItem.classList.contains('keyboard-focus')) {
-                        hideStatus();
+                        this.hideStatus();
                     }
-                })
-                .catch(err => {
+                } catch (err) {
                     console.error('Error loading metadata:', err);
-                    showStatus('Error loading metadata', 'error');
-                    setFormEnabled(true);
-                });
-        }
+                    this.showStatus('Error loading metadata', 'error');
+                    this.setFormEnabled(true);
+                }
+            },
         
-        // Filename editing functions
-        document.getElementById('current-filename').onclick = function() {
-            if (!currentFile) return;
-            
-            document.getElementById('current-filename').style.display = 'none';
-            document.querySelector('.filename-edit').style.display = 'flex';
-            document.getElementById('filename-input').value = originalFilename;
-            document.getElementById('filename-input').focus();
+            // Filename editing
+            cancelFilenameEdit() {
+                document.getElementById('current-filename').style.display = 'inline';
+                document.querySelector('.filename-edit').style.display = 'none';
+            },
+        
+            resetFilename() {
+                document.getElementById('filename-input').value = this.state.originalFilename;
+            },
+        
+            async saveFilename() {
+                const newName = document.getElementById('filename-input').value.trim();
+                if (!newName || newName === this.state.originalFilename) {
+                    this.cancelFilenameEdit();
+                    return;
+                }
+                
+                this.setFormEnabled(false);
+                this.showStatus('Renaming file...', 'success');
+                
+                try {
+                    const result = await this.apiCall('/rename', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({
+                            oldPath: this.state.currentFile,
+                            newName: newName
+                        })
+                    });
+                    
+                    if (result.status === 'success') {
+                        this.state.currentFile = result.newPath;
+                        this.state.originalFilename = newName;
+                        document.getElementById('current-filename').textContent = newName;
+                        this.cancelFilenameEdit();
+                        this.showStatus('File renamed successfully!', 'success');
+                        this.loadFiles(this.state.currentPath);
+                    } else {
+                        this.showStatus(result.error || 'Error renaming file', 'error');
+                    }
+                } catch (err) {
+                    console.error('Error renaming file:', err);
+                    this.showStatus('Error renaming file', 'error');
+                }
+                
+                this.setFormEnabled(true);
+            },
+        
+            // Album art functions
+            handleArtUpload(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+                
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    this.state.pendingAlbumArt = e.target.result;
+                    this.state.shouldRemoveArt = false;
+                    
+                    const artDisplay = document.getElementById('art-display');
+                    artDisplay.innerHTML = `<img src="${this.state.pendingAlbumArt}" class="album-art">`;
+                    document.querySelector('.delete-art-btn').style.display = 'block';
+                    document.querySelector('.save-image-btn').style.display = 'block';
+                    document.querySelector('.apply-folder-btn').style.display = 'block';
+                    
+                    this.showStatus('Image loaded. Click "Save Image" to save only the image, or "Save" to save all changes.', 'success');
+                };
+                reader.readAsDataURL(file);
+                
+                event.target.value = '';
+            },
+        
+            deleteAlbumArt() {
+                this.state.shouldRemoveArt = true;
+                this.state.pendingAlbumArt = null;
+                
+                const artDisplay = document.getElementById('art-display');
+                artDisplay.innerHTML = '<div class="album-art-placeholder">No album art</div>';
+                document.querySelector('.delete-art-btn').style.display = 'none';
+                document.querySelector('.save-image-btn').style.display = 'none';
+                document.querySelector('.apply-folder-btn').style.display = 'none';
+                
+                this.showStatus('Album art marked for deletion. Click Save to apply changes.', 'success');
+            },
+        
+            async saveAlbumArt() {
+                if (!this.state.currentFile || !this.state.pendingAlbumArt) return;
+                
+                document.querySelector('.save-image-btn').disabled = true;
+                this.showStatus('Saving album art...', 'success');
+                
+                try {
+                    const result = await this.apiCall(`/metadata/${encodeURIComponent(this.state.currentFile)}`, {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ art: this.state.pendingAlbumArt })
+                    });
+                    
+                    if (result.status === 'success') {
+                        this.showStatus('Album art saved successfully!', 'success');
+                        this.state.currentAlbumArt = this.state.pendingAlbumArt;
+                        this.state.pendingAlbumArt = null;
+                        
+                        document.querySelector('.save-image-btn').style.display = 'none';
+                        document.querySelector('.apply-folder-btn').style.display = 'none';
+                    } else {
+                        this.showStatus('Error saving album art', 'error');
+                    }
+                } catch (err) {
+                    console.error('Error saving album art:', err);
+                    this.showStatus('Error saving album art', 'error');
+                }
+                
+                document.querySelector('.save-image-btn').disabled = false;
+            },
+        
+            async applyArtToFolder() {
+                if (!this.state.currentFile || (!this.state.pendingAlbumArt && !this.state.currentAlbumArt)) return;
+                
+                const artToApply = this.state.pendingAlbumArt || (this.state.currentAlbumArt ? `data:image/jpeg;base64,${this.state.currentAlbumArt}` : null);
+                if (!artToApply) {
+                    this.showStatus('No album art to apply', 'error');
+                    return;
+                }
+                
+                const folderPath = this.state.currentFile.substring(0, this.state.currentFile.lastIndexOf('/'));
+                
+                if (!confirm(`Apply this album art to all files in the folder "${folderPath || 'root'}"? This will replace any existing album art.`)) {
+                    return;
+                }
+                
+                document.querySelector('.apply-folder-btn').disabled = true;
+                this.setFormEnabled(false);
+                this.showStatus('Applying album art to all files in folder...', 'success');
+                
+                try {
+                    const result = await this.apiCall('/apply-art-to-folder', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({
+                            folderPath: folderPath,
+                            art: artToApply
+                        })
+                    });
+                    
+                    if (result.status === 'success') {
+                        this.showStatus(`Album art applied to ${result.filesUpdated} files successfully!`, 'success');
+                        
+                        if (this.state.pendingAlbumArt) {
+                            this.state.currentAlbumArt = this.state.pendingAlbumArt;
+                            this.state.pendingAlbumArt = null;
+                            document.querySelector('.save-image-btn').style.display = 'none';
+                            document.querySelector('.apply-folder-btn').style.display = 'none';
+                        }
+                    } else {
+                        this.showStatus(result.error || 'Error applying album art to folder', 'error');
+                    }
+                } catch (err) {
+                    console.error('Error applying album art to folder:', err);
+                    this.showStatus('Error applying album art to folder', 'error');
+                }
+                
+                document.querySelector('.apply-folder-btn').disabled = false;
+                this.setFormEnabled(true);
+            },
+        
+            async applyFieldToFolder(field) {
+                if (!this.state.currentFile) return;
+                
+                const value = document.getElementById(field).value.trim();
+                if (!value) return;
+                
+                const folderPath = this.state.currentFile.substring(0, this.state.currentFile.lastIndexOf('/'));
+                const fieldLabel = document.querySelector(`label[for="${field}"]`).textContent;
+                
+                if (!confirm(`Apply "${fieldLabel}" value "${value}" to all files in the folder "${folderPath || 'root'}"?`)) {
+                    return;
+                }
+                
+                const button = document.querySelector(`.apply-to-folder-btn[data-field="${field}"]`);
+                button.disabled = true;
+                this.setFormEnabled(false);
+                this.showStatus(`Applying ${fieldLabel} to all files in folder...`, 'success');
+                
+                try {
+                    const result = await this.apiCall('/apply-field-to-folder', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({
+                            folderPath: folderPath,
+                            field: field,
+                            value: value
+                        })
+                    });
+                    
+                    if (result.status === 'success') {
+                        this.showStatus(`${fieldLabel} applied to ${result.filesUpdated} files successfully!`, 'success');
+                        this.state.originalMetadata[field] = value;
+                        button.classList.remove('visible');
+                    } else {
+                        this.showStatus(result.error || `Error applying ${fieldLabel} to folder`, 'error');
+                    }
+                } catch (err) {
+                    console.error(`Error applying ${fieldLabel} to folder:`, err);
+                    this.showStatus(`Error applying ${fieldLabel} to folder`, 'error');
+                }
+                
+                button.disabled = false;
+                this.setFormEnabled(true);
+            },
+        
+            async save() {
+                if (!this.state.currentFile) return;
+                
+                const data = {
+                    title: document.getElementById('title').value,
+                    artist: document.getElementById('artist').value,
+                    album: document.getElementById('album').value,
+                    albumartist: document.getElementById('albumartist').value,
+                    date: document.getElementById('date').value,
+                    genre: document.getElementById('genre').value,
+                    track: document.getElementById('track').value,
+                    disc: document.getElementById('disc').value
+                };
+                
+                if (this.state.pendingAlbumArt) {
+                    data.art = this.state.pendingAlbumArt;
+                } else if (this.state.shouldRemoveArt) {
+                    data.removeArt = true;
+                }
+                
+                this.setFormEnabled(false);
+                this.showStatus('Saving metadata...', 'success');
+                
+                try {
+                    const result = await this.apiCall(`/metadata/${encodeURIComponent(this.state.currentFile)}`, {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify(data)
+                    });
+                    
+                    if (result.status === 'success') {
+                        this.showStatus('Metadata saved successfully!', 'success');
+                        
+                        Object.keys(data).forEach(key => {
+                            if (key !== 'art' && key !== 'removeArt') {
+                                this.state.originalMetadata[key] = data[key];
+                            }
+                        });
+                        
+                        document.querySelectorAll('.apply-to-folder-btn').forEach(btn => {
+                            btn.classList.remove('visible');
+                        });
+                        
+                        if (this.state.pendingAlbumArt) {
+                            this.state.currentAlbumArt = this.state.pendingAlbumArt;
+                            document.querySelector('.save-image-btn').style.display = 'none';
+                            document.querySelector('.apply-folder-btn').style.display = 'none';
+                        } else if (this.state.shouldRemoveArt) {
+                            this.state.currentAlbumArt = null;
+                        }
+                        this.state.pendingAlbumArt = null;
+                        this.state.shouldRemoveArt = false;
+                    } else {
+                        this.showStatus('Error saving metadata', 'error');
+                    }
+                } catch (err) {
+                    console.error('Error saving metadata:', err);
+                    this.showStatus('Error saving metadata', 'error');
+                }
+                
+                this.setFormEnabled(true);
+            },
+        
+            async resetForm() {
+                if (!this.state.currentFile) return;
+                
+                try {
+                    const data = await this.apiCall(`/metadata/${encodeURIComponent(this.state.currentFile)}`);
+                    
+                    this.state.originalMetadata = {
+                        title: data.title || '',
+                        artist: data.artist || '',
+                        album: data.album || '',
+                        albumartist: data.albumartist || '',
+                        date: data.date || '',
+                        genre: data.genre || '',
+                        track: data.track || '',
+                        disc: data.disc || ''
+                    };
+                    
+                    Object.entries(this.state.originalMetadata).forEach(([field, value]) => {
+                        document.getElementById(field).value = value;
+                    });
+                    
+                    document.querySelectorAll('.apply-to-folder-btn').forEach(btn => {
+                        btn.classList.remove('visible');
+                    });
+                    
+                    this.state.pendingAlbumArt = null;
+                    this.state.shouldRemoveArt = false;
+                    
+                    const artDisplay = document.getElementById('art-display');
+                    const deleteBtn = document.querySelector('.delete-art-btn');
+                    const saveImageBtn = document.querySelector('.save-image-btn');
+                    const applyFolderBtn = document.querySelector('.apply-folder-btn');
+                    
+                    if (data.hasArt && data.art) {
+                        this.state.currentAlbumArt = data.art;
+                        artDisplay.innerHTML = `<img src="data:image/jpeg;base64,${data.art}" class="album-art">`;
+                        deleteBtn.style.display = 'block';
+                        saveImageBtn.style.display = 'none';
+                        applyFolderBtn.style.display = 'none';
+                    } else {
+                        this.state.currentAlbumArt = null;
+                        artDisplay.innerHTML = '<div class="album-art-placeholder">No album art</div>';
+                        deleteBtn.style.display = 'none';
+                        saveImageBtn.style.display = 'none';
+                        applyFolderBtn.style.display = 'none';
+                    }
+                    
+                    this.hideStatus();
+                    this.showStatus('Form reset to original values', 'success');
+                    setTimeout(() => this.hideStatus(), 2000);
+                } catch (err) {
+                    console.error('Error resetting form:', err);
+                    this.showStatus('Error resetting form', 'error');
+                }
+            },
+        
+            // Utility functions
+            setFormEnabled(enabled) {
+                const inputs = document.querySelectorAll('#metadata-form input');
+                const buttons = document.querySelectorAll('button');
+                
+                inputs.forEach(input => input.disabled = !enabled);
+                buttons.forEach(button => button.disabled = !enabled);
+            },
+        
+            showStatus(message, type) {
+                const status = document.getElementById('status');
+                status.textContent = message;
+                status.className = `status ${type}`;
+                status.style.display = 'block';
+            },
+        
+            hideStatus() {
+                const status = document.getElementById('status');
+                status.style.display = 'none';
+            }
         };
         
-        function cancelFilenameEdit() {
-            document.getElementById('current-filename').style.display = 'inline';
-            document.querySelector('.filename-edit').style.display = 'none';
-        }
-        
-        function resetFilename() {
-            document.getElementById('filename-input').value = originalFilename;
+        // Global function bindings for onclick handlers in HTML
+        function setSortMethod(method) {
+            AudioMetadataEditor.setSortMethod(method);
         }
         
         function saveFilename() {
-            const newName = document.getElementById('filename-input').value.trim();
-            if (!newName || newName === originalFilename) {
-                cancelFilenameEdit();
-                return;
-            }
-            
-            setFormEnabled(false);
-            showStatus('Renaming file...', 'success');
-            
-            fetch('/rename', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    oldPath: currentFile,
-                    newName: newName
-                })
-            })
-            .then(r => r.json())
-            .then(result => {
-                if (result.status === 'success') {
-                    currentFile = result.newPath;
-                    originalFilename = newName;
-                    document.getElementById('current-filename').textContent = newName;
-                    cancelFilenameEdit();
-                    showStatus('File renamed successfully!', 'success');
-                    
-                    // Update file list
-                    loadFiles(currentPath);
-                } else {
-                    showStatus(result.error || 'Error renaming file', 'error');
-                }
-                setFormEnabled(true);
-            })
-            .catch(err => {
-                console.error('Error renaming file:', err);
-                showStatus('Error renaming file', 'error');
-                setFormEnabled(true);
-            });
+            AudioMetadataEditor.saveFilename();
         }
         
-        // Album art functions
+        function resetFilename() {
+            AudioMetadataEditor.resetFilename();
+        }
+        
+        function cancelFilenameEdit() {
+            AudioMetadataEditor.cancelFilenameEdit();
+        }
+        
         function handleArtUpload(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-            
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                pendingAlbumArt = e.target.result;
-                shouldRemoveArt = false;
-                
-                // Display preview
-                const artDisplay = document.getElementById('art-display');
-                artDisplay.innerHTML = `<img src="${pendingAlbumArt}" class="album-art">`;
-                document.querySelector('.delete-art-btn').style.display = 'block';
-                document.querySelector('.save-image-btn').style.display = 'block';
-                document.querySelector('.apply-folder-btn').style.display = 'block';
-                
-                showStatus('Image loaded. Click "Save Image" to save only the image, or "Save" to save all changes.', 'success');
-            };
-            reader.readAsDataURL(file);
-            
-            // Clear file input
-            event.target.value = '';
+            AudioMetadataEditor.handleArtUpload(event);
         }
         
         function deleteAlbumArt() {
-            shouldRemoveArt = true;
-            pendingAlbumArt = null;
-            
-            // Update display
-            const artDisplay = document.getElementById('art-display');
-            artDisplay.innerHTML = '<div class="album-art-placeholder">No album art</div>';
-            document.querySelector('.delete-art-btn').style.display = 'none';
-            document.querySelector('.save-image-btn').style.display = 'none';
-            document.querySelector('.apply-folder-btn').style.display = 'none';
-            
-            showStatus('Album art marked for deletion. Click Save to apply changes.', 'success');
+            AudioMetadataEditor.deleteAlbumArt();
         }
         
         function saveAlbumArt() {
-            if (!currentFile || !pendingAlbumArt) return;
-            
-            // Disable buttons while saving
-            document.querySelector('.save-image-btn').disabled = true;
-            showStatus('Saving album art...', 'success');
-            
-            // Create minimal data object with only art
-            const data = { art: pendingAlbumArt };
-            
-            fetch(`/metadata/${encodeURIComponent(currentFile)}`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(data)
-            })
-            .then(r => r.json())
-            .then(result => {
-                if (result.status === 'success') {
-                    showStatus('Album art saved successfully!', 'success');
-                    
-                    // Update current state
-                    currentAlbumArt = pendingAlbumArt;
-                    pendingAlbumArt = null;
-                    
-                    // Hide save image button since it's been saved
-                    document.querySelector('.save-image-btn').style.display = 'none';
-                    document.querySelector('.apply-folder-btn').style.display = 'none';
-                    document.querySelector('.save-image-btn').disabled = false;
-                } else {
-                    showStatus('Error saving album art', 'error');
-                    document.querySelector('.save-image-btn').disabled = false;
-                }
-            })
-            .catch(err => {
-                console.error('Error saving album art:', err);
-                showStatus('Error saving album art', 'error');
-                document.querySelector('.save-image-btn').disabled = false;
-            });
+            AudioMetadataEditor.saveAlbumArt();
         }
         
         function applyArtToFolder() {
-            if (!currentFile || (!pendingAlbumArt && !currentAlbumArt)) return;
-            
-            const artToApply = pendingAlbumArt || (currentAlbumArt ? `data:image/jpeg;base64,${currentAlbumArt}` : null);
-            if (!artToApply) {
-                showStatus('No album art to apply', 'error');
-                return;
-            }
-            
-            // Get folder path from current file
-            const folderPath = currentFile.substring(0, currentFile.lastIndexOf('/'));
-            
-            // Confirm action
-            if (!confirm(`Apply this album art to all files in the folder "${folderPath || 'root'}"? This will replace any existing album art.`)) {
-                return;
-            }
-            
-            // Disable buttons while processing
-            document.querySelector('.apply-folder-btn').disabled = true;
-            setFormEnabled(false);
-            showStatus('Applying album art to all files in folder...', 'success');
-            
-            // Send request to new endpoint
-            fetch('/apply-art-to-folder', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    folderPath: folderPath,
-                    art: artToApply
-                })
-            })
-            .then(r => r.json())
-            .then(result => {
-                if (result.status === 'success') {
-                    showStatus(`Album art applied to ${result.filesUpdated} files successfully!`, 'success');
-                    
-                    // If we applied pending art to current file too, update state
-                    if (pendingAlbumArt) {
-                        currentAlbumArt = pendingAlbumArt;
-                        pendingAlbumArt = null;
-                        document.querySelector('.save-image-btn').style.display = 'none';
-                        document.querySelector('.apply-folder-btn').style.display = 'none';
-                    }
-                } else {
-                    showStatus(result.error || 'Error applying album art to folder', 'error');
-                }
-                document.querySelector('.apply-folder-btn').disabled = false;
-                setFormEnabled(true);
-            })
-            .catch(err => {
-                console.error('Error applying album art to folder:', err);
-                showStatus('Error applying album art to folder', 'error');
-                document.querySelector('.apply-folder-btn').disabled = false;
-                setFormEnabled(true);
-            });
+            AudioMetadataEditor.applyArtToFolder();
+        }
+        
+        function applyFieldToFolder(field) {
+            AudioMetadataEditor.applyFieldToFolder(field);
         }
         
         function save() {
-            if (!currentFile) return;
-            
-            const data = {
-                title: document.getElementById('title').value,
-                artist: document.getElementById('artist').value,
-                album: document.getElementById('album').value,
-                albumartist: document.getElementById('albumartist').value,
-                date: document.getElementById('date').value,
-                genre: document.getElementById('genre').value,
-                track: document.getElementById('track').value,
-                disc: document.getElementById('disc').value
-            };
-            
-            // Handle album art changes
-            if (pendingAlbumArt) {
-                data.art = pendingAlbumArt;
-            } else if (shouldRemoveArt) {
-                data.removeArt = true;
-            }
-            
-            // Disable form while saving
-            setFormEnabled(false);
-            showStatus('Saving metadata...', 'success');
-            
-            fetch(`/metadata/${encodeURIComponent(currentFile)}`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(data)
-            })
-            .then(r => r.json())
-            .then(result => {
-                if (result.status === 'success') {
-                    showStatus('Metadata saved successfully!', 'success');
-                    
-                    // Update original metadata values
-                    Object.keys(data).forEach(key => {
-                        if (key !== 'art' && key !== 'removeArt') {
-                            originalMetadata[key] = data[key];
-                        }
-                    });
-                    
-                    // Hide all apply-to-folder buttons since values are now "original"
-                    document.querySelectorAll('.apply-to-folder-btn').forEach(btn => {
-                        btn.classList.remove('visible');
-                    });
-                    
-                    // Update current state
-                    if (pendingAlbumArt) {
-                        currentAlbumArt = pendingAlbumArt;
-                        document.querySelector('.save-image-btn').style.display = 'none';
-                        document.querySelector('.apply-folder-btn').style.display = 'none';
-                    } else if (shouldRemoveArt) {
-                        currentAlbumArt = null;
-                    }
-                    pendingAlbumArt = null;
-                    shouldRemoveArt = false;
-                } else {
-                    showStatus('Error saving metadata', 'error');
-                }
-                setFormEnabled(true);
-            })
-            .catch(err => {
-                console.error('Error saving metadata:', err);
-                showStatus('Error saving metadata', 'error');
-                setFormEnabled(true);
-            });
+            AudioMetadataEditor.save();
         }
         
         function resetForm() {
-            if (!currentFile) return;
+            AudioMetadataEditor.resetForm();
+        }
+        
+        // Filename edit click handler
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('current-filename').onclick = function() {
+                if (!AudioMetadataEditor.state.currentFile) return;
+                
+                document.getElementById('current-filename').style.display = 'none';
+                document.querySelector('.filename-edit').style.display = 'flex';
+                document.getElementById('filename-input').value = AudioMetadataEditor.state.originalFilename;
+                document.getElementById('filename-input').focus();
+            };
             
-            // Reload metadata from file
-            fetch(`/metadata/${encodeURIComponent(currentFile)}`)
-                .then(r => {
-                    if (!r.ok) throw new Error('Failed to load metadata');
-                    return r.json();
-                })
-                .then(data => {
-                    // Update original metadata values
-                    originalMetadata = {
-                        title: data.title || '',
-                        artist: data.artist || '',
-                        album: data.album || '',
-                        albumartist: data.albumartist || '',
-                        date: data.date || '',
-                        genre: data.genre || '',
-                        track: data.track || '',
-                        disc: data.disc || ''
-                    };
-                    
-                    // Set form values
-                    document.getElementById('title').value = originalMetadata.title;
-                    document.getElementById('artist').value = originalMetadata.artist;
-                    document.getElementById('album').value = originalMetadata.album;
-                    document.getElementById('albumartist').value = originalMetadata.albumartist;
-                    document.getElementById('date').value = originalMetadata.date;
-                    document.getElementById('genre').value = originalMetadata.genre;
-                    document.getElementById('track').value = originalMetadata.track;
-                    document.getElementById('disc').value = originalMetadata.disc;
-                    
-                    // Hide all apply-to-folder buttons
-                    document.querySelectorAll('.apply-to-folder-btn').forEach(btn => {
-                        btn.classList.remove('visible');
-                    });
-                    
-                    // Reset album art
-                    pendingAlbumArt = null;
-                    shouldRemoveArt = false;
-                    
-                    const artDisplay = document.getElementById('art-display');
-                    const deleteBtn = document.querySelector('.delete-art-btn');
-                    const saveImageBtn = document.querySelector('.save-image-btn');
-                    const applyFolderBtn = document.querySelector('.apply-folder-btn');
-                    
-                    if (data.hasArt && data.art) {
-                        currentAlbumArt = data.art;
-                        artDisplay.innerHTML = `<img src="data:image/jpeg;base64,${data.art}" class="album-art">`;
-                        deleteBtn.style.display = 'block';
-                        saveImageBtn.style.display = 'none';
-                        applyFolderBtn.style.display = 'none';
-                    } else {
-                        currentAlbumArt = null;
-                        artDisplay.innerHTML = '<div class="album-art-placeholder">No album art</div>';
-                        deleteBtn.style.display = 'none';
-                        saveImageBtn.style.display = 'none';
-                        applyFolderBtn.style.display = 'none';
-                    }
-                    
-                    hideStatus();
-                    showStatus('Form reset to original values', 'success');
-                    setTimeout(hideStatus, 2000);
-                })
-                .catch(err => {
-                    console.error('Error resetting form:', err);
-                    showStatus('Error resetting form', 'error');
-                });
-        }
-        
-        function setFormEnabled(enabled) {
-            const inputs = document.querySelectorAll('#metadata-form input');
-            const buttons = document.querySelectorAll('button');
-            
-            inputs.forEach(input => input.disabled = !enabled);
-            buttons.forEach(button => button.disabled = !enabled);
-        }
-        
-        function showStatus(message, type) {
-            const status = document.getElementById('status');
-            status.textContent = message;
-            status.className = `status ${type}`;
-            status.style.display = 'block';
-        }
-        
-        function hideStatus() {
-            const status = document.getElementById('status');
-            status.style.display = 'none';
-        }
+            // Initialize the application
+            AudioMetadataEditor.init();
+        });
     </script>
 </body>
 </html>
