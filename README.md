@@ -11,6 +11,7 @@ A modern web-based metadata editor for audio files, designed for managing large 
 - 📁 Bulk operations: Apply metadata to all files in a folder
 - ⌨️ Keyboard navigation: Arrow keys, tab switching, and shortcuts
 - 🎛️ Three-pane interface: Folders, files, and metadata editing
+- 🔍 File filtering: Quick search to filter files by name in large folders
 - ▶️ In-browser playback: Files can be played through the web interface
 - 🔄 File renaming: Direct file management through the web interface
 - 🌙 Modern dark UI: Responsive design with resizable panes
@@ -175,6 +176,12 @@ id -g  # Your group ID
 Found a bug or have a feature request? Please open an issue!
 
 Pull requests welcome - see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+## Contributors
+
+Thanks to all contributors who help improve metadata-remote!
+
+- [@gauravjot](https://github.com/gauravjot) - Added file filtering feature
 
 ## License
 
