@@ -30,9 +30,14 @@
             --success: #4ade80;
             --success-bg: #1a3a1a;
             --success-border: #2a5a2a;
+            --success-glow: rgba(74, 222, 128, 0.3);
             --error: #ff6b6b;
             --error-bg: #3a1a1a;
             --error-border: #5a2a2a;
+            --error-glow: rgba(255, 107, 107, 0.3);
+            --warning: #ffa94d;
+            --warning-bg: #3a2a1a;
+            --warning-glow: rgba(255, 169, 77, 0.3);
             --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
             --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
             --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
@@ -523,6 +528,13 @@
         .filename-save {
             background: linear-gradient(135deg, #2d5a2d 0%, #3a7a3a 100%);
             color: white;
+            min-width: 80px;
+        }
+        
+        .filename-save.processing,
+        .filename-save.success,
+        .filename-save.error {
+            min-width: 120px;
         }
         
         .filename-save:hover {
@@ -609,6 +621,8 @@
             display: flex;
             flex-direction: column;
             gap: 0.75rem;
+            align-items: stretch;
+            min-width: 150px;
         }
         
         .album-art-controls button {
@@ -621,6 +635,15 @@
             transition: all var(--transition-fast);
             position: relative;
             overflow: hidden;
+            width: 100%;
+        }
+        
+        /* Expand album art buttons when showing status */
+        .album-art-controls .btn-status.processing,
+        .album-art-controls .btn-status.success,
+        .album-art-controls .btn-status.error,
+        .album-art-controls .btn-status.warning {
+            min-width: 220px;
         }
         
         .album-art-controls button::before {
@@ -634,9 +657,10 @@
             background: rgba(255, 255, 255, 0.3);
             transform: translate(-50%, -50%);
             transition: width 0.6s, height 0.6s;
+            z-index: -1;
         }
         
-        .album-art-controls button:hover::before {
+        .album-art-controls button:hover:not(.processing):not(.success):not(.error):not(.warning)::before {
             width: 300px;
             height: 300px;
         }
@@ -646,9 +670,19 @@
             color: var(--text-primary);
         }
         
+        .upload-btn:hover:not(.processing):not(.success):not(.error):not(.warning) {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(58, 58, 58, 0.4);
+        }
+        
         .save-image-btn {
             background: linear-gradient(135deg, #2d5a2d 0%, #3a7a3a 100%);
             color: white;
+        }
+        
+        .save-image-btn:hover:not(.processing):not(.success):not(.error):not(.warning) {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(45, 90, 45, 0.4);
         }
         
         .apply-folder-btn {
@@ -656,9 +690,19 @@
             color: white;
         }
         
+        .apply-folder-btn:hover:not(.processing):not(.success):not(.error):not(.warning) {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(74, 93, 122, 0.4);
+        }
+        
         .delete-art-btn {
             background: linear-gradient(135deg, #5a2a2a 0%, #7a3a3a 100%);
             color: white;
+        }
+        
+        .delete-art-btn:hover:not(.processing):not(.success):not(.error):not(.warning) {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(90, 45, 45, 0.4);
         }
         
         input[type="file"] {
@@ -720,14 +764,15 @@
             background: rgba(255, 255, 255, 0.3);
             transform: translate(-50%, -50%);
             transition: width 0.6s, height 0.6s;
+            z-index: -1;
         }
         
-        .apply-to-folder-btn:hover::before {
+        .apply-to-folder-btn:hover:not(.processing):not(.success):not(.error):not(.warning)::before {
             width: 300px;
             height: 300px;
         }
         
-        .apply-to-folder-btn:hover:not(:disabled) {
+        .apply-to-folder-btn:hover:not(:disabled):not(.processing):not(.success):not(.error):not(.warning) {
             transform: translateY(-2px);
             box-shadow: 0 6px 20px rgba(74, 93, 122, 0.5);
         }
@@ -788,6 +833,8 @@
             display: flex;
             gap: 1rem;
             margin-top: 1.5rem;
+            flex-wrap: wrap;
+            align-items: center;
         }
         
         button {
@@ -802,6 +849,20 @@
             overflow: hidden;
         }
         
+        /* Allow overflow for status messages to prevent cutoff */
+        .btn-status.processing,
+        .btn-status.success,
+        .btn-status.error,
+        .btn-status.warning {
+            overflow: visible;
+        }
+        
+        /* Keep ripple effect contained */
+        button::before,
+        button::after {
+            z-index: -1;
+        }
+        
         button:disabled {
             opacity: 0.5;
             cursor: not-allowed;
@@ -811,9 +872,17 @@
             background: linear-gradient(135deg, #2d5a2d 0%, #3a7a3a 100%);
             color: white;
             flex: 1;
+            min-width: 120px;
         }
         
-        .save-btn:hover:not(:disabled) {
+        .save-btn.processing,
+        .save-btn.success,
+        .save-btn.error {
+            flex: 0 0 auto;
+            min-width: 160px;
+        }
+        
+        .save-btn:hover:not(:disabled):not(.processing):not(.success):not(.error):not(.warning) {
             transform: translateY(-2px);
             box-shadow: 0 6px 20px rgba(45, 90, 45, 0.5);
         }
@@ -821,46 +890,158 @@
         .clear-btn {
             background: linear-gradient(135deg, #3a3a3a 0%, #4a4a4a 100%);
             color: var(--text-primary);
+            min-width: 80px;
         }
         
-        .clear-btn:hover:not(:disabled) {
+        .clear-btn.processing,
+        .clear-btn.success,
+        .clear-btn.error {
+            min-width: 120px;
+        }
+        
+        .clear-btn:hover:not(:disabled):not(.processing):not(.success):not(.error):not(.warning) {
             transform: translateY(-2px);
             box-shadow: 0 6px 20px rgba(58, 58, 58, 0.5);
         }
         
-        .status {
-            padding: 1rem 1.25rem;
-            margin-top: 1.5rem;
-            border-radius: 8px;
-            font-size: 0.85rem;
-            display: none;
-            animation: statusSlide var(--transition-normal);
-            backdrop-filter: blur(5px);
+        /* Button Status Styles */
+        .btn-status {
+            position: relative;
+            transition: all var(--transition-normal), width var(--transition-normal), min-width var(--transition-normal);
+            min-width: fit-content;
         }
         
-        @keyframes statusSlide {
+        .btn-status-content {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            transition: opacity var(--transition-fast);
+            position: relative;
+            z-index: 1;
+        }
+        
+        .btn-status-message {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity var(--transition-fast);
+            font-size: 0.85rem;
+            padding: 0 1rem;
+            white-space: nowrap;
+            overflow: visible;
+            text-overflow: ellipsis;
+            z-index: 2;
+        }
+        
+        /* Expand button when showing status */
+        .btn-status.processing,
+        .btn-status.success,
+        .btn-status.error,
+        .btn-status.warning {
+            min-width: max-content;
+            width: auto !important;
+        }
+        
+        /* Special handling for apply-to-folder buttons */
+        .apply-to-folder-btn.btn-status {
+            transition: all var(--transition-normal), width var(--transition-normal);
+        }
+        
+        .apply-to-folder-btn.processing,
+        .apply-to-folder-btn.success,
+        .apply-to-folder-btn.error,
+        .apply-to-folder-btn.warning {
+            min-width: 200px;
+        }
+        
+        .btn-status.processing .btn-status-content,
+        .btn-status.success .btn-status-content,
+        .btn-status.error .btn-status-content {
+            opacity: 0;
+        }
+        
+        .btn-status.processing .btn-status-message,
+        .btn-status.success .btn-status-message,
+        .btn-status.error .btn-status-message {
+            opacity: 1;
+        }
+        
+        /* Processing state */
+        .btn-status.processing {
+            background: linear-gradient(135deg, #4a5d7a 0%, #5a6d8a 100%) !important;
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.8; }
+        }
+        
+        /* Success state */
+        .btn-status.success {
+            background: linear-gradient(135deg, #2d5a2d 0%, #3a7a3a 100%) !important;
+            box-shadow: 0 4px 16px var(--success-glow) !important;
+        }
+        
+        /* Error state */
+        .btn-status.error {
+            background: linear-gradient(135deg, #5a2a2a 0%, #7a3a3a 100%) !important;
+            box-shadow: 0 4px 16px var(--error-glow) !important;
+        }
+        
+        /* Warning state */
+        .btn-status.warning {
+            background: linear-gradient(135deg, #5a4a2a 0%, #7a6a3a 100%) !important;
+            box-shadow: 0 4px 16px var(--warning-glow) !important;
+        }
+        
+        /* Status icons */
+        .status-icon {
+            font-size: 1rem;
+            animation: statusIconIn var(--transition-normal);
+        }
+        
+        @keyframes statusIconIn {
             from {
+                transform: scale(0);
                 opacity: 0;
-                transform: translateY(10px);
             }
             to {
+                transform: scale(1);
                 opacity: 1;
-                transform: translateY(0);
             }
         }
         
-        .status.success {
-            background: linear-gradient(135deg, var(--success-bg) 0%, rgba(26, 58, 26, 0.8) 100%);
-            color: var(--success);
-            border: 1px solid var(--success-border);
-            box-shadow: 0 4px 12px rgba(74, 222, 128, 0.2);
+        .status-icon.success { color: #4ade80; }
+        .status-icon.error { color: #ff6b6b; }
+        .status-icon.warning { color: #ffa94d; }
+        
+        /* Loading spinner */
+        .spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255,255,255,.2);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 0.8s ease-in-out infinite;
         }
         
-        .status.error {
-            background: linear-gradient(135deg, var(--error-bg) 0%, rgba(58, 26, 26, 0.8) 100%);
-            color: var(--error);
-            border: 1px solid var(--error-border);
-            box-shadow: 0 4px 12px rgba(255, 107, 107, 0.2);
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        /* Legacy status (hidden but preserved for compatibility) */
+        .status {
+            display: none !important;
         }
         
         .no-file-selected {
@@ -869,20 +1050,6 @@
             margin-top: 4rem;
             font-size: 0.95rem;
             opacity: 0.7;
-        }
-        
-        .loading {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 3px solid rgba(255,255,255,.2);
-            border-radius: 50%;
-            border-top-color: var(--accent-primary);
-            animation: spin 1s ease-in-out infinite;
-        }
-        
-        @keyframes spin {
-            to { transform: rotate(360deg); }
         }
         
         /* Scrollbar styling */
@@ -928,7 +1095,7 @@
             transform-origin: 50% 50%;
         }
         
-        button:focus:not(:active)::after {
+        button:focus:not(:active):not(.processing):not(.success):not(.error):not(.warning)::after {
             animation: ripple 1s ease-out;
         }
         
@@ -945,6 +1112,18 @@
                 opacity: 0;
                 transform: scale(40, 40);
             }
+        }
+        
+        /* Disable hover effects during status display */
+        .btn-status.processing::before,
+        .btn-status.success::before,
+        .btn-status.error::before,
+        .btn-status.warning::before,
+        .btn-status.processing::after,
+        .btn-status.success::after,
+        .btn-status.error::after,
+        .btn-status.warning::after {
+            display: none !important;
         }
     </style>
 </head>
@@ -997,7 +1176,10 @@
                 
                 <div class="filename-edit">
                     <input type="text" id="filename-input" placeholder="Enter new filename">
-                    <button class="filename-save" onclick="saveFilename()">Save</button>
+                    <button class="filename-save btn-status" onclick="saveFilename()">
+                        <span class="btn-status-content">Save</span>
+                        <span class="btn-status-message"></span>
+                    </button>
                     <button class="filename-reset" onclick="resetFilename()">Reset</button>
                     <button class="filename-cancel" onclick="cancelFilenameEdit()">✕</button>
                 </div>
@@ -1009,9 +1191,18 @@
                         </div>
                         <div class="album-art-controls">
                             <button class="upload-btn" onclick="document.getElementById('art-upload').click()">Upload Image</button>
-                            <button class="save-image-btn" onclick="saveAlbumArt()" style="display: none;">Save Image</button>
-                            <button class="apply-folder-btn" onclick="applyArtToFolder()" style="display: none;">Apply to All in Folder</button>
-                            <button class="delete-art-btn" onclick="deleteAlbumArt()" style="display: none;">Delete Image</button>
+                            <button class="save-image-btn btn-status" onclick="saveAlbumArt()" style="display: none;">
+                                <span class="btn-status-content">Save Image</span>
+                                <span class="btn-status-message"></span>
+                            </button>
+                            <button class="apply-folder-btn btn-status" onclick="applyArtToFolder()" style="display: none;">
+                                <span class="btn-status-content">Apply to All in Folder</span>
+                                <span class="btn-status-message"></span>
+                            </button>
+                            <button class="delete-art-btn btn-status" onclick="deleteAlbumArt()" style="display: none;">
+                                <span class="btn-status-content">Delete Image</span>
+                                <span class="btn-status-message"></span>
+                            </button>
                             <input type="file" id="art-upload" accept="image/*" onchange="handleArtUpload(event)">
                         </div>
                     </div>
@@ -1023,7 +1214,10 @@
                             <label for="title">Title</label>
                             <input type="text" id="title" placeholder="Enter title" data-field="title">
                         </div>
-                        <button type="button" class="apply-to-folder-btn" data-field="title" onclick="applyFieldToFolder('title')">Apply to Folder</button>
+                        <button type="button" class="apply-to-folder-btn btn-status" data-field="title" onclick="applyFieldToFolder('title')">
+                            <span class="btn-status-content">Apply to Folder</span>
+                            <span class="btn-status-message"></span>
+                        </button>
                     </div>
                     
                     <div class="form-group-with-button">
@@ -1031,7 +1225,10 @@
                             <label for="artist">Artist</label>
                             <input type="text" id="artist" placeholder="Enter artist" data-field="artist">
                         </div>
-                        <button type="button" class="apply-to-folder-btn" data-field="artist" onclick="applyFieldToFolder('artist')">Apply to Folder</button>
+                        <button type="button" class="apply-to-folder-btn btn-status" data-field="artist" onclick="applyFieldToFolder('artist')">
+                            <span class="btn-status-content">Apply to Folder</span>
+                            <span class="btn-status-message"></span>
+                        </button>
                     </div>
                     
                     <div class="form-group-with-button">
@@ -1039,7 +1236,10 @@
                             <label for="album">Album</label>
                             <input type="text" id="album" placeholder="Enter album" data-field="album">
                         </div>
-                        <button type="button" class="apply-to-folder-btn" data-field="album" onclick="applyFieldToFolder('album')">Apply to Folder</button>
+                        <button type="button" class="apply-to-folder-btn btn-status" data-field="album" onclick="applyFieldToFolder('album')">
+                            <span class="btn-status-content">Apply to Folder</span>
+                            <span class="btn-status-message"></span>
+                        </button>
                     </div>
                     
                     <div class="form-group-with-button">
@@ -1047,7 +1247,10 @@
                             <label for="albumartist">Album Artist</label>
                             <input type="text" id="albumartist" placeholder="Enter album artist" data-field="albumartist">
                         </div>
-                        <button type="button" class="apply-to-folder-btn" data-field="albumartist" onclick="applyFieldToFolder('albumartist')">Apply to Folder</button>
+                        <button type="button" class="apply-to-folder-btn btn-status" data-field="albumartist" onclick="applyFieldToFolder('albumartist')">
+                            <span class="btn-status-content">Apply to Folder</span>
+                            <span class="btn-status-message"></span>
+                        </button>
                     </div>
                     
                     <div class="form-group-with-button">
@@ -1055,7 +1258,10 @@
                             <label for="date">Year</label>
                             <input type="text" id="date" placeholder="Enter year" data-field="date">
                         </div>
-                        <button type="button" class="apply-to-folder-btn" data-field="date" onclick="applyFieldToFolder('date')">Apply to Folder</button>
+                        <button type="button" class="apply-to-folder-btn btn-status" data-field="date" onclick="applyFieldToFolder('date')">
+                            <span class="btn-status-content">Apply to Folder</span>
+                            <span class="btn-status-message"></span>
+                        </button>
                     </div>
                     
                     <div class="form-group-with-button">
@@ -1063,7 +1269,10 @@
                             <label for="genre">Genre</label>
                             <input type="text" id="genre" placeholder="Enter genre" data-field="genre">
                         </div>
-                        <button type="button" class="apply-to-folder-btn" data-field="genre" onclick="applyFieldToFolder('genre')">Apply to Folder</button>
+                        <button type="button" class="apply-to-folder-btn btn-status" data-field="genre" onclick="applyFieldToFolder('genre')">
+                            <span class="btn-status-content">Apply to Folder</span>
+                            <span class="btn-status-message"></span>
+                        </button>
                     </div>
                     
                     <div class="form-group-with-button">
@@ -1071,7 +1280,10 @@
                             <label for="track">Track Number</label>
                             <input type="text" id="track" placeholder="Enter track number" data-field="track">
                         </div>
-                        <button type="button" class="apply-to-folder-btn" data-field="track" onclick="applyFieldToFolder('track')">Apply to Folder</button>
+                        <button type="button" class="apply-to-folder-btn btn-status" data-field="track" onclick="applyFieldToFolder('track')">
+                            <span class="btn-status-content">Apply to Folder</span>
+                            <span class="btn-status-message"></span>
+                        </button>
                     </div>
                     
                     <div class="form-group-with-button">
@@ -1079,12 +1291,21 @@
                             <label for="disc">CD Number</label>
                             <input type="text" id="disc" placeholder="Enter CD number" data-field="disc">
                         </div>
-                        <button type="button" class="apply-to-folder-btn" data-field="disc" onclick="applyFieldToFolder('disc')">Apply to Folder</button>
+                        <button type="button" class="apply-to-folder-btn btn-status" data-field="disc" onclick="applyFieldToFolder('disc')">
+                            <span class="btn-status-content">Apply to Folder</span>
+                            <span class="btn-status-message"></span>
+                        </button>
                     </div>
                     
                     <div class="buttons">
-                        <button type="button" class="save-btn" onclick="save()">Save</button>
-                        <button type="button" class="clear-btn" onclick="resetForm()">Reset</button>
+                        <button type="button" class="save-btn btn-status" onclick="save()">
+                            <span class="btn-status-content">Save all fields</span>
+                            <span class="btn-status-message"></span>
+                        </button>
+                        <button type="button" class="clear-btn btn-status" onclick="resetForm()">
+                            <span class="btn-status-content">Reset</span>
+                            <span class="btn-status-message"></span>
+                        </button>
                     </div>
                 </form>
                 
@@ -1145,6 +1366,79 @@
                 } catch (error) {
                     console.error(`API error for ${url}:`, error);
                     throw error;
+                }
+            },
+            
+            // Enhanced button status management
+            showButtonStatus(button, message, type = 'processing', duration = 3000) {
+                if (!button || !button.classList.contains('btn-status')) return;
+                
+                // Clear any existing timeout
+                if (button._statusTimeout) {
+                    clearTimeout(button._statusTimeout);
+                }
+                
+                // Store original width if not already stored
+                if (!button._originalWidth) {
+                    button._originalWidth = window.getComputedStyle(button).width;
+                }
+                
+                // Remove all status classes
+                button.classList.remove('processing', 'success', 'error', 'warning');
+                
+                // Add new status class
+                button.classList.add(type);
+                
+                // Truncate very long messages
+                const maxLength = 30;
+                const displayMessage = message.length > maxLength ? 
+                    message.substring(0, maxLength - 3) + '...' : message;
+                
+                // Update message
+                const messageEl = button.querySelector('.btn-status-message');
+                if (messageEl) {
+                    if (type === 'processing') {
+                        messageEl.innerHTML = `<span class="spinner"></span> ${displayMessage}`;
+                    } else {
+                        const icons = {
+                            success: '✓',
+                            error: '✕',
+                            warning: '⚠'
+                        };
+                        messageEl.innerHTML = `<span class="status-icon ${type}">${icons[type] || ''}</span> ${displayMessage}`;
+                    }
+                    
+                    // Add title attribute for full message if truncated
+                    if (message.length > maxLength) {
+                        button.title = message;
+                    }
+                }
+                
+                // Auto-clear status after duration (except for processing)
+                if (type !== 'processing' && duration > 0) {
+                    button._statusTimeout = setTimeout(() => {
+                        this.clearButtonStatus(button);
+                    }, duration);
+                }
+            },
+            
+            clearButtonStatus(button) {
+                if (!button || !button.classList.contains('btn-status')) return;
+                
+                if (button._statusTimeout) {
+                    clearTimeout(button._statusTimeout);
+                    delete button._statusTimeout;
+                }
+                
+                button.classList.remove('processing', 'success', 'error', 'warning');
+                button.title = ''; // Clear tooltip
+                
+                // Restore original width after a brief delay
+                if (button._originalWidth) {
+                    setTimeout(() => {
+                        button.style.width = '';
+                        delete button._originalWidth;
+                    }, 300);
                 }
             },
         
@@ -1824,6 +2118,7 @@
             },
         
             async saveFilename() {
+                const button = document.querySelector('.filename-save');
                 const newName = document.getElementById('filename-input').value.trim();
                 if (!newName || newName === this.state.originalFilename) {
                     this.cancelFilenameEdit();
@@ -1831,7 +2126,7 @@
                 }
                 
                 this.setFormEnabled(false);
-                this.showStatus('Renaming file...', 'success');
+                this.showButtonStatus(button, 'Renaming...', 'processing');
                 
                 try {
                     const result = await this.apiCall('/rename', {
@@ -1848,14 +2143,14 @@
                         this.state.originalFilename = newName;
                         document.getElementById('current-filename').textContent = newName;
                         this.cancelFilenameEdit();
-                        this.showStatus('File renamed successfully!', 'success');
+                        this.showButtonStatus(button, 'Renamed!', 'success');
                         this.loadFiles(this.state.currentPath);
                     } else {
-                        this.showStatus(result.error || 'Error renaming file', 'error');
+                        this.showButtonStatus(button, result.error || 'Error', 'error');
                     }
                 } catch (err) {
                     console.error('Error renaming file:', err);
-                    this.showStatus('Error renaming file', 'error');
+                    this.showButtonStatus(button, 'Error', 'error');
                 }
                 
                 this.setFormEnabled(true);
@@ -1885,6 +2180,7 @@
             },
         
             deleteAlbumArt() {
+                const button = document.querySelector('.delete-art-btn');
                 this.state.shouldRemoveArt = true;
                 this.state.pendingAlbumArt = null;
                 
@@ -1894,14 +2190,15 @@
                 document.querySelector('.save-image-btn').style.display = 'none';
                 document.querySelector('.apply-folder-btn').style.display = 'none';
                 
-                this.showStatus('Album art marked for deletion. Click Save to apply changes.', 'success');
+                this.showButtonStatus(button, 'Marked for deletion', 'warning', 2000);
             },
         
             async saveAlbumArt() {
                 if (!this.state.currentFile || !this.state.pendingAlbumArt) return;
                 
-                document.querySelector('.save-image-btn').disabled = true;
-                this.showStatus('Saving album art...', 'success');
+                const button = document.querySelector('.save-image-btn');
+                button.disabled = true;
+                this.showButtonStatus(button, 'Saving...', 'processing');
                 
                 try {
                     const result = await this.apiCall(`/metadata/${encodeURIComponent(this.state.currentFile)}`, {
@@ -1911,29 +2208,32 @@
                     });
                     
                     if (result.status === 'success') {
-                        this.showStatus('Album art saved successfully!', 'success');
+                        this.showButtonStatus(button, 'Saved!', 'success');
                         this.state.currentAlbumArt = this.state.pendingAlbumArt;
                         this.state.pendingAlbumArt = null;
                         
-                        document.querySelector('.save-image-btn').style.display = 'none';
-                        document.querySelector('.apply-folder-btn').style.display = 'none';
+                        setTimeout(() => {
+                            document.querySelector('.save-image-btn').style.display = 'none';
+                            document.querySelector('.apply-folder-btn').style.display = 'none';
+                        }, 2000);
                     } else {
-                        this.showStatus('Error saving album art', 'error');
+                        this.showButtonStatus(button, 'Error', 'error');
                     }
                 } catch (err) {
                     console.error('Error saving album art:', err);
-                    this.showStatus('Error saving album art', 'error');
+                    this.showButtonStatus(button, 'Error', 'error');
                 }
                 
-                document.querySelector('.save-image-btn').disabled = false;
+                button.disabled = false;
             },
         
             async applyArtToFolder() {
                 if (!this.state.currentFile || (!this.state.pendingAlbumArt && !this.state.currentAlbumArt)) return;
                 
+                const button = document.querySelector('.apply-folder-btn');
                 const artToApply = this.state.pendingAlbumArt || (this.state.currentAlbumArt ? `data:image/jpeg;base64,${this.state.currentAlbumArt}` : null);
                 if (!artToApply) {
-                    this.showStatus('No album art to apply', 'error');
+                    this.showButtonStatus(button, 'No art', 'error', 2000);
                     return;
                 }
                 
@@ -1943,9 +2243,9 @@
                     return;
                 }
                 
-                document.querySelector('.apply-folder-btn').disabled = true;
+                button.disabled = true;
                 this.setFormEnabled(false);
-                this.showStatus('Applying album art to all files in folder...', 'success');
+                this.showButtonStatus(button, 'Applying...', 'processing');
                 
                 try {
                     const result = await this.apiCall('/apply-art-to-folder', {
@@ -1958,29 +2258,32 @@
                     });
                     
                     if (result.status === 'success') {
-                        this.showStatus(`Album art applied to ${result.filesUpdated} files successfully!`, 'success');
+                        this.showButtonStatus(button, `Applied to ${result.filesUpdated} files!`, 'success', 3000);
                         
                         if (this.state.pendingAlbumArt) {
                             this.state.currentAlbumArt = this.state.pendingAlbumArt;
                             this.state.pendingAlbumArt = null;
-                            document.querySelector('.save-image-btn').style.display = 'none';
-                            document.querySelector('.apply-folder-btn').style.display = 'none';
+                            setTimeout(() => {
+                                document.querySelector('.save-image-btn').style.display = 'none';
+                                document.querySelector('.apply-folder-btn').style.display = 'none';
+                            }, 3000);
                         }
                     } else {
-                        this.showStatus(result.error || 'Error applying album art to folder', 'error');
+                        this.showButtonStatus(button, result.error || 'Error', 'error');
                     }
                 } catch (err) {
                     console.error('Error applying album art to folder:', err);
-                    this.showStatus('Error applying album art to folder', 'error');
+                    this.showButtonStatus(button, 'Error', 'error');
                 }
                 
-                document.querySelector('.apply-folder-btn').disabled = false;
+                button.disabled = false;
                 this.setFormEnabled(true);
             },
         
             async applyFieldToFolder(field) {
                 if (!this.state.currentFile) return;
                 
+                const button = document.querySelector(`.apply-to-folder-btn[data-field="${field}"]`);
                 const value = document.getElementById(field).value.trim();
                 if (!value) return;
                 
@@ -1991,10 +2294,9 @@
                     return;
                 }
                 
-                const button = document.querySelector(`.apply-to-folder-btn[data-field="${field}"]`);
                 button.disabled = true;
                 this.setFormEnabled(false);
-                this.showStatus(`Applying ${fieldLabel} to all files in folder...`, 'success');
+                this.showButtonStatus(button, 'Applying...', 'processing');
                 
                 try {
                     const result = await this.apiCall('/apply-field-to-folder', {
@@ -2008,15 +2310,17 @@
                     });
                     
                     if (result.status === 'success') {
-                        this.showStatus(`${fieldLabel} applied to ${result.filesUpdated} files successfully!`, 'success');
+                        this.showButtonStatus(button, `Applied to ${result.filesUpdated} files!`, 'success', 3000);
                         this.state.originalMetadata[field] = value;
-                        button.classList.remove('visible');
+                        setTimeout(() => {
+                            button.classList.remove('visible');
+                        }, 1000);
                     } else {
-                        this.showStatus(result.error || `Error applying ${fieldLabel} to folder`, 'error');
+                        this.showButtonStatus(button, result.error || 'Error', 'error');
                     }
                 } catch (err) {
                     console.error(`Error applying ${fieldLabel} to folder:`, err);
-                    this.showStatus(`Error applying ${fieldLabel} to folder`, 'error');
+                    this.showButtonStatus(button, 'Error', 'error');
                 }
                 
                 button.disabled = false;
@@ -2026,6 +2330,7 @@
             async save() {
                 if (!this.state.currentFile) return;
                 
+                const button = document.querySelector('.save-btn');
                 const data = {
                     title: document.getElementById('title').value,
                     artist: document.getElementById('artist').value,
@@ -2044,7 +2349,7 @@
                 }
                 
                 this.setFormEnabled(false);
-                this.showStatus('Saving metadata...', 'success');
+                this.showButtonStatus(button, 'Saving...', 'processing');
                 
                 try {
                     const result = await this.apiCall(`/metadata/${encodeURIComponent(this.state.currentFile)}`, {
@@ -2054,7 +2359,7 @@
                     });
                     
                     if (result.status === 'success') {
-                        this.showStatus('Metadata saved successfully!', 'success');
+                        this.showButtonStatus(button, 'Saved!', 'success', 3000);
                         
                         Object.keys(data).forEach(key => {
                             if (key !== 'art' && key !== 'removeArt') {
@@ -2076,11 +2381,11 @@
                         this.state.pendingAlbumArt = null;
                         this.state.shouldRemoveArt = false;
                     } else {
-                        this.showStatus('Error saving metadata', 'error');
+                        this.showButtonStatus(button, 'Error', 'error');
                     }
                 } catch (err) {
                     console.error('Error saving metadata:', err);
-                    this.showStatus('Error saving metadata', 'error');
+                    this.showButtonStatus(button, 'Error', 'error');
                 }
                 
                 this.setFormEnabled(true);
@@ -2088,6 +2393,9 @@
         
             async resetForm() {
                 if (!this.state.currentFile) return;
+                
+                const button = document.querySelector('.clear-btn');
+                this.showButtonStatus(button, 'Resetting...', 'processing');
                 
                 try {
                     const data = await this.apiCall(`/metadata/${encodeURIComponent(this.state.currentFile)}`);
@@ -2133,12 +2441,10 @@
                         applyFolderBtn.style.display = 'none';
                     }
                     
-                    this.hideStatus();
-                    this.showStatus('Form reset to original values', 'success');
-                    setTimeout(() => this.hideStatus(), 2000);
+                    this.showButtonStatus(button, 'Reset!', 'success', 2000);
                 } catch (err) {
                     console.error('Error resetting form:', err);
-                    this.showStatus('Error resetting form', 'error');
+                    this.showButtonStatus(button, 'Error', 'error');
                 }
             },
         
@@ -2148,17 +2454,23 @@
                 const buttons = document.querySelectorAll('button');
                 
                 inputs.forEach(input => input.disabled = !enabled);
-                buttons.forEach(button => button.disabled = !enabled);
+                buttons.forEach(button => {
+                    if (!button.classList.contains('btn-status') || !button.classList.contains('processing')) {
+                        button.disabled = !enabled;
+                    }
+                });
             },
         
             showStatus(message, type) {
+                // Legacy function - kept for compatibility but hidden
                 const status = document.getElementById('status');
                 status.textContent = message;
                 status.className = `status ${type}`;
-                status.style.display = 'block';
+                // Status is now hidden by CSS
             },
         
             hideStatus() {
+                // Legacy function - kept for compatibility
                 const status = document.getElementById('status');
                 status.style.display = 'none';
             }
