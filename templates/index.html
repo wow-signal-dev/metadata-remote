@@ -2000,13 +2000,13 @@
                         return;
                     }
 
-                    const filter_value = document.getElementById('filter-box').value.trim();
+                    const filter_value = document.getElementById('filter-box').value.toLowerCase().trim();
                     
                     data.files.forEach(file => {
                         const li = document.createElement('li');
                         li.dataset.filepath = file.path;
 
-                        if (filter_value.length > 0 && !file.name.includes(filter_value)) {
+                        if (filter_value.length > 0 && !file.name.toLowerCase().includes(filter_value)) {
                             li.setAttribute("aria-hidden", "true");
                         }
                         
