@@ -312,18 +312,11 @@
         }
         
         .files h3 {
-            padding: 1rem 1.25rem;
-            background: linear-gradient(180deg, #1f1f1f 0%, #1a1a1a 100%);
             color: var(--text-primary);
-            position: sticky;
-            top: 0;
-            z-index: 10;
-            border-bottom: 1px solid var(--border-color);
             font-weight: 500;
             font-size: 0.9rem;
             letter-spacing: 0.05em;
             text-transform: uppercase;
-            backdrop-filter: blur(5px);
         }
         
         #file-count {
@@ -331,6 +324,23 @@
             color: var(--text-muted);
             margin-left: 0.5rem;
             font-size: 0.85rem;
+        }        
+
+        .files .files-header {
+            display: flex;
+            justify-content: space-between;
+            place-items: center;
+            padding: 0.75rem 1.25rem;
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            backdrop-filter: blur(5px);
+            background: linear-gradient(180deg, #1f1f1f 0%, #1a1a1a 100%);
+        }
+
+        .files .files-header #filter-box {
+            padding-block: 0.5rem;
         }
         
         #file-list {
@@ -379,6 +389,10 @@
         
         #file-list li.keyboard-focus {
             box-shadow: inset 0 0 0 1px var(--accent-primary);
+        }
+
+        #file-list li[aria-hidden="true"] {
+            display: none;
         }
         
         .file-info {
@@ -1160,7 +1174,12 @@
         <div class="divider" id="divider1"></div>
         
         <div class="files">
-            <h3>Files <span id="file-count"></span></h3>
+            <div class="files-header">
+                <h3>Files <span id="file-count"></span></h3>
+                <div>
+                    <input type="text" id="filter-box" placeholder="Type to filter..." />
+                </div>
+            </div>
             <ul id="file-list"></ul>
         </div>
         
@@ -1980,10 +1999,16 @@
                         list.appendChild(li);
                         return;
                     }
+
+                    const filter_value = document.getElementById('filter-box').value.toLowerCase().trim();
                     
                     data.files.forEach(file => {
                         const li = document.createElement('li');
                         li.dataset.filepath = file.path;
+
+                        if (filter_value.length > 0 && !file.name.toLowerCase().includes(filter_value)) {
+                            li.setAttribute("aria-hidden", "true");
+                        }
                         
                         const fileInfo = document.createElement('div');
                         fileInfo.className = 'file-info';
@@ -2534,6 +2559,23 @@
             
             // Initialize the application
             AudioMetadataEditor.init();
+        });
+
+        // Filter box on input handler
+        const filter_box = document.getElementById('filter-box');
+        filter_box.addEventListener('input', (e) => {
+          const value = e.target.value.toLowerCase().trim();
+          const file_list_li = document.querySelectorAll('#file-list > li');
+          for (let i = 0; i < file_list_li.length; i++) {
+            const li = file_list_li[i];
+            const file_name = li.querySelector('.file-info > div').innerText.toLowerCase();
+            // if the filterd value does not match name, hide item
+            if (value.length > 0 && !file_name.includes(value)) {
+              li.setAttribute("aria-hidden", "true");
+            } else {
+              li.removeAttribute("aria-hidden");
+            }
+          }
         });
     </script>
 </body>
