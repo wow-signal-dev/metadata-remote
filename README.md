@@ -141,6 +141,10 @@ docker-compose up -d --build
 ### Volumes
 - `/music`: Your music directory (read/write access required)
 
+## Security
+
+⚠️ This application is designed for LOCAL USE ONLY and should NEVER be exposed to the internet.
+
 ## Technical Details
 
 - **Backend**: Python Flask with FFmpeg
