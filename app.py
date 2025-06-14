@@ -17,8 +17,11 @@ logger = logging.getLogger(__name__)
 
 # Constants
 AUDIO_EXTENSIONS = ('.mp3', '.flac')
-OWNER_UID = 1000
-OWNER_GID = 1000
+OWNER_UID = int(os.environ.get('PUID', '1000'))
+OWNER_GID = int(os.environ.get('PGID', '1000'))
+
+# Log the values being used
+logger.info(f"Starting with PUID={OWNER_UID}, PGID={OWNER_GID}")
 
 @app.route('/')
 def index():
