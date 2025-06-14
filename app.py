@@ -166,6 +166,7 @@ def apply_metadata_to_file(filepath, new_tags, art_data=None, remove_art=False):
             with os.fdopen(fd2, 'wb') as f:
                 f.write(art_bytes)
             
+            # FIX: Map only audio streams from original file, then add new art
             cmd = [
                 'ffmpeg', '-i', filepath, '-i', temp_art_file, '-y',
                 '-map', '0:a', '-map', '1', '-c:v', 'mjpeg',
