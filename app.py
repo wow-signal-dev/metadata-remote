@@ -168,7 +168,7 @@ def apply_metadata_to_file(filepath, new_tags, art_data=None, remove_art=False):
             
             cmd = [
                 'ffmpeg', '-i', filepath, '-i', temp_art_file, '-y',
-                '-map', '0', '-map', '1', '-c:v', 'mjpeg',
+                '-map', '0:a', '-map', '1', '-c:v', 'mjpeg',
                 '-disposition:v', 'attached_pic', '-codec:a', 'copy',
                 '-f', output_format
             ]
