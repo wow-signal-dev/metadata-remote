@@ -1417,14 +1417,25 @@
                 const messageEl = button.querySelector('.btn-status-message');
                 if (messageEl) {
                     if (type === 'processing') {
-                        messageEl.innerHTML = `<span class="spinner"></span> ${displayMessage}`;
+                        // Clear existing content
+                        messageEl.textContent = '';
+                        const spinner = document.createElement('span');
+                        spinner.className = 'spinner';
+                        messageEl.appendChild(spinner);
+                        messageEl.appendChild(document.createTextNode(' ' + displayMessage));
                     } else {
                         const icons = {
                             success: '✓',
                             error: '✕',
                             warning: '⚠'
                         };
-                        messageEl.innerHTML = `<span class="status-icon ${type}">${icons[type] || ''}</span> ${displayMessage}`;
+                        // Clear existing content
+                        messageEl.textContent = '';
+                        const iconSpan = document.createElement('span');
+                        iconSpan.className = `status-icon ${type}`;
+                        iconSpan.textContent = icons[type] || '';
+                        messageEl.appendChild(iconSpan);
+                        messageEl.appendChild(document.createTextNode(' ' + displayMessage));
                     }
                     
                     // Add title attribute for full message if truncated
@@ -2014,7 +2025,10 @@
                         fileInfo.className = 'file-info';
                         
                         const nameDiv = document.createElement('div');
-                        nameDiv.innerHTML = `🎵 ${file.name}`;
+                        const musicIcon = document.createTextNode('🎵 ');
+                        const fileName = document.createTextNode(file.name);
+                        nameDiv.appendChild(musicIcon);
+                        nameDiv.appendChild(fileName);
                         fileInfo.appendChild(nameDiv);
                         
                         if (file.folder !== '.') {
