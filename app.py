@@ -6,6 +6,7 @@ import logging
 import tempfile
 import base64
 import re
+import urllib.parse
 from pathlib import Path
 
 app = Flask(__name__)
@@ -228,6 +229,13 @@ def stream_audio(filepath):
         file_size = os.path.getsize(file_path)
         range_header = request.headers.get('range', None)
         
+        # Prepare filename for Content-Disposition header
+        basename = os.path.basename(file_path)
+        # Create a safe ASCII version for compatibility
+        safe_filename = basename.encode('ascii', 'ignore').decode('ascii')
+        # Create a properly encoded UTF-8 version for modern browsers
+        utf8_filename = urllib.parse.quote(basename, safe='')
+        
         if range_header:
             # Parse range header
             byte_start = 0
@@ -264,7 +272,7 @@ def stream_audio(filepath):
                     'Content-Range': f'bytes {byte_start}-{byte_end}/{file_size}',
                     'Accept-Ranges': 'bytes',
                     'Content-Length': str(byte_end - byte_start + 1),
-                    'Content-Disposition': f'inline; filename="{os.path.basename(file_path)}"'
+                    'Content-Disposition': f'inline; filename="{safe_filename}"; filename*=UTF-8\'\'{utf8_filename}'
                 }
             )
         else:
