@@ -16,13 +16,48 @@ MUSIC_DIR = os.environ.get('MUSIC_DIR', '/music')
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Constants
-AUDIO_EXTENSIONS = ('.mp3', '.flac')
+# Supported audio formats only
+AUDIO_EXTENSIONS = (
+    '.mp3', '.flac', '.wav', '.m4a', '.wma', '.wv'
+)
+
+# Format-specific metadata handling
+# Note: Different formats have different requirements:
+# - MP3: Uses ID3v2 tags, supports embedded art
+# - FLAC: Uses Vorbis comments (lowercase), supports embedded art
+# - M4A: Uses iTunes metadata atoms, supports embedded art
+# - WAV: Very limited metadata support, no embedded art
+# - WMA: Uses ASF metadata, supports embedded art
+# - WV: Uses custom metadata, no embedded art at this time
+FORMAT_METADATA_CONFIG = {
+    # Formats that typically use uppercase tags
+    'uppercase': ['mp3'],
+    # Formats that typically use lowercase tags
+    'lowercase': ['flac'],
+    # Formats that use specific tag systems
+    'itunes': ['m4a'],
+    # Formats with limited metadata support
+    'limited': ['wav'],
+    # Formats that don't support embedded album art
+    'no_embedded_art': ['wav', 'wv']
+}
+
+# MIME type mapping for streaming
+MIME_TYPES = {
+    '.mp3': 'audio/mpeg',
+    '.flac': 'audio/flac',
+    '.wav': 'audio/wav',
+    '.m4a': 'audio/mp4',
+    '.wma': 'audio/x-ms-wma',
+    '.wv': 'audio/x-wavpack'
+}
+
 OWNER_UID = int(os.environ.get('PUID', '1000'))
 OWNER_GID = int(os.environ.get('PGID', '1000'))
 
 # Log the values being used
 logger.info(f"Starting with PUID={OWNER_UID}, PGID={OWNER_GID}")
+logger.info(f"Supporting 6 audio formats: {', '.join(AUDIO_EXTENSIONS)}")
 
 @app.route('/')
 def index():
@@ -45,12 +80,25 @@ def validate_path(filepath):
 
 def get_file_format(filepath):
     """Get file format and metadata tag case preference"""
-    if filepath.lower().endswith('.mp3'):
-        return 'mp3', True  # MP3 uses uppercase tags
-    elif filepath.lower().endswith('.flac'):
-        return 'flac', False  # FLAC uses lowercase tags
+    ext = os.path.splitext(filepath.lower())[1]
+    base_format = ext[1:]  # Remove the dot
+    
+    # Determine the container format for output
+    if ext == '.m4a':
+        output_format = 'mp4'
+    elif ext == '.wav':
+        output_format = 'wav'
+    elif ext == '.wma':
+        output_format = 'asf'  # WMA uses ASF container
+    elif ext == '.wv':
+        output_format = 'wv'
     else:
-        raise ValueError("Unsupported file format")
+        output_format = base_format
+    
+    # Determine tag case preference
+    use_uppercase = base_format in FORMAT_METADATA_CONFIG.get('uppercase', [])
+    
+    return output_format, use_uppercase, base_format
 
 def run_ffprobe(filepath):
     """Run ffprobe and return parsed JSON data"""
@@ -63,31 +111,66 @@ def run_ffprobe(filepath):
     
     return json.loads(result.stdout)
 
-def normalize_metadata_tags(tags):
+def normalize_metadata_tags(tags, format_type=''):
     """Normalize common tag names from various formats"""
+    # Handle iTunes/MP4 specific tags
+    if format_type in FORMAT_METADATA_CONFIG.get('itunes', []):
+        return {
+            'title': tags.get('title', tags.get('TITLE', tags.get('©nam', ''))),
+            'artist': tags.get('artist', tags.get('ARTIST', tags.get('©ART', ''))),
+            'album': tags.get('album', tags.get('ALBUM', tags.get('©alb', ''))),
+            'albumartist': tags.get('albumartist', tags.get('ALBUMARTIST', 
+                           tags.get('album_artist', tags.get('ALBUM_ARTIST', 
+                           tags.get('aART', ''))))),
+            'date': tags.get('date', tags.get('DATE', tags.get('©day', 
+                    tags.get('year', tags.get('YEAR', ''))))),
+            'genre': tags.get('genre', tags.get('GENRE', tags.get('©gen', ''))),
+            'track': tags.get('track', tags.get('TRACK', tags.get('trkn', ''))),
+            'disc': tags.get('disc', tags.get('DISC', tags.get('disk', 
+                    tags.get('discnumber', tags.get('DISCNUMBER', '')))))
+        }
+    
+    # Standard normalization for other formats
     return {
-        'title': tags.get('title', tags.get('TITLE', '')),
-        'artist': tags.get('artist', tags.get('ARTIST', '')),
-        'album': tags.get('album', tags.get('ALBUM', '')),
+        'title': tags.get('title', tags.get('TITLE', tags.get('Title', ''))),
+        'artist': tags.get('artist', tags.get('ARTIST', tags.get('Artist', ''))),
+        'album': tags.get('album', tags.get('ALBUM', tags.get('Album', ''))),
         'albumartist': tags.get('albumartist', tags.get('ALBUMARTIST', 
-                       tags.get('album_artist', tags.get('ALBUM_ARTIST', '')))),
-        'date': tags.get('year', tags.get('YEAR', 
-                tags.get('date', tags.get('DATE', '')))),
-        'genre': tags.get('genre', tags.get('GENRE', '')),
-        'track': tags.get('track', tags.get('TRACK', '')),
-        'disc': tags.get('disc', tags.get('DISC', 
-                tags.get('discnumber', tags.get('DISCNUMBER', ''))))
+                       tags.get('album_artist', tags.get('ALBUM_ARTIST', 
+                       tags.get('AlbumArtist', ''))))),
+        'date': tags.get('year', tags.get('YEAR', tags.get('Year',
+                tags.get('date', tags.get('DATE', tags.get('Date', '')))))),
+        'genre': tags.get('genre', tags.get('GENRE', tags.get('Genre', ''))),
+        'track': tags.get('track', tags.get('TRACK', tags.get('Track', 
+                 tags.get('tracknumber', tags.get('TRACKNUMBER', ''))))),
+        'disc': tags.get('disc', tags.get('DISC', tags.get('Disc',
+                tags.get('discnumber', tags.get('DISCNUMBER', 
+                tags.get('disk', tags.get('DISK', '')))))))
     }
 
-def get_metadata_field_mapping(use_uppercase):
+def get_metadata_field_mapping(use_uppercase, format_type=''):
     """Get proper metadata field names based on format"""
+    # Special handling for iTunes/MP4 formats
+    if format_type in FORMAT_METADATA_CONFIG.get('itunes', []):
+        return {
+            'title': 'title',
+            'artist': 'artist',
+            'album': 'album',
+            'albumartist': 'albumartist',
+            'date': 'date',
+            'year': 'date',
+            'genre': 'genre',
+            'track': 'track',
+            'disc': 'disc'
+        }
+    
     base_mapping = {
         'title': 'title',
         'artist': 'artist',
         'album': 'album',
         'albumartist': 'albumartist',
         'date': 'date',
-        'year': 'date',  # Map year to date
+        'year': 'date',
         'genre': 'genre',
         'track': 'track',
         'disc': 'disc'
@@ -97,14 +180,15 @@ def get_metadata_field_mapping(use_uppercase):
         return {k: v.upper() for k, v in base_mapping.items()}
     return base_mapping
 
-def merge_metadata_tags(existing_tags, new_tags, use_uppercase):
+def merge_metadata_tags(existing_tags, new_tags, use_uppercase, format_type=''):
     """Merge new tags into existing tags with proper handling"""
     merged = existing_tags.copy()
-    field_mapping = get_metadata_field_mapping(use_uppercase)
+    field_mapping = get_metadata_field_mapping(use_uppercase, format_type)
     
     # Special tag variants to handle
-    albumartist_variants = ['albumartist', 'ALBUMARTIST', 'album_artist', 'ALBUM_ARTIST']
-    disc_variants = ['disc', 'DISC', 'discnumber', 'DISCNUMBER']
+    albumartist_variants = ['albumartist', 'ALBUMARTIST', 'album_artist', 'ALBUM_ARTIST', 'AlbumArtist', 'aART']
+    disc_variants = ['disc', 'DISC', 'discnumber', 'DISCNUMBER', 'disk', 'DISK', 'Disc']
+    track_variants = ['track', 'TRACK', 'tracknumber', 'TRACKNUMBER']
     
     for key, value in new_tags.items():
         if key in ['art', 'removeArt']:
@@ -126,6 +210,13 @@ def merge_metadata_tags(existing_tags, new_tags, use_uppercase):
             if value:
                 merged[proper_tag_name] = value
                 
+        elif key == 'track':
+            # Remove all variants
+            for variant in track_variants:
+                merged.pop(variant, None)
+            if value:
+                merged[proper_tag_name] = value
+                
         else:
             # Find and remove any case variant
             for existing_key in list(merged.keys()):
@@ -140,6 +231,11 @@ def merge_metadata_tags(existing_tags, new_tags, use_uppercase):
 
 def extract_album_art(filepath):
     """Extract album art from audio file"""
+    # Check if format supports album art
+    _, _, base_format = get_file_format(filepath)
+    if base_format in FORMAT_METADATA_CONFIG.get('no_embedded_art', []):
+        return None
+    
     art_cmd = ['ffmpeg', '-i', filepath, '-an', '-vcodec', 'copy', '-f', 'image2pipe', '-']
     result = subprocess.run(art_cmd, capture_output=True)
     
@@ -150,8 +246,15 @@ def extract_album_art(filepath):
 def apply_metadata_to_file(filepath, new_tags, art_data=None, remove_art=False):
     """Apply metadata changes to a single file"""
     # Get file format
-    output_format, use_uppercase = get_file_format(filepath)
-    ext = '.' + output_format
+    output_format, use_uppercase, base_format = get_file_format(filepath)
+    ext = os.path.splitext(filepath)[1]
+    
+    # Check if format supports embedded album art
+    if art_data and base_format in FORMAT_METADATA_CONFIG.get('no_embedded_art', []):
+        logger.warning(f"Format {base_format} does not support embedded album art")
+        # For OGG/Vorbis, we could potentially use METADATA_BLOCK_PICTURE, but it's complex
+        # For now, skip album art for these formats
+        art_data = None
     
     # Get existing metadata
     probe_data = run_ffprobe(filepath)
@@ -170,7 +273,7 @@ def apply_metadata_to_file(filepath, new_tags, art_data=None, remove_art=False):
             with os.fdopen(fd2, 'wb') as f:
                 f.write(art_bytes)
             
-            # FIX: Map only audio streams from original file, then add new art
+            # Map only audio streams from original file, then add new art
             cmd = [
                 'ffmpeg', '-i', filepath, '-i', temp_art_file, '-y',
                 '-map', '0:a', '-map', '1', '-c:v', 'mjpeg',
@@ -188,12 +291,45 @@ def apply_metadata_to_file(filepath, new_tags, art_data=None, remove_art=False):
                 '-map', '0', '-codec', 'copy', '-f', output_format
             ]
         
-        # Merge tags
-        merged_tags = merge_metadata_tags(existing_tags, new_tags, use_uppercase)
+        # Merge tags normally for supported formats
+        merged_tags = merge_metadata_tags(existing_tags, new_tags, use_uppercase, base_format)
         
-        # Add metadata to command
-        for key, value in merged_tags.items():
-            cmd.extend(['-metadata', f'{key}={value}'])
+        # For OGG/Vorbis, ensure we use the right tag format
+        if base_format == 'ogg':
+            # Clear all existing metadata first
+            for key in list(merged_tags.keys()):
+                cmd.extend(['-metadata', f'{key}='])
+            
+            # Then add our tags in the correct format
+            tag_mapping = {
+                'title': 'TITLE',
+                'artist': 'ARTIST',
+                'album': 'ALBUM',
+                'albumartist': 'ALBUMARTIST',
+                'date': 'DATE',
+                'genre': 'GENRE',
+                'track': 'TRACKNUMBER',
+                'disc': 'DISCNUMBER'
+            }
+            
+            # Apply new tags
+            for our_field, ogg_field in tag_mapping.items():
+                if our_field in new_tags and new_tags[our_field]:
+                    cmd.extend(['-metadata', f'{ogg_field}={new_tags[our_field]}'])
+            
+            # Skip the normal metadata addition since we've already added them
+            merged_tags = {}
+        
+        # Add any remaining metadata that wasn't handled by special cases
+        if base_format != 'ogg':
+            # Add metadata to command for other formats
+            for key, value in merged_tags.items():
+                if value:  # Only add non-empty values
+                    cmd.extend(['-metadata', f'{key}={value}'])
+        
+        # Special handling for formats with limited metadata support
+        if base_format in FORMAT_METADATA_CONFIG.get('limited', []):
+            logger.info(f"Note: {base_format} format has limited metadata support. Some fields may not be saved.")
         
         cmd.append(temp_file)
         
@@ -202,6 +338,9 @@ def apply_metadata_to_file(filepath, new_tags, art_data=None, remove_art=False):
         
         if result.returncode != 0:
             logger.error(f"FFmpeg stderr: {result.stderr}")
+            # Check for specific errors
+            if "Unsupported codec id in stream" in result.stderr and base_format in FORMAT_METADATA_CONFIG.get('no_embedded_art', []):
+                raise Exception(f"Album art is not supported for {base_format.upper()} files")
             raise Exception(f"FFmpeg failed: {result.stderr}")
         
         # Replace original file
@@ -231,10 +370,12 @@ def stream_audio(filepath):
         
         # Prepare filename for Content-Disposition header
         basename = os.path.basename(file_path)
-        # Create a safe ASCII version for compatibility
         safe_filename = basename.encode('ascii', 'ignore').decode('ascii')
-        # Create a properly encoded UTF-8 version for modern browsers
         utf8_filename = urllib.parse.quote(basename, safe='')
+        
+        # Get MIME type
+        ext = os.path.splitext(file_path.lower())[1]
+        mimetype = MIME_TYPES.get(ext, 'audio/mpeg')
         
         if range_header:
             # Parse range header
@@ -262,8 +403,6 @@ def stream_audio(filepath):
                         remaining -= len(chunk)
                         yield chunk
             
-            mimetype = 'audio/mpeg' if file_path.lower().endswith('.mp3') else 'audio/flac'
-            
             return Response(
                 generate(),
                 status=206,
@@ -277,7 +416,6 @@ def stream_audio(filepath):
             )
         else:
             # Return full file
-            mimetype = 'audio/mpeg' if file_path.lower().endswith('.mp3') else 'audio/flac'
             return send_file(file_path, mimetype=mimetype, as_attachment=False)
             
     except ValueError:
@@ -418,13 +556,25 @@ def get_metadata(filename):
         probe_data = run_ffprobe(filepath)
         tags = probe_data.get('format', {}).get('tags', {})
         
+        # Get format info for proper normalization
+        _, _, base_format = get_file_format(filepath)
+        
         # Normalize tags
-        metadata = normalize_metadata_tags(tags)
+        metadata = normalize_metadata_tags(tags, base_format)
         
         # Get album art
         art = extract_album_art(filepath)
         metadata['hasArt'] = bool(art)
         metadata['art'] = art
+        
+        # Add format info for client
+        metadata['format'] = base_format
+        
+        # Add format limitations info
+        metadata['formatLimitations'] = {
+            'supportsAlbumArt': base_format not in FORMAT_METADATA_CONFIG.get('no_embedded_art', []),
+            'hasLimitedMetadata': base_format in FORMAT_METADATA_CONFIG.get('limited', [])
+        }
         
         return jsonify(metadata)
         
