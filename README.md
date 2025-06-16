@@ -6,13 +6,13 @@ A modern web-based metadata editor for audio files, designed for managing large 
 
 ## Features
 
-- 🎵 Multi-format support: MP3 and FLAC files
+- 🎵 Multi-format support: MP3, FLAC, WAV, WV, M4A, and WMA files
 - 🎨 Album art management: Upload, preview, and apply to entire folders
 - 📁 Bulk operations: Apply metadata to all files in a folder
 - ⌨️ Keyboard navigation: Arrow keys, tab switching, and shortcuts
 - 🎛️ Three-pane interface: Folders, files, and metadata editing
 - 🔍 File filtering: Quick search to filter files by name in large folders
-- ▶️ In-browser playback: Files can be played through the web interface
+- ▶️ In-browser playback: Files can be played through the web interface (not yet WMA or WV)
 - 🔄 File renaming: Direct file management through the web interface
 - 🌙 Modern dark UI: Responsive design with resizable panes
 - 🚀 Ultra-lightweight: Only 189MB Docker image (75% smaller than alternatives)
