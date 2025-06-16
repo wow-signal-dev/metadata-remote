@@ -7,6 +7,7 @@ A modern web-based metadata editor for audio files, designed for managing large 
 ## Features
 
 - 🎵 Multi-format support: MP3, FLAC, WAV, WV, M4A, and WMA files
+- 🧠 Smart metadata inference: Automated suggestions for empty fields using pattern recognition, folder structure analysis, and MusicBrainz database
 - 🎨 Album art management: Upload, preview, and apply to entire folders
 - 📁 Bulk operations: Apply metadata to all files in a folder
 - ⌨️ Keyboard navigation: Arrow keys, tab switching, and shortcuts
