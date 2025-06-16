@@ -6,18 +6,18 @@ A modern web-based metadata editor for audio files, designed for managing large 
 
 ## Features
 
-- 🎵 Multi-format support: MP3, FLAC, WAV, WV, M4A, and WMA files
-- 🧠 Smart metadata inference: Automated suggestions for empty fields using pattern recognition, folder structure analysis, and MusicBrainz database
-- 🎨 Album art management: Upload, preview, and apply to entire folders
-- 📁 Bulk operations: Apply metadata to all files in a folder
-- ⌨️ Keyboard navigation: Arrow keys, tab switching, and shortcuts
-- 🎛️ Three-pane interface: Folders, files, and metadata editing
-- 🔍 File filtering: Quick search to filter files by name in large folders
-- ▶️ In-browser playback: Files can be played through the web interface (not yet WMA or WV)
-- 🔄 File renaming: Direct file management through the web interface
-- 🌙 Modern dark UI: Responsive design with resizable panes
-- 🚀 Ultra-lightweight: Only 189MB Docker image (75% smaller than alternatives)
-- ⚡ Fast performance: Alpine Linux base with optimized dependencies
+- 🎵 **Multi-format support**: MP3, FLAC, WAV, WV, M4A, and WMA files
+- 🧠 **Smart metadata inference**: Automated suggestions for empty fields using pattern recognition, folder structure analysis, and MusicBrainz database
+- 🎨 **Album art management**: Upload, preview, and apply to entire folders
+- 📁 **Bulk operations**: Apply metadata to all files in a folder
+- ⌨️ **Keyboard navigation**: Arrow keys, tab switching, and shortcuts
+- 🎛️ **Three-pane interface**: Folders, files, and metadata editing
+- 🔍 **File filtering**: Quick search to filter files by name in large folders
+- ▶️ **In-browser playback**: Files can be played through the web interface (not yet WMA or WV)
+- 🔄 **File renaming**: Direct file management through the web interface
+- 🌙 **Modern dark UI**: Responsive design with resizable panes
+- 🚀 **Ultra-lightweight**: Only 189MB Docker image (75% smaller than alternatives)
+- ⚡ **Fast performance**: Alpine Linux base with optimized dependencies
 
 ## Quick Start (Recommended)
 
