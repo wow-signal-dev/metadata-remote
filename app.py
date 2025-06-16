@@ -769,7 +769,7 @@ class MetadataInferenceEngine:
         
         try:
             req = urllib.request.Request(url, headers={
-                'User-Agent': 'Metadata-Remote/1.0 (https://github.com/yourusername/metadata-remote)'
+                'User-Agent': 'Metadata-Remote/1.0 (https://github.com/wow-signal-dev/metadata-remote)'
             })
             
             with urllib.request.urlopen(req, timeout=10) as response:
