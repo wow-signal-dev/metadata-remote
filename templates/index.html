@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>mdrm</title>
+    <title>mdrm heart</title>
     <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
     <style>
         * {
@@ -749,25 +749,66 @@
             gap: 0.5rem;
         }
         
-        .apply-to-folder-btn {
+        /* New apply field controls styling */
+        .apply-field-controls {
             display: none;
-            padding: 0.85rem 1.25rem;
-            border: none;
-            border-radius: 8px;
-            background: linear-gradient(135deg, #4a5d7a 0%, #5a6d8a 100%);
-            color: white;
-            cursor: pointer;
-            font-size: 0.8rem;
-            font-weight: 500;
-            white-space: nowrap;
+            align-items: center;
+            gap: 0.5rem;
             height: fit-content;
             margin-bottom: 0;
+            animation: slideIn var(--transition-normal);
+        }
+        
+        .apply-field-controls.visible {
+            display: flex;
+        }
+        
+        .apply-field-label {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            white-space: nowrap;
+            padding-right: 0.25rem;
+        }
+        
+        .apply-field-btn {
+            padding: 0.6rem 1rem;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.75rem;
+            font-weight: 500;
             transition: all var(--transition-fast);
             position: relative;
             overflow: hidden;
+            white-space: nowrap;
         }
         
-        .apply-to-folder-btn::before {
+        .apply-file-btn {
+            background: linear-gradient(135deg, #2d5a2d 0%, #3a7a3a 100%);
+            color: white;
+        }
+        
+        .apply-file-btn:hover:not(.processing):not(.success):not(.error):not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(45, 90, 45, 0.4);
+        }
+        
+        .apply-folder-btn-new {
+            background: linear-gradient(135deg, #4a5d7a 0%, #5a6d8a 100%);
+            color: white;
+        }
+        
+        .apply-folder-btn-new:hover:not(.processing):not(.success):not(.error):not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(74, 93, 122, 0.4);
+        }
+        
+        .apply-field-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .apply-field-btn::before {
             content: '';
             position: absolute;
             top: 50%;
@@ -781,25 +822,11 @@
             z-index: -1;
         }
         
-        .apply-to-folder-btn:hover:not(.processing):not(.success):not(.error):not(.warning)::before {
-            width: 300px;
-            height: 300px;
+        .apply-field-btn:hover:not(.processing):not(.success):not(.error):not(.warning):not(:disabled)::before {
+            width: 200px;
+            height: 200px;
         }
         
-        .apply-to-folder-btn:hover:not(:disabled):not(.processing):not(.success):not(.error):not(.warning) {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(74, 93, 122, 0.5);
-        }
-        
-        .apply-to-folder-btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-        
-        .apply-to-folder-btn.visible {
-            display: block;
-            animation: slideIn var(--transition-normal);
-        }
         
         @keyframes slideIn {
             from {
@@ -1095,16 +1122,13 @@
             width: auto !important;
         }
         
-        /* Special handling for apply-to-folder buttons */
-        .apply-to-folder-btn.btn-status {
-            transition: all var(--transition-normal), width var(--transition-normal);
-        }
-        
-        .apply-to-folder-btn.processing,
-        .apply-to-folder-btn.success,
-        .apply-to-folder-btn.error,
-        .apply-to-folder-btn.warning {
-            min-width: 200px;
+        /* Prevent apply-field buttons from expanding */
+        .apply-field-btn.processing,
+        .apply-field-btn.success,
+        .apply-field-btn.error,
+        .apply-field-btn.warning {
+            min-width: initial !important;
+            width: auto !important;
         }
         
         .btn-status.processing .btn-status-content,
@@ -1154,6 +1178,11 @@
             animation: statusIconIn var(--transition-normal);
         }
         
+        /* Smaller icons for apply-field buttons */
+        .apply-field-btn .status-icon {
+            font-size: 0.9rem;
+        }
+        
         @keyframes statusIconIn {
             from {
                 transform: scale(0);
@@ -1177,6 +1206,13 @@
             border-radius: 50%;
             border-top-color: white;
             animation: spin 0.8s ease-in-out infinite;
+        }
+        
+        /* Smaller spinner for apply-field buttons */
+        .apply-field-btn .spinner {
+            width: 14px;
+            height: 14px;
+            border-width: 1.5px;
         }
         
         @keyframes spin {
@@ -1369,10 +1405,17 @@
                                 <div class="inference-suggestions" id="title-suggestions"></div>
                             </div>
                         </div>
-                        <button type="button" class="apply-to-folder-btn btn-status" data-field="title" onclick="applyFieldToFolder('title')">
-                            <span class="btn-status-content">Apply to Folder</span>
-                            <span class="btn-status-message"></span>
-                        </button>
+                        <div class="apply-field-controls" data-field="title">
+                            <span class="apply-field-label">Apply to</span>
+                            <button type="button" class="apply-field-btn apply-file-btn btn-status" data-field="title" onclick="saveFieldToFile('title')">
+                                <span class="btn-status-content">File</span>
+                                <span class="btn-status-message"></span>
+                            </button>
+                            <button type="button" class="apply-field-btn apply-folder-btn-new btn-status" data-field="title" onclick="applyFieldToFolder('title')">
+                                <span class="btn-status-content">Folder</span>
+                                <span class="btn-status-message"></span>
+                            </button>
+                        </div>
                     </div>
                     
                     <div class="form-group-with-button">
@@ -1386,10 +1429,17 @@
                                 <div class="inference-suggestions" id="artist-suggestions"></div>
                             </div>
                         </div>
-                        <button type="button" class="apply-to-folder-btn btn-status" data-field="artist" onclick="applyFieldToFolder('artist')">
-                            <span class="btn-status-content">Apply to Folder</span>
-                            <span class="btn-status-message"></span>
-                        </button>
+                        <div class="apply-field-controls" data-field="artist">
+                            <span class="apply-field-label">Apply to</span>
+                            <button type="button" class="apply-field-btn apply-file-btn btn-status" data-field="artist" onclick="saveFieldToFile('artist')">
+                                <span class="btn-status-content">File</span>
+                                <span class="btn-status-message"></span>
+                            </button>
+                            <button type="button" class="apply-field-btn apply-folder-btn-new btn-status" data-field="artist" onclick="applyFieldToFolder('artist')">
+                                <span class="btn-status-content">Folder</span>
+                                <span class="btn-status-message"></span>
+                            </button>
+                        </div>
                     </div>
                     
                     <div class="form-group-with-button">
@@ -1403,10 +1453,17 @@
                                 <div class="inference-suggestions" id="album-suggestions"></div>
                             </div>
                         </div>
-                        <button type="button" class="apply-to-folder-btn btn-status" data-field="album" onclick="applyFieldToFolder('album')">
-                            <span class="btn-status-content">Apply to Folder</span>
-                            <span class="btn-status-message"></span>
-                        </button>
+                        <div class="apply-field-controls" data-field="album">
+                            <span class="apply-field-label">Apply to</span>
+                            <button type="button" class="apply-field-btn apply-file-btn btn-status" data-field="album" onclick="saveFieldToFile('album')">
+                                <span class="btn-status-content">File</span>
+                                <span class="btn-status-message"></span>
+                            </button>
+                            <button type="button" class="apply-field-btn apply-folder-btn-new btn-status" data-field="album" onclick="applyFieldToFolder('album')">
+                                <span class="btn-status-content">Folder</span>
+                                <span class="btn-status-message"></span>
+                            </button>
+                        </div>
                     </div>
                     
                     <div class="form-group-with-button">
@@ -1420,10 +1477,17 @@
                                 <div class="inference-suggestions" id="albumartist-suggestions"></div>
                             </div>
                         </div>
-                        <button type="button" class="apply-to-folder-btn btn-status" data-field="albumartist" onclick="applyFieldToFolder('albumartist')">
-                            <span class="btn-status-content">Apply to Folder</span>
-                            <span class="btn-status-message"></span>
-                        </button>
+                        <div class="apply-field-controls" data-field="albumartist">
+                            <span class="apply-field-label">Apply to</span>
+                            <button type="button" class="apply-field-btn apply-file-btn btn-status" data-field="albumartist" onclick="saveFieldToFile('albumartist')">
+                                <span class="btn-status-content">File</span>
+                                <span class="btn-status-message"></span>
+                            </button>
+                            <button type="button" class="apply-field-btn apply-folder-btn-new btn-status" data-field="albumartist" onclick="applyFieldToFolder('albumartist')">
+                                <span class="btn-status-content">Folder</span>
+                                <span class="btn-status-message"></span>
+                            </button>
+                        </div>
                     </div>
                     
                     <div class="form-group-with-button">
@@ -1437,10 +1501,17 @@
                                 <div class="inference-suggestions" id="date-suggestions"></div>
                             </div>
                         </div>
-                        <button type="button" class="apply-to-folder-btn btn-status" data-field="date" onclick="applyFieldToFolder('date')">
-                            <span class="btn-status-content">Apply to Folder</span>
-                            <span class="btn-status-message"></span>
-                        </button>
+                        <div class="apply-field-controls" data-field="date">
+                            <span class="apply-field-label">Apply to</span>
+                            <button type="button" class="apply-field-btn apply-file-btn btn-status" data-field="date" onclick="saveFieldToFile('date')">
+                                <span class="btn-status-content">File</span>
+                                <span class="btn-status-message"></span>
+                            </button>
+                            <button type="button" class="apply-field-btn apply-folder-btn-new btn-status" data-field="date" onclick="applyFieldToFolder('date')">
+                                <span class="btn-status-content">Folder</span>
+                                <span class="btn-status-message"></span>
+                            </button>
+                        </div>
                     </div>
                     
                     <div class="form-group-with-button">
@@ -1454,10 +1525,17 @@
                                 <div class="inference-suggestions" id="genre-suggestions"></div>
                             </div>
                         </div>
-                        <button type="button" class="apply-to-folder-btn btn-status" data-field="genre" onclick="applyFieldToFolder('genre')">
-                            <span class="btn-status-content">Apply to Folder</span>
-                            <span class="btn-status-message"></span>
-                        </button>
+                        <div class="apply-field-controls" data-field="genre">
+                            <span class="apply-field-label">Apply to</span>
+                            <button type="button" class="apply-field-btn apply-file-btn btn-status" data-field="genre" onclick="saveFieldToFile('genre')">
+                                <span class="btn-status-content">File</span>
+                                <span class="btn-status-message"></span>
+                            </button>
+                            <button type="button" class="apply-field-btn apply-folder-btn-new btn-status" data-field="genre" onclick="applyFieldToFolder('genre')">
+                                <span class="btn-status-content">Folder</span>
+                                <span class="btn-status-message"></span>
+                            </button>
+                        </div>
                     </div>
                     
                     <div class="form-group-with-button">
@@ -1471,10 +1549,17 @@
                                 <div class="inference-suggestions" id="track-suggestions"></div>
                             </div>
                         </div>
-                        <button type="button" class="apply-to-folder-btn btn-status" data-field="track" onclick="applyFieldToFolder('track')">
-                            <span class="btn-status-content">Apply to Folder</span>
-                            <span class="btn-status-message"></span>
-                        </button>
+                        <div class="apply-field-controls" data-field="track">
+                            <span class="apply-field-label">Apply to</span>
+                            <button type="button" class="apply-field-btn apply-file-btn btn-status" data-field="track" onclick="saveFieldToFile('track')">
+                                <span class="btn-status-content">File</span>
+                                <span class="btn-status-message"></span>
+                            </button>
+                            <button type="button" class="apply-field-btn apply-folder-btn-new btn-status" data-field="track" onclick="applyFieldToFolder('track')">
+                                <span class="btn-status-content">Folder</span>
+                                <span class="btn-status-message"></span>
+                            </button>
+                        </div>
                     </div>
                     
                     <div class="form-group-with-button">
@@ -1488,10 +1573,17 @@
                                 <div class="inference-suggestions" id="disc-suggestions"></div>
                             </div>
                         </div>
-                        <button type="button" class="apply-to-folder-btn btn-status" data-field="disc" onclick="applyFieldToFolder('disc')">
-                            <span class="btn-status-content">Apply to Folder</span>
-                            <span class="btn-status-message"></span>
-                        </button>
+                        <div class="apply-field-controls" data-field="disc">
+                            <span class="apply-field-label">Apply to</span>
+                            <button type="button" class="apply-field-btn apply-file-btn btn-status" data-field="disc" onclick="saveFieldToFile('disc')">
+                                <span class="btn-status-content">File</span>
+                                <span class="btn-status-message"></span>
+                            </button>
+                            <button type="button" class="apply-field-btn apply-folder-btn-new btn-status" data-field="disc" onclick="applyFieldToFolder('disc')">
+                                <span class="btn-status-content">Folder</span>
+                                <span class="btn-status-message"></span>
+                            </button>
+                        </div>
                     </div>
                     
                     <div class="buttons">
@@ -1590,6 +1682,9 @@
                 // Add new status class
                 button.classList.add(type);
                 
+                // Check if this is an apply-field button (File/Folder buttons)
+                const isApplyFieldBtn = button.classList.contains('apply-field-btn');
+                
                 // Truncate very long messages
                 const maxLength = 30;
                 const displayMessage = message.length > maxLength ? 
@@ -1598,31 +1693,52 @@
                 // Update message
                 const messageEl = button.querySelector('.btn-status-message');
                 if (messageEl) {
-                    if (type === 'processing') {
-                        // Clear existing content
+                    if (isApplyFieldBtn) {
+                        // For File/Folder buttons, show only icons
                         messageEl.textContent = '';
-                        const spinner = document.createElement('span');
-                        spinner.className = 'spinner';
-                        messageEl.appendChild(spinner);
-                        messageEl.appendChild(document.createTextNode(' ' + displayMessage));
-                    } else {
-                        const icons = {
-                            success: '✓',
-                            error: '✕',
-                            warning: '⚠'
-                        };
-                        // Clear existing content
-                        messageEl.textContent = '';
-                        const iconSpan = document.createElement('span');
-                        iconSpan.className = `status-icon ${type}`;
-                        iconSpan.textContent = icons[type] || '';
-                        messageEl.appendChild(iconSpan);
-                        messageEl.appendChild(document.createTextNode(' ' + displayMessage));
-                    }
-                    
-                    // Add title attribute for full message if truncated
-                    if (message.length > maxLength) {
+                        if (type === 'processing') {
+                            const spinner = document.createElement('span');
+                            spinner.className = 'spinner';
+                            messageEl.appendChild(spinner);
+                        } else {
+                            const icons = {
+                                success: '✓',
+                                error: '✕',
+                                warning: '⚠'
+                            };
+                            const iconSpan = document.createElement('span');
+                            iconSpan.className = `status-icon ${type}`;
+                            iconSpan.textContent = icons[type] || '';
+                            messageEl.appendChild(iconSpan);
+                        }
+                        // Add tooltip with the actual message
                         button.title = message;
+                    } else {
+                        // For other buttons, show icon + text as before
+                        if (type === 'processing') {
+                            messageEl.textContent = '';
+                            const spinner = document.createElement('span');
+                            spinner.className = 'spinner';
+                            messageEl.appendChild(spinner);
+                            messageEl.appendChild(document.createTextNode(' ' + displayMessage));
+                        } else {
+                            const icons = {
+                                success: '✓',
+                                error: '✕',
+                                warning: '⚠'
+                            };
+                            messageEl.textContent = '';
+                            const iconSpan = document.createElement('span');
+                            iconSpan.className = `status-icon ${type}`;
+                            iconSpan.textContent = icons[type] || '';
+                            messageEl.appendChild(iconSpan);
+                            messageEl.appendChild(document.createTextNode(' ' + displayMessage));
+                        }
+                        
+                        // Add title attribute for full message if truncated
+                        if (message.length > maxLength) {
+                            button.title = message;
+                        }
                     }
                 }
                 
@@ -1645,8 +1761,8 @@
                 button.classList.remove('processing', 'success', 'error', 'warning');
                 button.title = ''; // Clear tooltip
                 
-                // Restore original width after a brief delay
-                if (button._originalWidth) {
+                // Don't restore width for apply-field buttons
+                if (!button.classList.contains('apply-field-btn') && button._originalWidth) {
                     setTimeout(() => {
                         button.style.width = '';
                         delete button._originalWidth;
@@ -1795,22 +1911,64 @@
                 
                 fields.forEach(field => {
                     const input = document.getElementById(field);
-                    const button = document.querySelector(`.apply-to-folder-btn[data-field="${field}"]`);
+                    const controls = document.querySelector(`.apply-field-controls[data-field="${field}"]`);
                     
-                    const updateButtonVisibility = () => {
+                    const updateControlsVisibility = () => {
                         const hasValue = input.value.trim().length > 0;
                         const hasChanged = input.value !== (this.state.originalMetadata[field] || '');
                         
                         if (hasValue && hasChanged) {
-                            button.classList.add('visible');
+                            controls.classList.add('visible');
                         } else {
-                            button.classList.remove('visible');
+                            controls.classList.remove('visible');
                         }
                     };
                     
-                    input.addEventListener('input', updateButtonVisibility);
-                    input.addEventListener('focus', updateButtonVisibility);
+                    input.addEventListener('input', updateControlsVisibility);
+                    input.addEventListener('focus', updateControlsVisibility);
                 });
+            },
+            
+            // NEW: Save individual field to file
+            async saveFieldToFile(field) {
+                if (!this.state.currentFile) return;
+                
+                const button = document.querySelector(`.apply-file-btn[data-field="${field}"]`);
+                const value = document.getElementById(field).value.trim();
+                if (!value && value !== '') return; // Allow empty string to clear field
+                
+                button.disabled = true;
+                this.showButtonStatus(button, 'Saving to file...', 'processing');
+                
+                // Create metadata object with only this field
+                const data = {};
+                data[field] = value;
+                
+                try {
+                    const result = await this.apiCall(`/metadata/${encodeURIComponent(this.state.currentFile)}`, {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify(data)
+                    });
+                    
+                    if (result.status === 'success') {
+                        this.showButtonStatus(button, 'Saved to file!', 'success', 2000);
+                        this.state.originalMetadata[field] = value;
+                        
+                        // Hide controls after successful save
+                        setTimeout(() => {
+                            const controls = document.querySelector(`.apply-field-controls[data-field="${field}"]`);
+                            controls.classList.remove('visible');
+                        }, 1000);
+                    } else {
+                        this.showButtonStatus(button, 'Failed to save', 'error');
+                    }
+                } catch (err) {
+                    console.error(`Error saving ${field} to file:`, err);
+                    this.showButtonStatus(button, 'Error saving field', 'error');
+                }
+                
+                button.disabled = false;
             },
             
             // NEW: Setup inference handlers
@@ -1941,7 +2099,7 @@
                             document.getElementById(field).value = suggestion.value;
                             this.hideInferenceSuggestions(field);
                             
-                            // Trigger input event to update apply-to-folder button
+                            // Trigger input event to update apply controls
                             const event = new Event('input', { bubbles: true });
                             document.getElementById(field).dispatchEvent(event);
                         });
@@ -2431,8 +2589,8 @@
                 this.cancelFilenameEdit();
                 this.hideStatus();
                 
-                document.querySelectorAll('.apply-to-folder-btn').forEach(btn => {
-                    btn.classList.remove('visible');
+                document.querySelectorAll('.apply-field-controls').forEach(controls => {
+                    controls.classList.remove('visible');
                 });
                 
                 if (listItem.classList.contains('keyboard-focus')) {
@@ -2476,20 +2634,20 @@
                             const allFields = ['title', 'artist', 'album', 'albumartist', 'date', 'genre', 'track', 'disc'];
                             allFields.forEach(field => {
                                 const input = document.getElementById(field);
-                                const button = document.querySelector(`.apply-to-folder-btn[data-field="${field}"]`);
+                                const controls = document.querySelector(`.apply-field-controls[data-field="${field}"]`);
                                 if (!data.supportedFields.includes(field)) {
                                     input.disabled = true;
                                     input.style.opacity = '0.5';
                                     input.title = `${format.toUpperCase()} format does not support this field`;
-                                    if (button) {
-                                        button.style.display = 'none';
+                                    if (controls) {
+                                        controls.style.display = 'none';
                                     }
                                 } else {
                                     input.disabled = false;
                                     input.style.opacity = '1';
                                     input.title = '';
-                                    if (button) {
-                                        button.style.display = '';
+                                    if (controls) {
+                                        controls.style.display = '';
                                     }
                                 }
                             });
@@ -2719,9 +2877,9 @@
             async applyFieldToFolder(field) {
                 if (!this.state.currentFile) return;
                 
-                const button = document.querySelector(`.apply-to-folder-btn[data-field="${field}"]`);
+                const button = document.querySelector(`.apply-folder-btn-new[data-field="${field}"]`);
                 const value = document.getElementById(field).value.trim();
-                if (!value) return;
+                if (!value && value !== '') return; // Allow empty string to clear field
                 
                 const folderPath = this.state.currentFile.substring(0, this.state.currentFile.lastIndexOf('/'));
                 const fieldLabel = document.querySelector(`label[for="${field}"]`).textContent;
@@ -2732,7 +2890,7 @@
                 
                 button.disabled = true;
                 this.setFormEnabled(false);
-                this.showButtonStatus(button, 'Applying...', 'processing');
+                this.showButtonStatus(button, 'Applying to folder...', 'processing');
                 
                 try {
                     const result = await this.apiCall('/apply-field-to-folder', {
@@ -2749,14 +2907,15 @@
                         this.showButtonStatus(button, `Applied to ${result.filesUpdated} files!`, 'success', 3000);
                         this.state.originalMetadata[field] = value;
                         setTimeout(() => {
-                            button.classList.remove('visible');
+                            const controls = document.querySelector(`.apply-field-controls[data-field="${field}"]`);
+                            controls.classList.remove('visible');
                         }, 1000);
                     } else {
-                        this.showButtonStatus(button, result.error || 'Error', 'error');
+                        this.showButtonStatus(button, result.error || 'Failed to apply to folder', 'error');
                     }
                 } catch (err) {
                     console.error(`Error applying ${fieldLabel} to folder:`, err);
-                    this.showButtonStatus(button, 'Error', 'error');
+                    this.showButtonStatus(button, 'Error applying to folder', 'error');
                 }
                 
                 button.disabled = false;
@@ -2804,8 +2963,8 @@
                             }
                         });
                         
-                        document.querySelectorAll('.apply-to-folder-btn').forEach(btn => {
-                            btn.classList.remove('visible');
+                        document.querySelectorAll('.apply-field-controls').forEach(controls => {
+                            controls.classList.remove('visible');
                         });
                         
                         if (this.state.pendingAlbumArt) {
@@ -2914,8 +3073,8 @@
                         document.getElementById(field).value = value;
                     });
                     
-                    document.querySelectorAll('.apply-to-folder-btn').forEach(btn => {
-                        btn.classList.remove('visible');
+                    document.querySelectorAll('.apply-field-controls').forEach(controls => {
+                        controls.classList.remove('visible');
                     });
                     
                     this.state.pendingAlbumArt = null;
@@ -3010,6 +3169,10 @@
         
         function applyFieldToFolder(field) {
             AudioMetadataEditor.applyFieldToFolder(field);
+        }
+        
+        function saveFieldToFile(field) {
+            AudioMetadataEditor.saveFieldToFile(field);
         }
         
         function save() {
