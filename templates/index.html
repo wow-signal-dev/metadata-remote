@@ -2025,10 +2025,15 @@
                         fileInfo.className = 'file-info';
                         
                         const nameDiv = document.createElement('div');
-                        const musicIcon = document.createTextNode('🎵 ');
-                        const fileName = document.createTextNode(file.name);
+                        const formatEmoji = this.getFormatEmoji(file.name);  // Add 'this.'
+                        const musicIcon = document.createTextNode(formatEmoji + ' ');
                         nameDiv.appendChild(musicIcon);
-                        nameDiv.appendChild(fileName);
+                        nameDiv.appendChild(document.createTextNode(file.name));
+                        
+                        // Add format badge
+                        const badgeHtml = this.getFormatBadge(file.name);
+                        nameDiv.insertAdjacentHTML('beforeend', badgeHtml);
+                        
                         fileInfo.appendChild(nameDiv);
                         
                         if (file.folder !== '.') {
@@ -2116,22 +2121,72 @@
                         document.getElementById(field).value = value;
                     });
                     
+                    // Handle format limitations
+                    const formatLimitations = data.formatLimitations || {};
+                    const format = data.format || '';
+                    
+                    // Show format-specific warnings
+                    if (formatLimitations.hasLimitedMetadata) {
+                        this.showStatus(`Note: ${format.toUpperCase()} files have limited metadata support`, 'warning');
+                        
+                        // Disable unsupported fields
+                        if (data.supportedFields) {
+                            const allFields = ['title', 'artist', 'album', 'albumartist', 'date', 'genre', 'track', 'disc'];
+                            allFields.forEach(field => {
+                                const input = document.getElementById(field);
+                                const button = document.querySelector(`.apply-to-folder-btn[data-field="${field}"]`);
+                                if (!data.supportedFields.includes(field)) {
+                                    input.disabled = true;
+                                    input.style.opacity = '0.5';
+                                    input.title = `${format.toUpperCase()} format does not support this field`;
+                                    if (button) {
+                                        button.style.display = 'none';
+                                    }
+                                } else {
+                                    input.disabled = false;
+                                    input.style.opacity = '1';
+                                    input.title = '';
+                                    if (button) {
+                                        button.style.display = '';
+                                    }
+                                }
+                            });
+                        }
+                    }
+                    
+                    // Handle album art
                     const artDisplay = document.getElementById('art-display');
                     const deleteBtn = document.querySelector('.delete-art-btn');
                     const saveImageBtn = document.querySelector('.save-image-btn');
                     const applyFolderBtn = document.querySelector('.apply-folder-btn');
+                    const uploadBtn = document.querySelector('.upload-btn');
                     
-                    if (data.hasArt && data.art) {
-                        this.state.currentAlbumArt = data.art;
-                        artDisplay.innerHTML = `<img src="data:image/jpeg;base64,${data.art}" class="album-art">`;
-                        deleteBtn.style.display = 'block';
-                        saveImageBtn.style.display = 'none';
-                        applyFolderBtn.style.display = 'none';
-                    } else {
-                        artDisplay.innerHTML = '<div class="album-art-placeholder">No album art</div>';
+                    // Check if format supports album art
+                    if (!formatLimitations.supportsAlbumArt) {
+                        artDisplay.innerHTML = `<div class="album-art-placeholder" style="opacity: 0.5;">Album art not supported for ${format.toUpperCase()}</div>`;
                         deleteBtn.style.display = 'none';
                         saveImageBtn.style.display = 'none';
                         applyFolderBtn.style.display = 'none';
+                        uploadBtn.disabled = true;
+                        uploadBtn.style.opacity = '0.5';
+                        uploadBtn.title = `${format.toUpperCase()} format does not support embedded album art`;
+                    } else {
+                        uploadBtn.disabled = false;
+                        uploadBtn.style.opacity = '1';
+                        uploadBtn.title = '';
+                        
+                        if (data.hasArt && data.art) {
+                            this.state.currentAlbumArt = data.art;
+                            artDisplay.innerHTML = `<img src="data:image/jpeg;base64,${data.art}" class="album-art">`;
+                            deleteBtn.style.display = 'block';
+                            saveImageBtn.style.display = 'none';
+                            applyFolderBtn.style.display = 'none';
+                        } else {
+                            artDisplay.innerHTML = '<div class="album-art-placeholder">No album art</div>';
+                            deleteBtn.style.display = 'none';
+                            saveImageBtn.style.display = 'none';
+                            applyFolderBtn.style.display = 'none';
+                        }
                     }
                     
                     this.setFormEnabled(true);
@@ -2145,17 +2200,17 @@
                     this.setFormEnabled(true);
                 }
             },
-        
+            
             // Filename editing
             cancelFilenameEdit() {
                 document.getElementById('current-filename').style.display = 'inline';
                 document.querySelector('.filename-edit').style.display = 'none';
             },
-        
+            
             resetFilename() {
                 document.getElementById('filename-input').value = this.state.originalFilename;
             },
-        
+            
             async saveFilename() {
                 const button = document.querySelector('.filename-save');
                 const newName = document.getElementById('filename-input').value.trim();
@@ -2366,6 +2421,7 @@
                 this.setFormEnabled(true);
             },
         
+            // Update the save method to handle format-specific errors
             async save() {
                 if (!this.state.currentFile) return;
                 
@@ -2424,12 +2480,74 @@
                     }
                 } catch (err) {
                     console.error('Error saving metadata:', err);
-                    this.showButtonStatus(button, 'Error', 'error');
+                    // Check for specific format-related errors
+                    const errorMessage = err.message || '';
+                    if (errorMessage.includes('Album art is not supported')) {
+                        this.showButtonStatus(button, 'Album art not supported for this format', 'error', 5000);
+                    } else {
+                        this.showButtonStatus(button, 'Error', 'error');
+                    }
                 }
                 
                 this.setFormEnabled(true);
             },
-        
+
+            getFormatEmoji(filename) {
+                const ext = filename.split('.').pop().toLowerCase();
+                const FORMAT_EMOJIS = {
+                    'mp3': '🎵',
+                    'flac': '💿',
+                    'm4a': '🎶',
+                    'wav': '🌊',
+                    'wma': '🪟',
+                    'wv': '📦',
+                };
+                return FORMAT_EMOJIS[ext] || '🎵';
+            },
+
+            // Add visual indicators for file format support
+            getFormatBadge(filename) {
+                const ext = filename.split('.').pop().toUpperCase();
+                const lossless = ['FLAC', 'WAV', 'WV'];
+                const limitedMetadata = ['WAV', 'WV'];
+                const noAlbumArt = ['WAV', 'WV'];
+                
+                const isLossless = lossless.includes(ext);
+                const hasLimitations = limitedMetadata.includes(ext) || noAlbumArt.includes(ext);
+                
+                let badgeHtml = `<span style="
+                    font-size: 0.7rem;
+                    padding: 0.2rem 0.4rem;
+                    border-radius: 4px;
+                    background: ${isLossless ? 'rgba(74, 222, 128, 0.2)' : 'rgba(255, 169, 77, 0.2)'};
+                    color: ${isLossless ? '#4ade80' : '#ffa94d'};
+                    margin-left: 0.5rem;
+                    font-weight: 500;
+                ">${ext}</span>`;
+                
+                if (hasLimitations) {
+                    const limitations = [];
+                    if (limitedMetadata.includes(ext)) {
+                        limitations.push('limited metadata');
+                    }
+                    if (noAlbumArt.includes(ext)) {
+                        limitations.push('no album art');
+                    }
+                    
+                    badgeHtml += `<span style="
+                        font-size: 0.65rem;
+                        padding: 0.15rem 0.3rem;
+                        border-radius: 4px;
+                        background: rgba(255, 107, 107, 0.2);
+                        color: #ff6b6b;
+                        margin-left: 0.3rem;
+                        font-weight: 400;
+                    " title="${limitations.join(', ')}">⚠</span>`;
+                }
+                
+                return badgeHtml;
+            },
+
             async resetForm() {
                 if (!this.state.currentFile) return;
                 
