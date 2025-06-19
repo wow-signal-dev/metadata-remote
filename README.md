@@ -19,9 +19,17 @@ A modern web-based metadata editor for audio files, designed for managing large 
 - 🚀 **Ultra-lightweight**: Only 189MB Docker image (75% smaller than alternatives)
 - ⚡ **Fast performance**: Alpine Linux base with optimized dependencies
 
+## Compatibility
+
+- ✅ **Works on all devices**: Raspberry Pi, Intel/AMD PCs, Apple Silicon Macs
+- ✅ **Automatic architecture detection**: No need to specify your CPU type
+- ✅ **Same installation process**: Works identically on all platforms
+
 ## Quick Start (Recommended)
 
 The easiest way to get started is using our pre-built Docker image.
+
+> **Note:** Our image supports x86, ARM, and Apple Silicon processors automatically. Docker will download the correct version for your device.
 
 ### Prerequisites
 - Docker and Docker Compose
@@ -171,6 +179,13 @@ id -g  # Your group ID
 - Check if the container is running: `docker ps`
 - Check logs: `docker-compose logs`
 - Ensure port 8338 isn't already in use
+
+### Architecture Errors
+If you see "platform does not match" errors, make sure you're using the latest image:
+```bash
+docker pull ghcr.io/wow-signal-dev/metadata-remote:latest
+docker-compose up -d
+```
 
 ## Contributing
 
