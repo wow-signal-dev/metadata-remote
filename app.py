@@ -1,3 +1,19 @@
+# Metadata Remote - AI-powered audio metadata editor
+# Copyright (C) 2025 Dr. William Nelson Leonard
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 from flask import Flask, jsonify, request, render_template, send_file, Response
 import subprocess
 import json
@@ -17,11 +33,14 @@ import threading
 from typing import Dict, List, Tuple, Optional, Any
 import urllib.request
 import urllib.error
+import uuid
+from dataclasses import dataclass, asdict
+from enum import Enum
 
 app = Flask(__name__)
 MUSIC_DIR = os.environ.get('MUSIC_DIR', '/music')
 
-# Setup logging
+# Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -68,9 +87,319 @@ OWNER_GID = int(os.environ.get('PGID', '1000'))
 logger.info(f"Starting with PUID={OWNER_UID}, PGID={OWNER_GID}")
 logger.info(f"Supporting 6 audio formats: {', '.join(AUDIO_EXTENSIONS)}")
 
-# ============================================================================
+# ======================
+# EDITING HISTORY SYSTEM
+# ======================
+
+class ActionType(Enum):
+    """Types of actions that can be performed"""
+    METADATA_CHANGE = "metadata_change"
+    ALBUM_ART_CHANGE = "album_art_change"
+    ALBUM_ART_DELETE = "album_art_delete"
+    BATCH_METADATA = "batch_metadata"
+    BATCH_ALBUM_ART = "batch_album_art"
+
+@dataclass
+class HistoryAction:
+    """Represents a single action in the editing history"""
+    id: str
+    timestamp: float
+    action_type: ActionType
+    files: List[str]  # List of affected file paths
+    field: Optional[str]  # For metadata changes
+    old_values: Dict[str, Any]  # Map of filepath to old value
+    new_values: Dict[str, Any]  # Map of filepath to new value
+    description: str
+    is_undone: bool = False
+    
+    def to_dict(self):
+        """Convert to dictionary for JSON serialization"""
+        return {
+            'id': self.id,
+            'timestamp': self.timestamp,
+            'action_type': self.action_type.value,
+            'files': self.files,
+            'field': self.field,
+            'description': self.description,
+            'is_undone': self.is_undone,
+            'file_count': len(self.files)
+        }
+    
+    def get_details(self):
+        """Get detailed information about the action"""
+        details = self.to_dict()
+        
+        # Add specific details based on action type
+        if self.action_type in [ActionType.METADATA_CHANGE, ActionType.BATCH_METADATA]:
+            # For metadata changes, include old and new values
+            details['changes'] = []
+            for filepath in self.files[:10]:  # Limit to first 10 files for UI
+                change = {
+                    'file': os.path.basename(filepath),
+                    'old_value': self.old_values.get(filepath, ''),
+                    'new_value': self.new_values.get(filepath, '')
+                }
+                details['changes'].append(change)
+            if len(self.files) > 10:
+                details['more_files'] = len(self.files) - 10
+        elif self.action_type in [ActionType.ALBUM_ART_CHANGE, ActionType.ALBUM_ART_DELETE, ActionType.BATCH_ALBUM_ART]:
+            details['has_old_art'] = any(self.old_values.values())
+            details['has_new_art'] = any(self.new_values.values())
+            
+        return details
+
+class EditingHistory:
+    """Manages the editing history for the application"""
+    
+    def __init__(self):
+        self.actions: List[HistoryAction] = []
+        self.lock = threading.Lock()
+        
+        # Create temp directory for storing album art
+        self.temp_dir = tempfile.mkdtemp(prefix='metadata_remote_history_')
+        logger.info(f"Created temp directory for history: {self.temp_dir}")
+    
+    def add_action(self, action: HistoryAction):
+        """Add a new action to the history"""
+        with self.lock:
+            self.actions.append(action)
+            # Keep only last 1000 actions to prevent memory issues
+            if len(self.actions) > 1000:
+                # Clean up old album art files if any
+                old_action = self.actions.pop(0)
+                self._cleanup_action_files(old_action)
+    
+    def get_all_actions(self):
+        """Get all actions in reverse chronological order"""
+        with self.lock:
+            return [action.to_dict() for action in reversed(self.actions)]
+    
+    def get_action(self, action_id: str) -> Optional[HistoryAction]:
+        """Get a specific action by ID"""
+        with self.lock:
+            for action in self.actions:
+                if action.id == action_id:
+                    return action
+            return None
+    
+    def save_album_art(self, art_data: str) -> str:
+        """Save album art to temp file and return the path"""
+        if not art_data:
+            return ''
+        
+        # Generate unique filename
+        art_hash = hashlib.md5(art_data.encode()).hexdigest()
+        art_path = os.path.join(self.temp_dir, f"{art_hash}.jpg")
+        
+        # Save only if not already exists
+        if not os.path.exists(art_path):
+            try:
+                # Decode base64 data
+                art_bytes = base64.b64decode(art_data.split(',')[1] if ',' in art_data else art_data)
+                with open(art_path, 'wb') as f:
+                    f.write(art_bytes)
+            except Exception as e:
+                logger.error(f"Error saving album art: {e}")
+                return ''
+        
+        return art_path
+    
+    def load_album_art(self, art_path: str) -> Optional[str]:
+        """Load album art from temp file"""
+        if not art_path or not os.path.exists(art_path):
+            return None
+        
+        try:
+            with open(art_path, 'rb') as f:
+                art_bytes = f.read()
+            return f"data:image/jpeg;base64,{base64.b64encode(art_bytes).decode()}"
+        except Exception as e:
+            logger.error(f"Error loading album art: {e}")
+            return None
+    
+    def _cleanup_action_files(self, action: HistoryAction):
+        """Clean up any temporary files associated with an action"""
+        if action.action_type in [ActionType.ALBUM_ART_CHANGE, ActionType.ALBUM_ART_DELETE, ActionType.BATCH_ALBUM_ART]:
+            # Clean up old album art files
+            for art_path in action.old_values.values():
+                if art_path and os.path.exists(art_path):
+                    try:
+                        os.remove(art_path)
+                    except:
+                        pass
+            for art_path in action.new_values.values():
+                if art_path and os.path.exists(art_path):
+                    try:
+                        os.remove(art_path)
+                    except:
+                        pass
+    
+    def __del__(self):
+        """Clean up temp directory on exit"""
+        try:
+            import shutil
+            if hasattr(self, 'temp_dir') and os.path.exists(self.temp_dir):
+                shutil.rmtree(self.temp_dir)
+                logger.info(f"Cleaned up temp directory: {self.temp_dir}")
+        except:
+            pass
+        
+    def clear(self):
+        """Clear all history and clean up associated files"""
+        with self.lock:
+            # Clean up all temporary files
+            for action in self.actions:
+                self._cleanup_action_files(action)
+            
+            # Clear the actions list
+            self.actions.clear()
+            
+            logger.info("Cleared all editing history")
+
+    def update_file_references(self, old_path: str, new_path: str):
+        """Update all actions that reference a file when it gets renamed"""
+        with self.lock:
+            for action in self.actions:
+                # Update files list
+                updated_files = []
+                for filepath in action.files:
+                    if filepath == old_path:
+                        updated_files.append(new_path)
+                    else:
+                        updated_files.append(filepath)
+                action.files = updated_files
+                
+                # Update old_values keys (not values)
+                updated_old_values = {}
+                for filepath, value in action.old_values.items():
+                    if filepath == old_path:
+                        updated_old_values[new_path] = value
+                    else:
+                        updated_old_values[filepath] = value
+                action.old_values = updated_old_values
+                
+                # Update new_values keys (not values)
+                updated_new_values = {}
+                for filepath, value in action.new_values.items():
+                    if filepath == old_path:
+                        updated_new_values[new_path] = value
+                    else:
+                        updated_new_values[filepath] = value
+                action.new_values = updated_new_values
+                
+        logger.info(f"Updated file references from {old_path} to {new_path} in history")
+
+# Global history instance
+history = EditingHistory()
+
+# =====================================
+# HELPER FUNCTIONS FOR HISTORY TRACKING
+# =====================================
+
+def create_metadata_action(filepath: str, field: str, old_value: str, new_value: str) -> HistoryAction:
+    """Create a history action for a single metadata change"""
+    filename = os.path.basename(filepath)
+    description = f"Changed {field} in \"{filename}\""
+    if old_value and new_value:
+        description += f" from \"{old_value}\" to \"{new_value}\""
+    elif new_value:
+        description += f" to \"{new_value}\""
+    elif old_value:
+        description += f" (cleared)"
+    
+    return HistoryAction(
+        id=str(uuid.uuid4()),
+        timestamp=time.time(),
+        action_type=ActionType.METADATA_CHANGE,
+        files=[filepath],
+        field=field,
+        old_values={filepath: old_value},
+        new_values={filepath: new_value},
+        description=description
+    )
+
+def create_batch_metadata_action(folder_path: str, field: str, value: str, file_changes: List[Tuple[str, str, str]]) -> HistoryAction:
+    """Create a history action for batch metadata changes"""
+    folder_name = os.path.basename(folder_path) or "root"
+    description = f"Changed {field} to \"{value}\" for {len(file_changes)} files in \"{folder_name}\""
+    
+    old_values = {}
+    new_values = {}
+    files = []
+    
+    for filepath, old_value, new_value in file_changes:
+        files.append(filepath)
+        old_values[filepath] = old_value
+        new_values[filepath] = new_value
+    
+    return HistoryAction(
+        id=str(uuid.uuid4()),
+        timestamp=time.time(),
+        action_type=ActionType.BATCH_METADATA,
+        files=files,
+        field=field,
+        old_values=old_values,
+        new_values=new_values,
+        description=description
+    )
+
+def create_album_art_action(filepath: str, old_art: Optional[str], new_art: Optional[str], is_delete: bool = False) -> HistoryAction:
+    """Create a history action for album art change"""
+    filename = os.path.basename(filepath)
+    
+    # Save album art to temp files
+    old_art_path = history.save_album_art(old_art) if old_art else ''
+    new_art_path = history.save_album_art(new_art) if new_art else ''
+    
+    if is_delete:
+        description = f"Deleted album art from \"{filename}\""
+        action_type = ActionType.ALBUM_ART_DELETE
+    else:
+        description = f"Changed album art in \"{filename}\""
+        action_type = ActionType.ALBUM_ART_CHANGE
+    
+    return HistoryAction(
+        id=str(uuid.uuid4()),
+        timestamp=time.time(),
+        action_type=action_type,
+        files=[filepath],
+        field='art',
+        old_values={filepath: old_art_path},
+        new_values={filepath: new_art_path},
+        description=description
+    )
+
+def create_batch_album_art_action(folder_path: str, art_data: str, file_changes: List[Tuple[str, Optional[str]]]) -> HistoryAction:
+    """Create a history action for batch album art changes"""
+    folder_name = os.path.basename(folder_path) or "root"
+    description = f"Applied album art to {len(file_changes)} files in \"{folder_name}\""
+    
+    # Save new art once
+    new_art_path = history.save_album_art(art_data)
+    
+    old_values = {}
+    new_values = {}
+    files = []
+    
+    for filepath, old_art in file_changes:
+        files.append(filepath)
+        old_values[filepath] = history.save_album_art(old_art) if old_art else ''
+        new_values[filepath] = new_art_path
+    
+    return HistoryAction(
+        id=str(uuid.uuid4()),
+        timestamp=time.time(),
+        action_type=ActionType.BATCH_ALBUM_ART,
+        files=files,
+        field='art',
+        old_values=old_values,
+        new_values=new_values,
+        description=description
+    )
+
+# =========================
 # METADATA INFERENCE ENGINE
-# ============================================================================
+# =========================
 
 class MetadataInferenceEngine:
     """Universal Metadata Inference Algorithm Implementation"""
@@ -1001,9 +1330,9 @@ class MetadataInferenceEngine:
 # Create global inference engine instance
 inference_engine = MetadataInferenceEngine()
 
-# ============================================================================
-# ORIGINAL APP FUNCTIONS (unchanged)
-# ============================================================================
+# =============
+# APP FUNCTIONS
+# =============
 
 @app.route('/')
 def index():
@@ -1195,6 +1524,12 @@ def apply_metadata_to_file(filepath, new_tags, art_data=None, remove_art=False):
     output_format, use_uppercase, base_format = get_file_format(filepath)
     ext = os.path.splitext(filepath)[1]
     
+    # Check for and fix corrupted album art before proceeding
+    if not remove_art and not art_data:  # Only if we're not already modifying art
+        if detect_corrupted_album_art(filepath):
+            logger.info(f"Detected corrupted album art in {filepath}, attempting to fix...")
+            fix_corrupted_album_art(filepath)
+    
     # Check if format supports embedded album art
     if art_data and base_format in FORMAT_METADATA_CONFIG.get('no_embedded_art', []):
         logger.warning(f"Format {base_format} does not support embedded album art")
@@ -1301,6 +1636,213 @@ def apply_metadata_to_file(filepath, new_tags, art_data=None, remove_art=False):
         if os.path.exists(temp_file):
             os.remove(temp_file)
         raise
+
+def detect_corrupted_album_art(filepath):
+    """Detect if album art in the file is corrupted"""
+    try:
+        # First, try to run ffprobe normally
+        probe_data = run_ffprobe(filepath)
+        
+        # Also try to extract art and see if FFmpeg complains
+        art_cmd = ['ffmpeg', '-i', filepath, '-an', '-vcodec', 'copy', '-f', 'image2pipe', '-']
+        # Remove text=True - we're dealing with binary data!
+        result = subprocess.run(art_cmd, capture_output=True, timeout=5)
+        
+        # Check for various corruption indicators
+        corruption_indicators = [
+            "Invalid PNG signature",
+            "Could not find codec parameters",
+            "dimensions not set",
+            "Invalid data found when processing input",
+            "Error while decoding stream",
+            "Invalid pixel format",
+            "Invalid image size",
+            "Truncated or corrupted",
+        ]
+        
+        # Check stderr for corruption indicators - decode it properly
+        if result.stderr:
+            stderr_text = result.stderr.decode('utf-8', errors='ignore')
+            for indicator in corruption_indicators:
+                if indicator in stderr_text:
+                    logger.info(f"Detected corruption indicator: {indicator}")
+                    return True
+        
+        # Check if FFmpeg failed to extract art but there is a video stream
+        streams = probe_data.get('streams', [])
+        has_video_stream = any(s.get('codec_type') == 'video' for s in streams)
+        
+        if has_video_stream and result.returncode != 0:
+            # There's supposed to be art but extraction failed
+            return True
+            
+        # Check for specific metadata inconsistencies
+        for stream in streams:
+            if stream.get('codec_type') == 'video':
+                width = stream.get('width', 0)
+                height = stream.get('height', 0)
+                codec_name = stream.get('codec_name', '')
+                
+                # Invalid dimensions
+                if width == 0 or height == 0:
+                    return True
+                
+                # Suspiciously large dimensions (probably corrupted)
+                if width > 10000 or height > 10000:
+                    return True
+                    
+        return False
+        
+    except subprocess.TimeoutExpired:
+        # If ffmpeg hangs, that's also a sign of corruption
+        logger.warning(f"FFmpeg timed out checking {filepath} - likely corrupted")
+        return True
+    except Exception as e:
+        logger.error(f"Error checking for corrupted art: {e}")
+        return False
+
+def fix_corrupted_album_art(filepath):
+    """Extract and re-embed album art to fix corruption"""
+    try:
+        # Step 1: Try multiple methods to extract the image data
+        image_data = None
+        image_format = None
+        
+        # Method 1: Try to extract as-is (might work despite corruption)
+        art_cmd = ['ffmpeg', '-i', filepath, '-an', '-vcodec', 'copy', '-f', 'image2pipe', '-']
+        result = subprocess.run(art_cmd, capture_output=True, timeout=5)
+        
+        if result.returncode == 0 and result.stdout:
+            image_data = result.stdout
+            # Try to detect format from magic bytes
+            if image_data[:2] == b'\xff\xd8':
+                image_format = 'jpeg'
+            elif image_data[:8] == b'\x89PNG\r\n\x1a\n':
+                image_format = 'png'
+            elif image_data[:4] == b'RIFF' and image_data[8:12] == b'WEBP':
+                image_format = 'webp'
+            else:
+                # Default to JPEG if we can't determine
+                image_format = 'jpeg'
+        
+        # Method 2: If that failed, try to decode and re-encode
+        if not image_data:
+            decode_cmd = [
+                'ffmpeg', '-i', filepath, '-an', '-vframes', '1',
+                '-f', 'image2pipe', '-vcodec', 'mjpeg', '-'
+            ]
+            result = subprocess.run(decode_cmd, capture_output=True, timeout=5)
+            
+            if result.returncode == 0 and result.stdout:
+                image_data = result.stdout
+                image_format = 'jpeg'
+        
+        # Method 3: If still no luck, try to extract with error concealment
+        if not image_data:
+            concealment_cmd = [
+                'ffmpeg', '-err_detect', 'ignore_err', '-i', filepath,
+                '-an', '-vframes', '1', '-f', 'image2pipe', '-vcodec', 'mjpeg', '-'
+            ]
+            result = subprocess.run(concealment_cmd, capture_output=True, timeout=5)
+            
+            if result.returncode == 0 and result.stdout:
+                image_data = result.stdout
+                image_format = 'jpeg'
+        
+        # If we couldn't extract any image data, we'll need to remove the art
+        if not image_data:
+            logger.warning(f"Could not extract any valid image data from {filepath}")
+            # Strip the corrupted art stream
+            output_format, _, _ = get_file_format(filepath)
+            ext = os.path.splitext(filepath)[1]
+            fd, temp_file = tempfile.mkstemp(suffix=ext, dir=os.path.dirname(filepath))
+            os.close(fd)
+            
+            strip_cmd = [
+                'ffmpeg', '-i', filepath, '-y',
+                '-map', '0:a', '-codec', 'copy', '-f', output_format,
+                temp_file
+            ]
+            
+            result = subprocess.run(strip_cmd, capture_output=True, text=True)
+            if result.returncode == 0:
+                os.replace(temp_file, filepath)
+                fix_file_ownership(filepath)
+                return True
+            else:
+                if os.path.exists(temp_file):
+                    os.remove(temp_file)
+                return False
+        
+        # Step 2: Create a clean file without album art
+        output_format, _, _ = get_file_format(filepath)
+        ext = os.path.splitext(filepath)[1]
+        fd, temp_file = tempfile.mkstemp(suffix=ext, dir=os.path.dirname(filepath))
+        os.close(fd)
+        
+        try:
+            # Strip all video streams
+            strip_cmd = [
+                'ffmpeg', '-i', filepath, '-y',
+                '-map', '0:a', '-codec', 'copy', '-f', output_format,
+                temp_file
+            ]
+            
+            result = subprocess.run(strip_cmd, capture_output=True, text=True)
+            if result.returncode != 0:
+                raise Exception(f"Failed to strip art: {result.stderr}")
+            
+            # Step 3: Save the extracted image to a temp file
+            image_ext = '.jpg' if image_format == 'jpeg' else f'.{image_format}'
+            fd2, temp_art_file = tempfile.mkstemp(suffix=image_ext)
+            with os.fdopen(fd2, 'wb') as f:
+                f.write(image_data)
+            
+            # Step 4: Re-embed the art properly
+            fd3, final_file = tempfile.mkstemp(suffix=ext, dir=os.path.dirname(filepath))
+            os.close(fd3)
+            
+            # Use appropriate codec based on detected format
+            video_codec = 'mjpeg' if image_format == 'jpeg' else 'png'
+            
+            embed_cmd = [
+                'ffmpeg', '-i', temp_file, '-i', temp_art_file, '-y',
+                '-map', '0:a', '-map', '1', '-c:v', video_codec,
+                '-disposition:v', 'attached_pic', '-codec:a', 'copy',
+                '-f', output_format, final_file
+            ]
+            
+            result = subprocess.run(embed_cmd, capture_output=True, text=True)
+            if result.returncode != 0:
+                raise Exception(f"Failed to embed art: {result.stderr}")
+            
+            # Replace original file
+            os.replace(final_file, filepath)
+            fix_file_ownership(filepath)
+            
+            # Cleanup
+            os.remove(temp_file)
+            os.remove(temp_art_file)
+            
+            logger.info(f"Successfully fixed corrupted album art in {filepath} (format: {image_format})")
+            return True
+            
+        except Exception as e:
+            # Cleanup on error
+            if os.path.exists(temp_file):
+                os.remove(temp_file)
+            if 'temp_art_file' in locals() and os.path.exists(temp_art_file):
+                os.remove(temp_art_file)
+            if 'final_file' in locals() and os.path.exists(final_file):
+                os.remove(final_file)
+            raise
+            
+    except subprocess.TimeoutExpired:
+        logger.error(f"Timeout while fixing corrupted album art in {filepath}")
+        return False
+    except Exception as e:
+        logger.error(f"Error fixing corrupted album art: {e}")
+        return False
 
 @app.route('/stream/<path:filepath>')
 def stream_audio(filepath):
@@ -1479,6 +2021,9 @@ def rename_file():
         os.rename(old_path, new_path)
         fix_file_ownership(new_path)
         
+        # Update all history references to use the new filename
+        history.update_file_references(old_path, new_path)
+        
         # Return new relative path
         new_rel_path = os.path.relpath(new_path, MUSIC_DIR)
         return jsonify({'status': 'success', 'newPath': new_rel_path})
@@ -1541,10 +2086,32 @@ def set_metadata(filename):
         
         data = request.json
         
+        # Get current metadata before changes
+        probe_data = run_ffprobe(filepath)
+        tags = probe_data.get('format', {}).get('tags', {})
+        _, _, base_format = get_file_format(filepath)
+        current_metadata = normalize_metadata_tags(tags, base_format)
+        current_art = extract_album_art(filepath)
+        
         # Separate metadata from special operations
         metadata_tags = {k: v for k, v in data.items() if k not in ['art', 'removeArt']}
         art_data = data.get('art')
         remove_art = data.get('removeArt', False)
+        
+        # Track individual field changes
+        for field, new_value in metadata_tags.items():
+            old_value = current_metadata.get(field, '')
+            if old_value != new_value:
+                action = create_metadata_action(filepath, field, old_value, new_value)
+                history.add_action(action)
+        
+        # Track album art changes
+        if art_data or remove_art:
+            if remove_art:
+                action = create_album_art_action(filepath, current_art, None, is_delete=True)
+            else:
+                action = create_album_art_action(filepath, current_art, art_data)
+            history.add_action(action)
         
         # Apply changes
         apply_metadata_to_file(filepath, metadata_tags, art_data, remove_art)
@@ -1623,10 +2190,34 @@ def apply_art_to_folder():
     if not art_data:
         return jsonify({'error': 'No album art provided'}), 400
     
+    # Collect changes before applying
+    file_changes = []
+    abs_folder_path = validate_path(os.path.join(MUSIC_DIR, folder_path) if folder_path else MUSIC_DIR)
+    
+    for filename in os.listdir(abs_folder_path):
+        file_path = os.path.join(abs_folder_path, filename)
+        if os.path.isfile(file_path) and filename.lower().endswith(AUDIO_EXTENSIONS):
+            try:
+                current_art = extract_album_art(file_path)
+                file_changes.append((file_path, current_art))
+            except:
+                pass
+    
     def apply_art(file_path):
         apply_metadata_to_file(file_path, {}, art_data)
     
-    return process_folder_files(folder_path, apply_art, "updated with album art")
+    # Use process_folder_files to handle the batch operation
+    response = process_folder_files(folder_path, apply_art, "updated with album art")
+    
+    # Check if it's a successful response by examining the response data
+    if response.status_code == 200:
+        response_data = response.get_json()
+        if response_data.get('status') in ['success', 'partial']:
+            # Add to history if successful
+            action = create_batch_album_art_action(folder_path, art_data, file_changes)
+            history.add_action(action)
+    
+    return response
 
 @app.route('/apply-field-to-folder', methods=['POST'])
 def apply_field_to_folder():
@@ -1639,14 +2230,266 @@ def apply_field_to_folder():
     if not field:
         return jsonify({'error': 'No field specified'}), 400
     
+    # Collect current values before applying changes
+    file_changes = []
+    abs_folder_path = validate_path(os.path.join(MUSIC_DIR, folder_path) if folder_path else MUSIC_DIR)
+    
+    for filename in os.listdir(abs_folder_path):
+        file_path = os.path.join(abs_folder_path, filename)
+        if os.path.isfile(file_path) and filename.lower().endswith(AUDIO_EXTENSIONS):
+            try:
+                probe_data = run_ffprobe(file_path)
+                tags = probe_data.get('format', {}).get('tags', {})
+                _, _, base_format = get_file_format(file_path)
+                current_metadata = normalize_metadata_tags(tags, base_format)
+                old_value = current_metadata.get(field, '')
+                file_changes.append((file_path, old_value, value))
+            except:
+                pass
+    
     def apply_field(file_path):
         apply_metadata_to_file(file_path, {field: value})
     
-    return process_folder_files(folder_path, apply_field, f"updated with {field}")
+    response = process_folder_files(folder_path, apply_field, f"updated with {field}")
+    
+    # Check if it's a successful response by examining the response data
+    if response.status_code == 200:
+        response_data = response.get_json()
+        if response_data.get('status') in ['success', 'partial']:
+            # Add to history if successful
+            action = create_batch_metadata_action(folder_path, field, value, file_changes)
+            history.add_action(action)
+    
+    return response
 
-# ============================================================================
-# NEW INFERENCE ENDPOINT
-# ============================================================================
+# =================
+# HISTORY ENDPOINTS
+# =================
+
+@app.route('/history')
+def get_history():
+    """Get all editing history"""
+    return jsonify({'actions': history.get_all_actions()})
+
+@app.route('/history/<action_id>')
+def get_history_action(action_id):
+    """Get details for a specific action"""
+    action = history.get_action(action_id)
+    if not action:
+        return jsonify({'error': 'Action not found'}), 404
+    
+    return jsonify(action.get_details())
+
+@app.route('/history/<action_id>/undo', methods=['POST'])
+def undo_action(action_id):
+    """Undo a specific action"""
+    action = history.get_action(action_id)
+    if not action:
+        return jsonify({'error': 'Action not found'}), 404
+    
+    if action.is_undone:
+        return jsonify({'error': 'Action is already undone'}), 400
+    
+    try:
+        errors = []
+        files_updated = 0
+        
+        if action.action_type == ActionType.METADATA_CHANGE:
+            # Undo single metadata change
+            filepath = action.files[0]
+            field = action.field
+            old_value = action.old_values[filepath]
+            
+            try:
+                apply_metadata_to_file(filepath, {field: old_value})
+                files_updated += 1
+            except Exception as e:
+                errors.append(f"{os.path.basename(filepath)}: {str(e)}")
+        
+        elif action.action_type == ActionType.BATCH_METADATA:
+            # Undo batch metadata changes
+            for filepath in action.files:
+                try:
+                    old_value = action.old_values.get(filepath, '')
+                    apply_metadata_to_file(filepath, {action.field: old_value})
+                    files_updated += 1
+                except Exception as e:
+                    errors.append(f"{os.path.basename(filepath)}: {str(e)}")
+
+        elif action.action_type in [ActionType.ALBUM_ART_CHANGE, ActionType.ALBUM_ART_DELETE]:
+            # Undo album art change
+            filepath = action.files[0]
+            old_art_path = action.old_values[filepath]
+            
+            try:
+                if old_art_path:
+                    old_art = history.load_album_art(old_art_path)
+                    if old_art:
+                        apply_metadata_to_file(filepath, {}, old_art)
+                    else:
+                        apply_metadata_to_file(filepath, {}, remove_art=True)
+                else:
+                    apply_metadata_to_file(filepath, {}, remove_art=True)
+                files_updated += 1
+            except Exception as e:
+                errors.append(f"{os.path.basename(filepath)}: {str(e)}")
+        
+        elif action.action_type == ActionType.BATCH_ALBUM_ART:
+            # Undo batch album art changes
+            for filepath in action.files:
+                try:
+                    old_art_path = action.old_values.get(filepath, '')
+                    if old_art_path:
+                        old_art = history.load_album_art(old_art_path)
+                        if old_art:
+                            apply_metadata_to_file(filepath, {}, old_art)
+                        else:
+                            apply_metadata_to_file(filepath, {}, remove_art=True)
+                    else:
+                        apply_metadata_to_file(filepath, {}, remove_art=True)
+                    files_updated += 1
+                except Exception as e:
+                    errors.append(f"{os.path.basename(filepath)}: {str(e)}")
+
+        # Mark as undone
+        action.is_undone = True
+        
+        # Return result
+        response_data = {
+            'filesUpdated': files_updated,
+            'action': action.to_dict()
+        }
+        
+        if files_updated == 0:
+            response_data['status'] = 'error'
+            response_data['error'] = 'No files were undone'
+            response_data['errors'] = errors
+            return jsonify(response_data), 500
+        elif errors:
+            response_data['status'] = 'partial'
+            response_data['errors'] = errors
+            return jsonify(response_data)
+        else:
+            response_data['status'] = 'success'
+            return jsonify(response_data)
+    
+    except Exception as e:
+        logger.error(f"Error undoing action {action_id}: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/history/<action_id>/redo', methods=['POST'])
+def redo_action(action_id):
+    """Redo a previously undone action"""
+    action = history.get_action(action_id)
+    if not action:
+        return jsonify({'error': 'Action not found'}), 404
+    
+    if not action.is_undone:
+        return jsonify({'error': 'Action is not undone'}), 400
+    
+    try:
+        errors = []
+        files_updated = 0
+        
+        if action.action_type == ActionType.METADATA_CHANGE:
+            # Redo single metadata change
+            filepath = action.files[0]
+            field = action.field
+            new_value = action.new_values[filepath]
+            
+            try:
+                apply_metadata_to_file(filepath, {field: new_value})
+                files_updated += 1
+            except Exception as e:
+                errors.append(f"{os.path.basename(filepath)}: {str(e)}")
+        
+        elif action.action_type == ActionType.BATCH_METADATA:
+            # Redo batch metadata changes
+            for filepath in action.files:
+                try:
+                    new_value = action.new_values.get(filepath, '')
+                    apply_metadata_to_file(filepath, {action.field: new_value})
+                    files_updated += 1
+                except Exception as e:
+                    errors.append(f"{os.path.basename(filepath)}: {str(e)}")
+
+        elif action.action_type in [ActionType.ALBUM_ART_CHANGE, ActionType.ALBUM_ART_DELETE]:
+            # Redo album art change
+            filepath = action.files[0]
+            new_art_path = action.new_values[filepath]
+            
+            try:
+                if new_art_path:
+                    new_art = history.load_album_art(new_art_path)
+                    if new_art:
+                        apply_metadata_to_file(filepath, {}, new_art)
+                    else:
+                        apply_metadata_to_file(filepath, {}, remove_art=True)
+                else:
+                    apply_metadata_to_file(filepath, {}, remove_art=True)
+                files_updated += 1
+            except Exception as e:
+                errors.append(f"{os.path.basename(filepath)}: {str(e)}")
+        
+        elif action.action_type == ActionType.BATCH_ALBUM_ART:
+            # Redo batch album art changes
+            for filepath in action.files:
+                try:
+                    new_art_path = action.new_values.get(filepath, '')
+                    if new_art_path:
+                        new_art = history.load_album_art(new_art_path)
+                        if new_art:
+                            apply_metadata_to_file(filepath, {}, new_art)
+                        else:
+                            apply_metadata_to_file(filepath, {}, remove_art=True)
+                    else:
+                        apply_metadata_to_file(filepath, {}, remove_art=True)
+                    files_updated += 1
+                except Exception as e:
+                    errors.append(f"{os.path.basename(filepath)}: {str(e)}")
+
+        # Mark as not undone
+        action.is_undone = False
+        
+        # Return result
+        response_data = {
+            'filesUpdated': files_updated,
+            'action': action.to_dict()
+        }
+        
+        if files_updated == 0:
+            response_data['status'] = 'error'
+            response_data['error'] = 'No files were redone'
+            response_data['errors'] = errors
+            return jsonify(response_data), 500
+        elif errors:
+            response_data['status'] = 'partial'
+            response_data['errors'] = errors
+            return jsonify(response_data)
+        else:
+            response_data['status'] = 'success'
+            return jsonify(response_data)
+    
+    except Exception as e:
+        logger.error(f"Error redoing action {action_id}: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/history/clear', methods=['POST'])
+def clear_history():
+    """Clear all editing history"""
+    try:
+        history.clear()
+        return jsonify({
+            'status': 'success',
+            'message': 'History cleared successfully'
+        })
+    except Exception as e:
+        logger.error(f"Error clearing history: {e}")
+        return jsonify({'error': str(e)}), 500
+
+# ==================
+# INFERENCE ENDPOINT
+# ==================
 
 @app.route('/infer/<path:filename>/<field>')
 def infer_metadata_field(filename, field):
