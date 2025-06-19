@@ -1,4 +1,4 @@
-# Metadata Remote - AI-powered audio metadata editor
+# Metadata Remote - Intelligent audio metadata editor
 # Copyright (C) 2025 Dr. William Nelson Leonard
 #
 # This program is free software: you can redistribute it and/or modify
