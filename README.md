@@ -2,7 +2,7 @@
 
 Web-based metadata editor for audio files on headless servers.
 
-Edit MP3, FLAC, and other audio file metadata through a browser interface, designed for servers without desktop environments or GUI access.
+Edit MP3, FLAC, and other audio file metadata through a browser interface, designed for headless servers.
 
 ![Screenshot](screenshots/main-interface.png)
 
