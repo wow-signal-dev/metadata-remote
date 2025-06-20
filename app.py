@@ -1455,55 +1455,6 @@ def get_metadata_field_mapping(use_uppercase, format_type=''):
         return {k: v.upper() for k, v in base_mapping.items()}
     return base_mapping
 
-def merge_metadata_tags(existing_tags, new_tags, use_uppercase, format_type=''):
-    """Merge new tags into existing tags with proper handling"""
-    merged = existing_tags.copy()
-    field_mapping = get_metadata_field_mapping(use_uppercase, format_type)
-    
-    # Special tag variants to handle
-    albumartist_variants = ['albumartist', 'ALBUMARTIST', 'album_artist', 'ALBUM_ARTIST', 'AlbumArtist', 'aART']
-    disc_variants = ['disc', 'DISC', 'discnumber', 'DISCNUMBER', 'disk', 'DISK', 'Disc']
-    track_variants = ['track', 'TRACK', 'tracknumber', 'TRACKNUMBER']
-    
-    for key, value in new_tags.items():
-        if key in ['art', 'removeArt']:
-            continue
-            
-        proper_tag_name = field_mapping.get(key, key.upper() if use_uppercase else key)
-        
-        if key == 'albumartist':
-            # Remove all variants
-            for variant in albumartist_variants:
-                merged.pop(variant, None)
-            if value:
-                merged[proper_tag_name] = value
-                
-        elif key == 'disc':
-            # Remove all variants
-            for variant in disc_variants:
-                merged.pop(variant, None)
-            if value:
-                merged[proper_tag_name] = value
-                
-        elif key == 'track':
-            # Remove all variants
-            for variant in track_variants:
-                merged.pop(variant, None)
-            if value:
-                merged[proper_tag_name] = value
-                
-        else:
-            # Find and remove any case variant
-            for existing_key in list(merged.keys()):
-                if existing_key.lower() == key.lower():
-                    del merged[existing_key]
-                    break
-            
-            if value:
-                merged[proper_tag_name] = value
-    
-    return merged
-
 def extract_album_art(filepath):
     """Extract album art from audio file"""
     # Check if format supports album art
@@ -1525,7 +1476,7 @@ def apply_metadata_to_file(filepath, new_tags, art_data=None, remove_art=False):
     ext = os.path.splitext(filepath)[1]
     
     # Check for and fix corrupted album art before proceeding
-    if not remove_art and not art_data:  # Only if we're not already modifying art
+    if not remove_art and not art_data:
         if detect_corrupted_album_art(filepath):
             logger.info(f"Detected corrupted album art in {filepath}, attempting to fix...")
             fix_corrupted_album_art(filepath)
@@ -1533,13 +1484,7 @@ def apply_metadata_to_file(filepath, new_tags, art_data=None, remove_art=False):
     # Check if format supports embedded album art
     if art_data and base_format in FORMAT_METADATA_CONFIG.get('no_embedded_art', []):
         logger.warning(f"Format {base_format} does not support embedded album art")
-        # For OGG/Vorbis, we could potentially use METADATA_BLOCK_PICTURE, but it's complex
-        # For now, skip album art for these formats
         art_data = None
-    
-    # Get existing metadata
-    probe_data = run_ffprobe(filepath)
-    existing_tags = probe_data.get('format', {}).get('tags', {})
     
     # Create temp file
     fd, temp_file = tempfile.mkstemp(suffix=ext, dir=os.path.dirname(filepath))
@@ -1572,47 +1517,108 @@ def apply_metadata_to_file(filepath, new_tags, art_data=None, remove_art=False):
                 '-map', '0', '-codec', 'copy', '-f', output_format
             ]
         
-        # Merge tags normally for supported formats
-        merged_tags = merge_metadata_tags(existing_tags, new_tags, use_uppercase, base_format)
+        # Add only the metadata fields we're changing
+        # Get proper field names based on format
+        field_mapping = get_metadata_field_mapping(use_uppercase, base_format)
         
-        # For OGG/Vorbis, ensure we use the right tag format
+        # Special handling for OGG/Vorbis format
         if base_format == 'ogg':
-            # Clear all existing metadata first
-            for key in list(merged_tags.keys()):
-                cmd.extend(['-metadata', f'{key}='])
-            
-            # Then add our tags in the correct format
-            tag_mapping = {
+            # OGG uses specific tag names
+            ogg_tag_mapping = {
                 'title': 'TITLE',
                 'artist': 'ARTIST',
                 'album': 'ALBUM',
                 'albumartist': 'ALBUMARTIST',
                 'date': 'DATE',
+                'year': 'DATE',  # Map year to DATE for OGG
                 'genre': 'GENRE',
                 'track': 'TRACKNUMBER',
                 'disc': 'DISCNUMBER'
             }
             
-            # Apply new tags
-            for our_field, ogg_field in tag_mapping.items():
-                if our_field in new_tags and new_tags[our_field]:
-                    cmd.extend(['-metadata', f'{ogg_field}={new_tags[our_field]}'])
+            for field, value in new_tags.items():
+                if field in ['art', 'removeArt']:
+                    continue
+                
+                # Get the OGG-specific tag name
+                ogg_field = ogg_tag_mapping.get(field, field.upper())
+                
+                if value:
+                    cmd.extend(['-metadata', f'{ogg_field}={value}'])
+                else:
+                    # Clear the field by setting it to empty
+                    cmd.extend(['-metadata', f'{ogg_field}='])
+        
+        # Special handling for WAV format
+        elif base_format == 'wav':
+            # WAV uses INFO tags with specific names
+            wav_tag_mapping = {
+                'title': 'INAM',
+                'artist': 'IART',
+                'album': 'IPRD',
+                'albumartist': 'IART',  # WAV doesn't have separate albumartist
+                'date': 'ICRD',
+                'year': 'ICRD',
+                'genre': 'IGNR',
+                'comment': 'ICMT',
+                'copyright': 'ICOP',
+                'track': 'ITRK'
+            }
             
-            # Skip the normal metadata addition since we've already added them
-            merged_tags = {}
+            for field, value in new_tags.items():
+                if field in ['art', 'removeArt']:
+                    continue
+                
+                # Get the WAV-specific tag name
+                wav_field = wav_tag_mapping.get(field, field.upper())
+                
+                if value:
+                    cmd.extend(['-metadata', f'{wav_field}={value}'])
+                else:
+                    # Clear the field
+                    cmd.extend(['-metadata', f'{wav_field}='])
+                    
+            # Warn about limited support
+            if base_format in FORMAT_METADATA_CONFIG.get('limited', []):
+                logger.info(f"Note: {base_format} format has limited metadata support. Some fields may not be saved.")
         
-        # Add any remaining metadata that wasn't handled by special cases
-        if base_format != 'ogg':
-            # Add metadata to command for other formats
-            for key, value in merged_tags.items():
-                if value:  # Only add non-empty values
-                    cmd.extend(['-metadata', f'{key}={value}'])
+        # Standard handling for other formats (MP3, FLAC, M4A, WMA, WV)
+        else:
+            for field, value in new_tags.items():
+                if field in ['art', 'removeArt']:
+                    continue
+                
+                # Get proper tag name for this format
+                proper_tag_name = field_mapping.get(field, field.upper() if use_uppercase else field)
+                
+                # Special case: some formats use different names for certain fields
+                if base_format == 'mp3' and use_uppercase:
+                    # MP3 ID3v2 uses specific uppercase tags
+                    mp3_special_mapping = {
+                        'albumartist': 'TPE2',
+                        'track': 'TRCK',
+                        'disc': 'TPOS',
+                        'year': 'TDRC',
+                        'date': 'TDRC'
+                    }
+                    proper_tag_name = mp3_special_mapping.get(field, proper_tag_name)
+                
+                if value:
+                    cmd.extend(['-metadata', f'{proper_tag_name}={value}'])
+                else:
+                    # Clear the field by setting it to empty
+                    cmd.extend(['-metadata', f'{proper_tag_name}='])
         
-        # Special handling for formats with limited metadata support
-        if base_format in FORMAT_METADATA_CONFIG.get('limited', []):
-            logger.info(f"Note: {base_format} format has limited metadata support. Some fields may not be saved.")
-        
+        # Add output file
         cmd.append(temp_file)
+        
+        # Log command for debugging (but not the full command to avoid clutter)
+        logger.debug(f"Applying metadata changes to {os.path.basename(filepath)}")
+        logger.debug(f"Changed fields: {', '.join(k for k in new_tags.keys() if k not in ['art', 'removeArt'])}")
+        if art_data:
+            logger.debug("Adding album art")
+        elif remove_art:
+            logger.debug("Removing album art")
         
         # Execute ffmpeg
         result = subprocess.run(cmd, capture_output=True, text=True)
@@ -1631,10 +1637,15 @@ def apply_metadata_to_file(filepath, new_tags, art_data=None, remove_art=False):
         # Clean up temp art file if exists
         if art_data and 'temp_art_file' in locals():
             os.remove(temp_art_file)
+        
+        logger.info(f"Successfully updated {os.path.basename(filepath)}")
             
-    except Exception:
+    except Exception as e:
+        # Clean up on error
         if os.path.exists(temp_file):
             os.remove(temp_file)
+        if art_data and 'temp_art_file' in locals() and os.path.exists(temp_art_file):
+            os.remove(temp_art_file)
         raise
 
 def detect_corrupted_album_art(filepath):
