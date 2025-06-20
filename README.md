@@ -206,4 +206,6 @@ AGPL-3.0 License - see [LICENSE](LICENSE) file for details.
 
 ---
 
+*Version 1.0 - Released June 2025*
+
 **Made with ❤️ for music lovers and metadata perfectionists**
