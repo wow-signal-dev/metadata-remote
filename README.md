@@ -1,96 +1,108 @@
-# Metadata Remote (mdrm)
+# Metadata Remote
 
-A powerful web-based metadata editor for audio files with smart inference, comprehensive editing history, and bulk operations - designed for managing large music collections efficiently.
+Web-based metadata editor for audio files on headless servers.
+
+Edit MP3, FLAC, and other audio file metadata through a browser interface, designed for servers without desktop environments or GUI access.
 
 ![Screenshot](screenshots/main-interface.png)
 
-## ✨ Key Features
+## Problem Statement
 
-### 🧠 Smart Metadata Inference
-Intelligent suggestions using pattern recognition, folder structure analysis, and MusicBrainz integration. Click any empty field to see confidence-scored suggestions.
+Managing audio metadata on headless servers used to require downloading files locally for editing or installing desktop/CLI music management applications on your server. Metadata Remote now eliminates both workflows by providing browser-based metadata editing directly on your server.
 
-### 📝 Complete Editing History
-Full undo/redo system. Tracks up to 1000 edits, revert mistakes, and even undo bulk operations across entire folders. Edit fearlessly.
+**No more:**
+- Downloading files via SSH/SFTP to edit locally
+- Installing heavyweight music applications on headless systems  
+- Complex command-line workflows for bulk operations
+- File transfers back and forth for metadata changes
 
-### 🎵 Comprehensive Format Support
-MP3, FLAC, WAV, WV, M4A, and WMA with format-aware editing. Visual indicators show capabilities and limitations for each format.
+## Quick Start
 
-### 📁 Powerful Bulk Operations
+```bash
+# Download docker-compose.yml
+wget https://raw.githubusercontent.com/wow-signal-dev/metadata-remote/main/docker-compose.yml
+
+# Edit your music directory path
+nano docker-compose.yml  # Change /path/to/your/music:/music
+
+# Start the service
+docker-compose up -d
+
+# Access the web interface
+open http://localhost:8338
+```
+
+Multi-architecture Docker images available for x86_64, ARM64, and ARMv7.
+
+## Key Features
+
+### Smart Metadata Inference
+Intelligent suggestions using pattern recognition, folder structure analysis, and MusicBrainz integration. Click any empty field to instantly see confidence-scored suggestions.
+
+### Complete Editing History
+Full undo/redo system tracks up to 1000 edits. Revert mistakes and even undo bulk operations across entire folders. Edit fearlessly.
+
+### Comprehensive Format Support
+MP3, FLAC, WAV, WV, M4A, and WMA with format-aware editing. Visual indicators show capabilities and limitations for each format:
+- 🟢 **Lossless formats** (FLAC, WAV, WV): Full metadata + embedded art
+- 🟡 **Lossy formats** (MP3, M4A, WMA): Standard tags + album art
+- ⚠️ **Limited formats**: Basic metadata support with visual warnings
+
+### Powerful Bulk Operations
 Apply metadata or album art to entire folders instantly. Save individual fields or update everything at once.
 
-### 🎨 Advanced Album Art Management
-Upload, preview, delete, and bulk apply album art.
+### Advanced Album Art Management
+Upload, preview, delete, and bulk apply album art. Metadata Remote automatically detects and repairs corrupted embedded images when editing.
 
-### 🔧 Auto-repair of Corrupted Embedded Images
-Automatically detects and repairs damaged embedded images when editing.
-
-### ⚡ Efficient Workflow
+### Efficient Server Workflow
 - **Keyboard-first navigation**: Arrow keys with smart repeat, Tab switching, Enter to expand
 - **Real-time filtering**: Instant search within large folders
 - **In-browser playback**: Stream files directly (supports most formats)
 - **Direct file renaming**: Update filenames with automatic history tracking
 - **Resizable panels**: Customize your workspace by dragging dividers
 
-### 🌙 Modern Interface
+### Modern Interface
 Clean dark theme with smooth animations, loading states, and clear visual feedback for every action.
 
-## 🚀 Quick Start
+## Comparison with Alternatives
 
-The easiest way to get started is using our pre-built Docker image.
+| Feature | Metadata Remote | Mp3tag | MusicBrainz Picard | Beets |
+|---------|----------------|--------|-------------------|-------|
+| **Headless server support** | ✅ Native web interface | ❌ Requires Windows/desktop | ❌ Requires desktop GUI | ✅ CLI only, no GUI |
+| **Remote browser access** | ✅ Edit from anywhere | ❌ Must install locally | ❌ Must install locally | ❌ SSH terminal only |
+| **Zero-setup editing** | ✅ Single Docker container | ❌ Windows/Wine required | ❌ Python dependencies | ❌ Complex configuration |
+| **Visual bulk operations** | ✅ Intuitive web interface | ✅ Advanced but desktop | ⚠️ Limited bulk features | ❌ Command-line only |
+| **Comprehensive undo** | ✅ 1000 operations + bulk | ⚠️ Basic undo only | ❌ No comprehensive undo | ❌ No undo system |
+| **Smart auto-suggestions** | ✅ Pattern + MusicBrainz | ⚠️ Database lookup only | ✅ MusicBrainz focused | ⚠️ Automatic but rigid |
+| **No learning curve** | ✅ Immediate productivity | ⚠️ Moderate complexity | ⚠️ Steep learning curve | ❌ Very steep, config-heavy |
 
-> **Note:** Our image supports x86, ARM, and Apple Silicon processors automatically. Docker will download the correct version for your device.
-
-### Prerequisites
-- Docker and Docker Compose
-- A music directory to manage
-
-### Installation
-
-1. Download the docker-compose.yml file:
-```bash
-wget https://raw.githubusercontent.com/wow-signal-dev/metadata-remote/main/docker-compose.yml
-```
-
-2. Edit the music directory path in `docker-compose.yml`:
-```bash
-nano docker-compose.yml
-# Change the line: /path/to/your/music:/music
-```
-
-3. Start the application:
-```bash
-docker-compose up -d
-```
-
-4. Open your browser to `http://localhost:8338`
-
-That's it! The container will automatically download and run the latest version.
-
-## 📋 Usage Guide
+## Usage Guide
 
 ### Navigation
 - **↑↓ Arrow keys**: Navigate folders and files with smart key repeat
-- **Enter**: Expand/collapse folders
+- **Enter**: Expand/collapse folders  
 - **Tab**: Switch between folder and file panes
 - **Click filename header**: Rename files directly
 - **Click empty field**: Get automatic intelligent suggestions
 
 ### Smart Metadata Inference
-When you click on an empty metadata field, mdrm will:
+When you click on an empty metadata field, Metadata Remote will:
 1. Analyze the filename, folder structure, and nearby files
 2. Query MusicBrainz if needed for additional data
 3. Present suggestions with confidence scores
-4. Click any suggestion to apply it instantly
+4. Just click any suggestion to apply it instantly
 
 ### Editing History
 - **Bottom panel**: Click to expand the editing history view
 - **Timeline view**: See all changes in chronological order
 - **Undo/Redo**: Revert or reapply any change in any order
+- **Filename tracking**: Undo/redo works even after renaming files - filename changes don't break metadata edit history
 - **Batch tracking**: Even bulk operations can be undone
 - **Clear history**: Remove all history when needed
 
 ### Bulk Operations
 - **Apply to File**: Save a single field to the current file
+- **Save all fields to file**: Save all metadata fields to a single file at once
 - **Apply to Folder**: Apply any field value to all files in the folder
 - **Album Art**: Upload once, apply to entire album folders
 - **Smart workflow**: Navigate → Edit → Apply to folder
@@ -102,39 +114,71 @@ When you click on an empty metadata field, mdrm will:
 - **Delete**: Remove embedded album art
 - **Auto-repair**: Corrupted art is automatically detected and fixed
 
-### Format Support & Limitations
-Visual indicators show format capabilities:
-- 🟢 **Green badges**: Indicate lossless formats (FLAC, WAV, WV)
-- 🟡 **Yellow badges**: Indicate lossy formats (MP3, M4A, WMA)
-- ⚠️ **Warning icons**: Indicate formats with limited metadata or album art support
+## Installation
 
-## 🎯 Perfect For
+### Docker Compose (Recommended)
 
-- **Jellyfin/Plex preparation**: Organize metadata before importing
-- **Large music collections**: Efficient bulk editing with history tracking
-- **FLAC libraries**: Full metadata and album art support
+```yaml
+version: '3.8'
+services:
+  metadata-remote:
+    image: wowsignaldev/metadata-remote:latest
+    container_name: metadata-remote
+    ports:
+      - "8338:8338"
+    volumes:
+      - /your/music/directory:/music
+    environment:
+      - PUID=1000
+      - PGID=1000
+    restart: unless-stopped
+```
+
+### Docker Run
+
+```bash
+docker run -d \
+  --name metadata-remote \
+  -p 8338:8338 \
+  -v /your/music:/music \
+  -e PUID=1000 \
+  -e PGID=1000 \
+  wowsignaldev/metadata-remote:latest
+```
+
+## Use Cases
+
+### Headless Media Servers
+- **Jellyfin/Plex preparation**: Organize metadata before library imports
+- **NAS systems**: TrueNAS, Unraid, Synology - edit without desktop apps
+- **VPS music libraries**: Cloud servers with no GUI access  
+- **Raspberry Pi setups**: Lightweight enough for minimal hardware
+
+### Large-Scale Operations
+- **Bulk metadata cleanup**: Process thousands of files efficiently
+- **Archive digitization**: Organize newly ripped collections
 - **Mixed format libraries**: Handle different formats intelligently
-- **Metadata cleanup**: Fix inconsistent tags across albums
-- **Archive management**: Track all changes for accountability
+- **Library maintenance**: Ongoing organization without workflow disruption
 
-## ⚙️ Configuration
+## Configuration
 
 ### Environment Variables
-- `PUID`: User ID for file permissions (default: 1000)
-- `PGID`: Group ID for file permissions (default: 1000)
-- `MUSIC_DIR`: Music directory path (default: /music)
 
-### Ports
-- `8338`: Web interface (customizable in docker-compose.yml)
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PUID` | 1000 | User ID for file permissions |
+| `PGID` | 1000 | Group ID for file permissions |
+| `MUSIC_DIR` | /music | Internal container music path |
 
-### Volumes
-- `/music`: Your music directory (read/write access required)
+### Port Configuration
 
-## 🔒 Security
+- `8338` - Web interface (configurable in docker-compose.yml)
 
-⚠️ **IMPORTANT**: This application is designed for LOCAL USE ONLY and should NEVER be exposed to the internet without proper authentication and encryption.
+### Volume Mounts
 
-## 🏗️ Architecture
+- `/music` - Mount your music directory here (read/write access required)
+
+## Architecture
 
 ### Backend
 - **Framework**: Python Flask
@@ -150,10 +194,11 @@ Visual indicators show format capabilities:
 
 ### Container
 - **Base**: Alpine Linux (ultra-lightweight)
-- **Size**: Only 189MB (75% smaller than alternatives)
-- **Architecture**: Multi-arch support (x86_64, arm64, armv7)
+- **Size**: Only 189MB (75% smaller than desktop alternatives)
+- **Architecture**: Multi-arch support (x86_64, ARM64, ARMv7)
+- **Dependencies**: Self-contained, no external requirements
 
-## 🐛 Troubleshooting
+## Troubleshooting
 
 ### Permission Issues
 Ensure PUID/PGID match your user:
@@ -178,34 +223,54 @@ docker-compose logs     # View logs for errors
 - This is by design for privacy and performance
 - Future versions may add persistent storage options
 
-## 🤝 Contributing
+### Container Not Starting
+```bash
+# Check container logs
+docker-compose logs metadata-remote
 
-We welcome contributions! Please:
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Submit a pull request
+# Verify volume mounts
+docker inspect metadata-remote
+```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
+### Network Access Issues
+```bash
+# Verify container is running
+docker ps
 
-## 👥 Contributors
+# Check port binding
+netstat -tulpn | grep 8338
+```
+
+## Security
+
+**⚠️ Important**: This application is designed for internal network use. Do not expose directly to the internet without proper authentication and encryption (reverse proxy with SSL recommended).
+
+## Contributing
+
+Contributions welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+### Development Setup
+```bash
+git clone https://github.com/wow-signal-dev/metadata-remote.git
+cd metadata-remote
+# See CONTRIBUTING.md for local development setup
+```
+
+## Contributors
 
 - [@gauravjot](https://github.com/gauravjot) - File filtering feature
 - [@you](https://github.com/you) - Your contribution here!
 
-## 📄 License
+## License
 
 AGPL-3.0 License - see [LICENSE](LICENSE) file for details.
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
-- Built for the self-hosted media server community
 - MusicBrainz for their amazing open music database
 - FFmpeg team for reliable audio processing
 - All our users and contributors
 
 ---
 
-*Version 1.0 - Released June 2025*
-
-**Made with ❤️ for audio lovers and metadata perfectionists**
+**Built with ❤️ for the self-hosted media server community**
