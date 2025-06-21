@@ -26,7 +26,9 @@ wget https://raw.githubusercontent.com/wow-signal-dev/metadata-remote/main/docke
 nano docker-compose.yml  # Change /path/to/your/music:/music
 
 # Start the service
-docker-compose up -d
+docker compose up -d    # For Docker Compose V2 (newer installations)
+# OR
+docker-compose up -d    # For Docker Compose V1 (legacy installations)
 
 # Access the web interface
 open http://localhost:8338
@@ -134,6 +136,16 @@ services:
     restart: unless-stopped
 ```
 
+### Running the Container
+
+```bash
+# For newer Docker installations (Compose V2):
+docker compose up -d
+
+# For older installations (Compose V1):
+docker-compose up -d
+```
+
 ### Docker Run
 
 ```bash
@@ -210,7 +222,8 @@ id -g  # Your group ID
 ### Can't Access the Interface
 ```bash
 docker ps               # Check if container is running
-docker-compose logs     # View logs for errors
+docker compose logs     # View logs for errors
+docker-compose logs     # View logs for errors (for older Docker installations)
 ```
 
 ### Inference Not Working
@@ -226,7 +239,7 @@ docker-compose logs     # View logs for errors
 ### Container Not Starting
 ```bash
 # Check container logs
-docker-compose logs metadata-remote
+docker compose logs metadata-remote    # (or docker-compose logs for older installations)
 
 # Verify volume mounts
 docker inspect metadata-remote
