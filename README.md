@@ -62,15 +62,18 @@ Clean dark theme with smooth animations, loading states, and clear visual feedba
 
 ## Comparison with Alternatives
 
-| Feature | Metadata Remote | Mp3tag | MusicBrainz Picard | Beets |
+## Comparison with Other Tools
+
+| | Metadata Remote | Mp3tag | MusicBrainz Picard | Beets |
 |---------|----------------|--------|-------------------|-------|
-| **Headless server support** | ✅ Native web interface | ❌ Requires Windows/desktop | ❌ Requires desktop GUI | ✅ CLI only, no GUI |
-| **Remote browser access** | ✅ Edit from anywhere | ❌ Must install locally | ❌ Must install locally | ❌ SSH terminal only |
-| **Zero-setup editing** | ✅ Single Docker container | ❌ Windows/Wine required | ❌ Python dependencies | ❌ Complex configuration |
-| **Visual bulk operations** | ✅ Intuitive web interface | ✅ Advanced but desktop | ⚠️ Limited bulk features | ❌ Command-line only |
-| **Comprehensive undo** | ✅ 1000 operations + bulk | ⚠️ Basic undo only | ❌ No comprehensive undo | ❌ No undo system |
-| **Smart auto-suggestions** | ✅ Pattern + MusicBrainz | ⚠️ Database lookup only | ✅ MusicBrainz focused | ⚠️ Automatic but rigid |
-| **No learning curve** | ✅ Immediate productivity | ⚠️ Moderate complexity | ⚠️ Steep learning curve | ❌ Very steep, config-heavy |
+| **Works on headless servers** | ✅ Yes | ❌ No | ❌ No | ✅ Yes |
+| **Access via browser** | ✅ Native web UI | ❌ Desktop only | ❌ Desktop only | ⚠️ Basic web plugin |
+| **Setup time** | ✅ < 1 minute | — | — | ❌ 30+ minutes |
+| **Edit without importing** | ✅ Direct file editing | — | — | ❌ Must import to library |
+| **Visual interface** | ✅ Full web UI | — | — | ⚠️ Terminal or basic web |
+| **Bulk operations** | ✅ Click and edit | — | — | ⚠️ Command-line only |
+| **Undo/safety** | ✅ Full history | — | — | ❌ No undo |
+| **Learning curve** | ✅ None | — | — | ❌ Steep |
 
 ## Usage Guide
 
