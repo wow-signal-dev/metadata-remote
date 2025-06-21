@@ -12,7 +12,7 @@
 
 ---
 
-> "It was an application I was thinking of making because I really needed it. You have made an application that will work for me before I write in go, which I plan to learn. I thought it would use a lot of resources because it was written only in python, but I did not encounter any problems while running it on raspberry pi 2. You made a very nice application."
+> "It was an application I was thinking of making because I really needed it... I thought it would use a lot of resources because it was written only in python, but I did not encounter any problems while running it on raspberry pi 2. You made a very nice application."
 > 
 > — u/senior-intern
 
