@@ -1,6 +1,6 @@
 # <img src="screenshots/mdrm-icon-for-light-bg.svg" alt="Alt Text" width="25" height="21"> Metadata Remote (mdrm)
 
-Web-based metadata editor for audio files on headless servers.
+Web-based audio metadata editor for headless servers.
 
 Edit MP3, FLAC, and other audio file metadata through a browser interface, designed for servers without desktop environments.
 
