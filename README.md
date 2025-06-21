@@ -1,4 +1,4 @@
-# <img src="screenshots/mdrm-icon-for-dark-bg.svg" alt="Alt Text" width="25" height="21"> Metadata Remote (mdrm)
+# <img src="screenshots/mdrm-icon-for-light-bg.svg" alt="Alt Text" width="25" height="21"> Metadata Remote (mdrm)
 
 Web-based metadata editor for audio files on headless servers.
 
