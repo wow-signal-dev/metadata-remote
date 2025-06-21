@@ -8,7 +8,9 @@ Edit audio file metadata through a browser interface, designed for servers witho
 
 ## Why?
 
-Need to edit audio metadata on a headless server? Until now you had to either use complex CLI tools over SSH, download files to edit locally, or navigate heavyweight library managers like Beets that require database backends, import pipelines, and complex configuration. Metadata Remote just does one thing well — spin up a Docker container, open a browser on any device, and edit your metadata. That's it.
+Need to edit audio metadata on a headless server? Until now you had to either use complex CLI tools over SSH, download files to edit locally, or navigate heavyweight library managers like Beets that require database backends, import pipelines, and complex configuration.
+
+Metadata Remote "just does one thing well" — spin up a Docker container, open a browser on any device, and edit your metadata. That's it.
 
 ## Quick Start
 
