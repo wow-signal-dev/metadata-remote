@@ -32,48 +32,40 @@ Multi-architecture Docker images available for x86_64, ARM64, and ARMv7.
 
 ## Key Features
 
-### Smart Metadata Inference
-Intelligent suggestions using pattern recognition, folder structure analysis, and MusicBrainz integration. Click any empty field to instantly see confidence-scored suggestions.
+### 🧠 Smart Metadata Suggestions
+Advanced inference engine that goes beyond simple MusicBrainz queries. Analyzes local context (filenames, folder patterns, siblings), performs confidence-weighted evidence synthesis, and iteratively refines suggestions. Handles edge cases like classical music, compilations, and live recordings with specialized strategies.
 
-### Complete Editing History
+### 🔄 Fully Reversible Editing History
 Full undo/redo system tracks up to 1000 edits. Revert mistakes and even undo bulk operations across entire folders. Edit fearlessly.
 
-### Comprehensive Format Support
-MP3, FLAC, WAV, WV, M4A, and WMA with format-aware editing. Visual indicators show capabilities and limitations for each format:
-- 🟢 **Lossless formats** (FLAC, WAV, WV): Full metadata + embedded art
-- 🟡 **Lossy formats** (MP3, M4A, WMA): Standard tags + album art
-- ⚠️ **Limited formats**: Basic metadata support with visual warnings
-
-### Powerful Bulk Operations
+### ⚡ Powerful Bulk Operations
 Apply metadata or album art to entire folders instantly. Save individual fields or update everything at once.
 
-### Advanced Album Art Management
+### 🎨 Advanced Album Art Management
 Upload, preview, delete, and bulk apply album art. Metadata Remote automatically detects and repairs corrupted embedded images when editing.
 
-### Efficient Server Workflow
+### 🔧 Efficient Server Workflow
 - **Keyboard-first navigation**: Arrow keys with smart repeat, Tab switching, Enter to expand
 - **Real-time filtering**: Instant search within large folders
 - **In-browser playback**: Stream files directly (supports most formats)
 - **Direct file renaming**: Update filenames with automatic history tracking
 - **Resizable panels**: Customize your workspace by dragging dividers
 
-### Modern Interface
+### ✨ Modern Interface
 Clean dark theme with smooth animations, loading states, and clear visual feedback for every action.
-
-## Comparison with Alternatives
 
 ## Comparison with Other Tools
 
 | | Metadata Remote | Mp3tag | MusicBrainz Picard | Beets |
 |---------|----------------|--------|-------------------|-------|
 | **Works on headless servers** | ✅ Yes | ❌ No | ❌ No | ✅ Yes |
-| **Access via browser** | ✅ Native web UI | ❌ Desktop only | ❌ Desktop only | ⚠️ Basic web plugin |
 | **Setup time** | ✅ < 1 minute | — | — | ❌ 30+ minutes |
 | **Edit without importing** | ✅ Direct file editing | — | — | ❌ Must import to library |
 | **Visual interface** | ✅ Full web UI | — | — | ⚠️ Terminal or basic web |
 | **Bulk operations** | ✅ Click and edit | — | — | ⚠️ Command-line only |
 | **Undo/safety** | ✅ Full history | — | — | ❌ No undo |
 | **Learning curve** | ✅ None | — | — | ❌ Steep |
+| **Smart suggestions** | ✅ Multi-source inference | — | — | ⚠️ MusicBrainz only |
 
 ## Usage Guide
 
@@ -88,7 +80,7 @@ Clean dark theme with smooth animations, loading states, and clear visual feedba
 When you click on an empty metadata field, Metadata Remote will:
 1. Analyze the filename, folder structure, and nearby files
 2. Query MusicBrainz if needed for additional data
-3. Present suggestions with confidence scores
+3. Present suggestions with synthesized confidence scores
 4. Just click any suggestion to apply it instantly
 
 ### Editing History
