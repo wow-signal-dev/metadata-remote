@@ -8,7 +8,7 @@ Edit MP3, FLAC, and other audio file metadata through a browser interface, desig
 
 ## Why?
 
-Managing audio metadata on headless servers used to require downloading files locally for editing or installing desktop/CLI music management applications on your server. Metadata Remote now eliminates both workflows by providing browser-based metadata editing directly on your server.
+Managing audio metadata on headless servers used to require downloading files locally for editing or installing desktop/CLI music management applications on your server. Metadata Remote solves this problem by providing browser-based metadata editing directly on your server.
 
 **No more:**
 - Downloading files via SSH/SFTP to edit locally
