@@ -1,4 +1,4 @@
-# Metadata Remote
+# Metadata Remote (mdrm)
 
 Web-based metadata editor for audio files on headless servers.
 
