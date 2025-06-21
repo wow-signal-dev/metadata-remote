@@ -86,7 +86,7 @@ When you click on an empty metadata field, Metadata Remote will:
 ### Editing History
 - **Bottom panel**: Click to expand the editing history view
 - **Timeline view**: See all changes in chronological order
-- **Undo/Redo**: Revert or reapply any change in any order
+- **Undo/Redo**: Revert or reapply any change in any order (up to 1000 changes)
 - **Filename tracking**: Undo/redo works even after renaming files - filename changes don't break metadata edit history
 - **Batch tracking**: Even bulk operations can be undone
 - **Clear history**: Remove all history when needed
