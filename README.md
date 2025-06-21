@@ -113,7 +113,7 @@ When you click on an empty metadata field, Metadata Remote will:
 version: '3.8'
 services:
   metadata-remote:
-    image: wow-signal-dev/metadata-remote:latest
+    image: ghcr.io/wow-signal-dev/metadata-remote:latest
     container_name: metadata-remote
     ports:
       - "8338:8338"
@@ -144,7 +144,7 @@ docker run -d \
   -v /your/music:/music \
   -e PUID=1000 \
   -e PGID=1000 \
-  wow-signal-dev/metadata-remote:latest
+  ghcr.io/wow-signal-dev/metadata-remote:latest
 ```
 
 ## Use Cases
