@@ -10,6 +10,7 @@ window.MetadataRemote = window.MetadataRemote || {};
 const State = window.MetadataRemote.State;
 const API = window.MetadataRemote.API;
 const ButtonStatus = window.MetadataRemote.UI.ButtonStatus;
+const UIUtils = window.MetadataRemote.UI.Utilities;
 
 const AudioMetadataEditor = {
     // Initialize the application
@@ -1239,7 +1240,7 @@ const AudioMetadataEditor = {
                 fileInfo.className = 'file-info';
                 
                 const nameDiv = document.createElement('div');
-                const formatEmoji = this.getFormatEmoji(file.name);  // Add 'this.'
+                const formatEmoji = UIUtils.getFormatEmoji(file.name);
                 const musicIcon = document.createTextNode(formatEmoji + ' ');
                 nameDiv.appendChild(musicIcon);
                 nameDiv.appendChild(document.createTextNode(file.name));
@@ -1701,59 +1702,12 @@ const AudioMetadataEditor = {
     },
 
     getFormatEmoji(filename) {
-        const ext = filename.split('.').pop().toLowerCase();
-        const FORMAT_EMOJIS = {
-            'mp3': '🎵',
-            'flac': '💿',
-            'm4a': '🎶',
-            'wav': '🌊',
-            'wma': '🪟',
-            'wv': '📦',
-        };
-        return FORMAT_EMOJIS[ext] || '🎵';
+        return UIUtils.getFormatEmoji(filename);
     },
 
     // Add visual indicators for file format support
     getFormatBadge(filename) {
-        const ext = filename.split('.').pop().toUpperCase();
-        const lossless = ['FLAC', 'WAV', 'WV'];
-        const limitedMetadata = ['WAV', 'WV'];
-        const noAlbumArt = ['WAV', 'WV'];
-        
-        const isLossless = lossless.includes(ext);
-        const hasLimitations = limitedMetadata.includes(ext) || noAlbumArt.includes(ext);
-        
-        let badgeHtml = `<span style="
-            font-size: 0.7rem;
-            padding: 0.2rem 0.4rem;
-            border-radius: 4px;
-            background: ${isLossless ? 'rgba(74, 222, 128, 0.2)' : 'rgba(255, 169, 77, 0.2)'};
-            color: ${isLossless ? '#4ade80' : '#ffa94d'};
-            margin-left: 0.5rem;
-            font-weight: 500;
-        ">${ext}</span>`;
-        
-        if (hasLimitations) {
-            const limitations = [];
-            if (limitedMetadata.includes(ext)) {
-                limitations.push('limited metadata');
-            }
-            if (noAlbumArt.includes(ext)) {
-                limitations.push('no album art');
-            }
-            
-            badgeHtml += `<span style="
-                font-size: 0.65rem;
-                padding: 0.15rem 0.3rem;
-                border-radius: 4px;
-                background: rgba(255, 107, 107, 0.2);
-                color: #ff6b6b;
-                margin-left: 0.3rem;
-                font-weight: 400;
-            " title="${limitations.join(', ')}">⚠</span>`;
-        }
-        
-        return badgeHtml;
+        return UIUtils.getFormatBadge(filename);
     },
 
     async resetForm() {
@@ -2329,34 +2283,16 @@ const AudioMetadataEditor = {
 
     // Utility functions
     setFormEnabled(enabled) {
-        const inputs = document.querySelectorAll('#metadata-form input');
-        const buttons = document.querySelectorAll('button');
-        
-        inputs.forEach(input => input.disabled = !enabled);
-        buttons.forEach(button => {
-            // Skip history panel buttons
-            if (button.classList.contains('history-btn') || 
-                button.classList.contains('history-clear-btn')) {
-                return;
-            }
-            if (!button.classList.contains('btn-status') || !button.classList.contains('processing')) {
-                button.disabled = !enabled;
-            }
-        });
+        UIUtils.setFormEnabled(enabled);
     },
 
     showStatus(message, type) {
-        // Legacy function - kept for compatibility but hidden - status is now hidden by CSS
-        const status = document.getElementById('status');
-        status.textContent = message;
-        status.className = `status ${type}`;
+        UIUtils.showStatus(message, type);
     },
 
     hideStatus() {
-        // Legacy function - kept for compatibility
-        const status = document.getElementById('status');
-        status.style.display = 'none';
-    }
+        UIUtils.hideStatus();
+    },
 };
 
 // Global function bindings for onclick handlers in HTML
