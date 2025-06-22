@@ -9,6 +9,7 @@ window.MetadataRemote = window.MetadataRemote || {};
 // Create shortcuts for easier access
 const State = window.MetadataRemote.State;
 const API = window.MetadataRemote.API;
+const ButtonStatus = window.MetadataRemote.UI.ButtonStatus;
 
 const AudioMetadataEditor = {
     // Initialize the application
@@ -34,112 +35,13 @@ const AudioMetadataEditor = {
    
     // Button status management
     showButtonStatus(button, message, type = 'processing', duration = 3000) {
-        if (!button || !button.classList.contains('btn-status')) return;
-        
-        // Clear any existing timeout
-        if (button._statusTimeout) {
-            clearTimeout(button._statusTimeout);
-        }
-        
-        // Store original width if not already stored
-        if (!button._originalWidth) {
-            button._originalWidth = window.getComputedStyle(button).width;
-        }
-        
-        // Remove all status classes
-        button.classList.remove('processing', 'success', 'error', 'warning');
-        
-        // Add new status class
-        button.classList.add(type);
-        
-        // Check if this is an apply-field button (File/Folder buttons)
-        const isApplyFieldBtn = button.classList.contains('apply-field-btn');
-        
-        // Truncate very long messages
-        const maxLength = 30;
-        const displayMessage = message.length > maxLength ? 
-            message.substring(0, maxLength - 3) + '...' : message;
-        
-        // Update message
-        const messageEl = button.querySelector('.btn-status-message');
-        if (messageEl) {
-            if (isApplyFieldBtn) {
-                // For File/Folder buttons, show only icons
-                messageEl.textContent = '';
-                if (type === 'processing') {
-                    const spinner = document.createElement('span');
-                    spinner.className = 'spinner';
-                    messageEl.appendChild(spinner);
-                } else {
-                    const icons = {
-                        success: '✓',
-                        error: '✕',
-                        warning: '⚠'
-                    };
-                    const iconSpan = document.createElement('span');
-                    iconSpan.className = `status-icon ${type}`;
-                    iconSpan.textContent = icons[type] || '';
-                    messageEl.appendChild(iconSpan);
-                }
-                // Add tooltip with the actual message
-                button.title = message;
-            } else {
-                // For other buttons, show icon + text as before
-                if (type === 'processing') {
-                    messageEl.textContent = '';
-                    const spinner = document.createElement('span');
-                    spinner.className = 'spinner';
-                    messageEl.appendChild(spinner);
-                    messageEl.appendChild(document.createTextNode(' ' + displayMessage));
-                } else {
-                    const icons = {
-                        success: '✓',
-                        error: '✕',
-                        warning: '⚠'
-                    };
-                    messageEl.textContent = '';
-                    const iconSpan = document.createElement('span');
-                    iconSpan.className = `status-icon ${type}`;
-                    iconSpan.textContent = icons[type] || '';
-                    messageEl.appendChild(iconSpan);
-                    messageEl.appendChild(document.createTextNode(' ' + displayMessage));
-                }
-                
-                // Add title attribute for full message if truncated
-                if (message.length > maxLength) {
-                    button.title = message;
-                }
-            }
-        }
-        
-        // Auto-clear status after duration (except for processing)
-        if (type !== 'processing' && duration > 0) {
-            button._statusTimeout = setTimeout(() => {
-                this.clearButtonStatus(button);
-            }, duration);
-        }
+        ButtonStatus.showButtonStatus(button, message, type, duration);
     },
     
     clearButtonStatus(button) {
-        if (!button || !button.classList.contains('btn-status')) return;
-        
-        if (button._statusTimeout) {
-            clearTimeout(button._statusTimeout);
-            delete button._statusTimeout;
-        }
-        
-        button.classList.remove('processing', 'success', 'error', 'warning');
-        button.title = ''; // Clear tooltip
-        
-        // Don't restore width for apply-field buttons
-        if (!button.classList.contains('apply-field-btn') && button._originalWidth) {
-            setTimeout(() => {
-                button.style.width = '';
-                delete button._originalWidth;
-            }, 300);
-        }
+        ButtonStatus.clearButtonStatus(button);
     },
-
+    
     // Audio player setup and controls
     setupAudioPlayer() {
         this.audioPlayer.addEventListener('ended', () => this.stopPlayback());
