@@ -13,15 +13,17 @@ const ButtonStatus = window.MetadataRemote.UI.ButtonStatus;
 const UIUtils = window.MetadataRemote.UI.Utilities;
 const AudioPlayer = window.MetadataRemote.Audio.Player;
 const PaneResize = window.MetadataRemote.UI.PaneResize;
+const TreeNav = window.MetadataRemote.Navigation.Tree;
 
 const AudioMetadataEditor = {
     // Initialize the application
     init() {
         // Reset state to ensure clean start
         State.reset();
+        TreeNav.init(this.selectTreeItem.bind(this), this.loadFiles.bind(this));
         AudioPlayer.init(document.getElementById('audio-player'));
-        this.loadTree();
-        this.updateSortUI();
+        TreeNav.loadTree();
+        TreeNav.updateSortUI();
         this.setupKeyboardNavigation();
         this.setupMetadataFieldListeners();
         PaneResize.initializePaneResize();
@@ -681,8 +683,7 @@ const AudioMetadataEditor = {
                     // Expand
                     if (children.children.length === 0) {
                         // Load children if not already loaded
-                        this.loadTreeChildren(folderPath, children, this.getLevel(folderPath) + 1);
-                    }
+                        TreeNav.loadTreeChildren(folderPath, children, TreeNav.getLevel(folderPath) + 1);                    }
                     children.classList.add('expanded');
                     State.expandedFolders.add(folderPath);
                     if (icon) icon.innerHTML = '📂';
@@ -703,204 +704,6 @@ const AudioMetadataEditor = {
             if (filepath) {
                 this.loadFile(filepath, State.selectedListItem);
             }
-        }
-    },
-
-    // Sorting functionality
-    updateSortUI() {
-        document.querySelectorAll('.sort-option').forEach(opt => {
-            opt.classList.remove('active');
-            opt.querySelectorAll('.sort-arrow').forEach(arrow => {
-                arrow.classList.remove('active');
-            });
-        });
-        
-        const activeOption = document.getElementById(`sort-${State.currentSort.method}`);
-        activeOption.classList.add('active');
-        activeOption.querySelector(`.sort-arrow[data-dir="${State.currentSort.direction}"]`).classList.add('active');
-    },
-
-    setSortMethod(method) {
-        if (State.currentSort.method === method) {
-            State.currentSort.direction = State.currentSort.direction === 'asc' ? 'desc' : 'asc';
-        } else {
-            State.currentSort.method = method;
-            State.currentSort.direction = 'asc';
-        }
-        
-        this.updateSortUI();
-        this.rebuildTree();
-    },
-
-    sortItems(items) {
-        return items.sort((a, b) => {
-            let comparison = 0;
-            
-            if (State.currentSort.method === 'name') {
-                comparison = a.name.toLowerCase().localeCompare(b.name.toLowerCase());
-            } else if (State.currentSort.method === 'date') {
-                comparison = (a.created || 0) - (b.created || 0);
-            }
-            
-            return State.currentSort.direction === 'asc' ? comparison : -comparison;
-        });
-    },
-
-    // Tree functionality
-    async loadTree() {
-        try {
-            const data = await API.loadTree();
-            State.treeData[''] = data.items;
-            this.buildTreeFromData();
-        } catch (err) {
-            console.error('Error loading tree:', err);
-            this.showStatus('Error loading folders', 'error');
-        }
-    },
-
-    buildTreeFromData() {
-        const tree = document.getElementById('folder-tree');
-        tree.innerHTML = '';
-        
-        const sortedItems = this.sortItems(State.treeData[''] || []);
-        
-        sortedItems.forEach(item => {
-            if (item.type === 'folder') {
-                tree.appendChild(this.createTreeItem(item, 0));
-            }
-        });
-        
-        // Auto-select the first folder on initial load
-        const firstTreeItem = tree.querySelector('.tree-item');
-        if (firstTreeItem && !State.selectedTreeItem) {
-            // Select with keyboard focus to show both highlight and focus indicator
-            this.selectTreeItem(firstTreeItem, true);
-            // Also set the focused pane to folders
-            State.focusedPane = 'folders';
-            this.updatePaneFocus();
-        }
-    },
-
-    rebuildTree() {
-        this.buildTreeFromData();
-        
-        State.expandedFolders.forEach(path => {
-            const element = document.querySelector(`[data-path="${path}"]`);
-            if (element && State.treeData[path]) {
-                const children = element.querySelector('.tree-children');
-                if (children && State.treeData[path].length > 0) {
-                    this.rebuildChildren(path, children, this.getLevel(path) + 1);
-                    children.classList.add('expanded');
-                }
-            }
-        });
-        
-        if (State.selectedTreeItem) {
-            const path = State.selectedTreeItem.dataset.path;
-            const newSelected = document.querySelector(`[data-path="${path}"]`);
-            if (newSelected) {
-                newSelected.classList.add('selected');
-                State.selectedTreeItem = newSelected;
-            }
-        }
-    },
-
-    getLevel(path) {
-        return path ? path.split('/').length - 1 : 0;
-    },
-
-    rebuildChildren(path, container, level) {
-        container.innerHTML = '';
-        const sortedItems = this.sortItems(State.treeData[path] || []);
-        
-        sortedItems.forEach(item => {
-            if (item.type === 'folder') {
-                container.appendChild(this.createTreeItem(item, level));
-            }
-        });
-    },
-
-    createTreeItem(item, level) {
-        const div = document.createElement('div');
-        div.className = 'tree-item';
-        div.dataset.path = item.path;
-        
-        const content = document.createElement('div');
-        content.className = 'tree-item-content';
-        content.style.paddingLeft = `${level * 1.5 + 1.25}rem`;
-        
-        const icon = document.createElement('span');
-        icon.className = 'tree-icon';
-        icon.innerHTML = State.expandedFolders.has(item.path) ? '📂' : '📁';
-        
-        const name = document.createElement('span');
-        name.textContent = item.name;
-        
-        content.appendChild(icon);
-        content.appendChild(name);
-        
-        const children = document.createElement('div');
-        children.className = 'tree-children';
-        
-        div.appendChild(content);
-        div.appendChild(children);
-        
-        content.onclick = (e) => {
-            e.stopPropagation();
-            this.selectTreeItem(div);
-            
-            // Check if this folder has subfolders
-            const hasSubfolders = State.treeData[item.path] && 
-                                 State.treeData[item.path].some(child => child.type === 'folder');
-            
-            const isExpanded = children.classList.contains('expanded');
-            
-            if (!isExpanded) {
-                if (children.children.length === 0) {
-                    this.loadTreeChildren(item.path, children, level + 1);
-                }
-                children.classList.add('expanded');
-                State.expandedFolders.add(item.path);
-                icon.innerHTML = '📂';
-            } else {
-                children.classList.remove('expanded');
-                State.expandedFolders.delete(item.path);
-                icon.innerHTML = '📁';
-            }
-            
-            // Always load files regardless of whether folder has subfolders
-            // (Remove the hasSubfolders check that was preventing file loading)
-            this.loadFiles(item.path);
-        };
-        
-        if (State.treeData[item.path] && State.treeData[item.path].length > 0 && State.expandedFolders.has(item.path)) {
-            const sortedItems = this.sortItems(State.treeData[item.path]);
-            sortedItems.forEach(child => {
-                if (child.type === 'folder') {
-                    children.appendChild(this.createTreeItem(child, level + 1));
-                }
-            });
-            children.classList.add('expanded');
-            icon.innerHTML = '📂';
-        }
-        
-        return div;
-    },
-
-    async loadTreeChildren(path, container, level) {
-        try {
-            const data = await API.loadTreeChildren(path);
-            State.treeData[path] = data.items;
-            
-            const sortedItems = this.sortItems(data.items);
-            
-            sortedItems.forEach(item => {
-                if (item.type === 'folder') {
-                    container.appendChild(this.createTreeItem(item, level));
-                }
-            });
-        } catch (err) {
-            console.error('Error loading tree children:', err);
         }
     },
 
@@ -1998,7 +1801,7 @@ const AudioMetadataEditor = {
 
 // Global function bindings for onclick handlers in HTML
 function setSortMethod(method) {
-    AudioMetadataEditor.setSortMethod(method);
+    window.MetadataRemote.Navigation.Tree.setSortMethod(method);
 }
 
 function saveFilename() {
