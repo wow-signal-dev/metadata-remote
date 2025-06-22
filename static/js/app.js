@@ -11,14 +11,14 @@ const State = window.MetadataRemote.State;
 const API = window.MetadataRemote.API;
 const ButtonStatus = window.MetadataRemote.UI.ButtonStatus;
 const UIUtils = window.MetadataRemote.UI.Utilities;
+const AudioPlayer = window.MetadataRemote.Audio.Player;
 
 const AudioMetadataEditor = {
     // Initialize the application
     init() {
         // Reset state to ensure clean start
         State.reset();
-        this.audioPlayer = document.getElementById('audio-player');
-        this.setupAudioPlayer();
+        AudioPlayer.init(document.getElementById('audio-player'));
         this.loadTree();
         this.updateSortUI();
         this.setupKeyboardNavigation();
@@ -43,46 +43,12 @@ const AudioMetadataEditor = {
         ButtonStatus.clearButtonStatus(button);
     },
     
-    // Audio player setup and controls
-    setupAudioPlayer() {
-        this.audioPlayer.addEventListener('ended', () => this.stopPlayback());
-        this.audioPlayer.addEventListener('error', (e) => {
-            // Only show error if we're actually trying to play something
-            if (State.currentlyPlayingFile && this.audioPlayer.src) {
-                console.error('Audio playback error:', e);
-                this.stopPlayback();
-                this.showStatus('Error playing audio file', 'error');
-            }
-        });
-    },
-
     togglePlayback(filepath, button) {
-        if (State.currentlyPlayingFile === filepath && !this.audioPlayer.paused) {
-            this.audioPlayer.pause();
-            button.classList.remove('playing');
-        } else {
-            this.stopPlayback();
-            State.currentlyPlayingFile = filepath;
-            this.audioPlayer.src = `/stream/${encodeURIComponent(filepath)}`;
-            this.audioPlayer.play()
-                .then(() => button.classList.add('playing'))
-                .catch(err => {
-                    console.error('Error playing audio:', err);
-                    this.showStatus('Error playing audio file', 'error');
-                    this.stopPlayback();
-                });
-        }
+        AudioPlayer.togglePlayback(filepath, button);
     },
 
     stopPlayback() {
-        if (!this.audioPlayer.paused) {
-            this.audioPlayer.pause();
-        }
-        this.audioPlayer.src = '';
-        State.currentlyPlayingFile = null;
-        document.querySelectorAll('.play-button.playing').forEach(btn => {
-            btn.classList.remove('playing');
-        });
+        AudioPlayer.stopPlayback();
     },
 
     // Pane resize functionality
