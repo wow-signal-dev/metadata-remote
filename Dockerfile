@@ -22,6 +22,8 @@ ENV PATH=/root/.local/bin:$PATH
 
 # Copy application files
 COPY app.py .
+COPY config.py .
+COPY core/ core/
 COPY templates/ templates/
 COPY static/ static/
 
