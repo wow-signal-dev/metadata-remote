@@ -37,55 +37,15 @@ import uuid
 from dataclasses import dataclass, asdict
 from enum import Enum
 
-app = Flask(__name__)
-MUSIC_DIR = os.environ.get('MUSIC_DIR', '/music')
-
-# Set up logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-# Supported audio formats only
-AUDIO_EXTENSIONS = (
-    '.mp3', '.flac', '.wav', '.m4a', '.wma', '.wv'
+from config import (
+    MUSIC_DIR, OWNER_UID, OWNER_GID, PORT, HOST,
+    AUDIO_EXTENSIONS, MIME_TYPES, FORMAT_METADATA_CONFIG,
+    MAX_HISTORY_ITEMS, INFERENCE_CACHE_DURATION, 
+    MUSICBRAINZ_RATE_LIMIT, MUSICBRAINZ_USER_AGENT,
+    FIELD_THRESHOLDS, logger
 )
 
-# Format-specific metadata handling
-# Note: Different formats have different requirements:
-# - MP3: Uses ID3v2 tags, supports embedded art
-# - FLAC: Uses Vorbis comments (lowercase), supports embedded art
-# - M4A: Uses iTunes metadata atoms, supports embedded art
-# - WAV: Very limited metadata support, no embedded art
-# - WMA: Uses ASF metadata, supports embedded art
-# - WV: Uses custom metadata, no embedded art at this time
-FORMAT_METADATA_CONFIG = {
-    # Formats that typically use uppercase tags
-    'uppercase': ['mp3'],
-    # Formats that typically use lowercase tags
-    'lowercase': ['flac'],
-    # Formats that use specific tag systems
-    'itunes': ['m4a'],
-    # Formats with limited metadata support
-    'limited': ['wav'],
-    # Formats that don't support embedded album art
-    'no_embedded_art': ['wav', 'wv']
-}
-
-# MIME type mapping for streaming
-MIME_TYPES = {
-    '.mp3': 'audio/mpeg',
-    '.flac': 'audio/flac',
-    '.wav': 'audio/wav',
-    '.m4a': 'audio/mp4',
-    '.wma': 'audio/x-ms-wma',
-    '.wv': 'audio/x-wavpack'
-}
-
-OWNER_UID = int(os.environ.get('PUID', '1000'))
-OWNER_GID = int(os.environ.get('PGID', '1000'))
-
-# Log the values being used
-logger.info(f"Starting with PUID={OWNER_UID}, PGID={OWNER_GID}")
-logger.info(f"Supporting 6 audio formats: {', '.join(AUDIO_EXTENSIONS)}")
+app = Flask(__name__)
 
 @app.after_request
 def add_cache_headers(response):
@@ -174,7 +134,7 @@ class EditingHistory:
         with self.lock:
             self.actions.append(action)
             # Keep only last 1000 actions to prevent memory issues
-            if len(self.actions) > 1000:
+            if len(self.actions) > MAX_HISTORY_ITEMS:
                 # Clean up old album art files if any
                 old_action = self.actions.pop(0)
                 self._cleanup_action_files(old_action)
@@ -418,19 +378,10 @@ class MetadataInferenceEngine:
         self.cache = {}
         self.cache_lock = threading.Lock()
         self.mb_last_request = 0
-        self.mb_rate_limit = 1.0  # 1 request per second
-        
+        self.mb_rate_limit = MUSICBRAINZ_RATE_LIMIT
+
         # Confidence thresholds
-        self.field_thresholds = {
-            'artist': 70,
-            'album': 65,
-            'title': 75,
-            'track': 80,
-            'date': 60,
-            'genre': 55,
-            'albumartist': 65,
-            'disc': 75
-        }
+        self.field_thresholds = FIELD_THRESHOLDS
         
     def infer_field(self, file_path: str, field: str, existing_metadata: dict, folder_context: dict) -> List[dict]:
         """Main entry point for inferring a single field"""
@@ -1108,7 +1059,7 @@ class MetadataInferenceEngine:
         
         try:
             req = urllib.request.Request(url, headers={
-                'User-Agent': 'Metadata-Remote/1.0 (https://github.com/wow-signal-dev/metadata-remote)'
+                'User-Agent': MUSICBRAINZ_USER_AGENT
             })
             
             with urllib.request.urlopen(req, timeout=10) as response:
@@ -1130,7 +1081,7 @@ class MetadataInferenceEngine:
         with self.cache_lock:
             if cache_key in self.cache:
                 cached_data, cached_time = self.cache[cache_key]
-                if time.time() - cached_time < 3600:
+                if time.time() - cached_time < INFERENCE_CACHE_DURATION:
                     return cached_data
         
         query = f'artist:"{artist}"'
@@ -2565,4 +2516,4 @@ def infer_metadata_field(filename, field):
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8338, debug=False)
+    app.run(host=HOST, port=PORT, debug=False)
