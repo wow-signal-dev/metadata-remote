@@ -87,6 +87,16 @@ OWNER_GID = int(os.environ.get('PGID', '1000'))
 logger.info(f"Starting with PUID={OWNER_UID}, PGID={OWNER_GID}")
 logger.info(f"Supporting 6 audio formats: {', '.join(AUDIO_EXTENSIONS)}")
 
+@app.after_request
+def add_cache_headers(response):
+    """Add cache-control headers to prevent reverse proxy caching of dynamic content"""
+    # Only add cache-control headers to JSON responses (our API endpoints)
+    if response.mimetype == 'application/json':
+        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, private'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+    return response
+
 # ======================
 # EDITING HISTORY SYSTEM
 # ======================
