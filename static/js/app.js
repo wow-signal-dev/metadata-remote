@@ -1,52 +1,20 @@
 /**
- * Metadata Remote - Main Application JavaScript
- * Handles all UI interactions and state management
+ * Main Application Logic for Metadata Remote
+ * Coordinates between state, API, and UI components
  */
 
-const AudioMetadataEditor = {
-    // Centralized state management
-    state: {
-        currentFile: null,
-        currentPath: '',
-        selectedListItem: null,
-        selectedTreeItem: null,
-        originalFilename: '',
-        currentAlbumArt: null,
-        pendingAlbumArt: null,
-        shouldRemoveArt: false,
-        treeData: {},
-        expandedFolders: new Set(),
-        currentSort: { method: 'name', direction: 'asc' },
-        focusedPane: 'folders',
-        loadFileDebounceTimer: null,
-        originalMetadata: {},
-        currentlyPlayingFile: null,
-        savedPaneSizes: { folders: 25, files: 35 },
-        isResizing: false,
-        currentDivider: null,
-        startX: 0,
-        startWidths: {},
-        // New inference state
-        inferenceActive: {},
-        inferenceAbortControllers: {},
-        // History state
-        historyActions: [],
-        selectedHistoryAction: null,
-        historyPanelExpanded: false,
-        historyRefreshTimer: null,
-        historyPanelHeight: 400,
-        historyListWidth: 50,
-        loadFileRequestId: 0,
-        keyRepeatTimer: null,
-        keyRepeatDelayTimer: null,
-        keyHeldDown: null,
-        keyRepeatDelay: 200,
-        keyRepeatInterval: 40,
-        isKeyRepeating: false
-    },
+// Ensure namespace exists
+window.MetadataRemote = window.MetadataRemote || {};
 
+// Create shortcuts for easier access
+const State = window.MetadataRemote.State;
+const API = window.MetadataRemote.API;
+
+const AudioMetadataEditor = {
     // Initialize the application
     init() {
+        // Reset state to ensure clean start
+        State.reset();
         this.audioPlayer = document.getElementById('audio-player');
         this.setupAudioPlayer();
         this.loadTree();
@@ -60,25 +28,10 @@ const AudioMetadataEditor = {
         const historyPanel = document.getElementById('history-panel');
         const metadataContent = document.querySelector('.metadata-content');
         if (historyPanel.classList.contains('expanded')) {
-            metadataContent.style.paddingBottom = `${this.state.historyPanelHeight + 20}px`;
+            metadataContent.style.paddingBottom = `${State.historyPanelHeight + 20}px`;
         }
     },
-
-    // API helper with centralized error handling
-    async apiCall(url, options = {}) {
-        try {
-            const response = await fetch(url, options);
-            if (!response.ok) {
-                const data = await response.json();
-                throw new Error(data.error || 'Request failed');
-            }
-            return await response.json();
-        } catch (error) {
-            console.error(`API error for ${url}:`, error);
-            throw error;
-        }
-    },
-    
+   
     // Button status management
     showButtonStatus(button, message, type = 'processing', duration = 3000) {
         if (!button || !button.classList.contains('btn-status')) return;
@@ -192,7 +145,7 @@ const AudioMetadataEditor = {
         this.audioPlayer.addEventListener('ended', () => this.stopPlayback());
         this.audioPlayer.addEventListener('error', (e) => {
             // Only show error if we're actually trying to play something
-            if (this.state.currentlyPlayingFile && this.audioPlayer.src) {
+            if (State.currentlyPlayingFile && this.audioPlayer.src) {
                 console.error('Audio playback error:', e);
                 this.stopPlayback();
                 this.showStatus('Error playing audio file', 'error');
@@ -201,12 +154,12 @@ const AudioMetadataEditor = {
     },
 
     togglePlayback(filepath, button) {
-        if (this.state.currentlyPlayingFile === filepath && !this.audioPlayer.paused) {
+        if (State.currentlyPlayingFile === filepath && !this.audioPlayer.paused) {
             this.audioPlayer.pause();
             button.classList.remove('playing');
         } else {
             this.stopPlayback();
-            this.state.currentlyPlayingFile = filepath;
+            State.currentlyPlayingFile = filepath;
             this.audioPlayer.src = `/stream/${encodeURIComponent(filepath)}`;
             this.audioPlayer.play()
                 .then(() => button.classList.add('playing'))
@@ -223,7 +176,7 @@ const AudioMetadataEditor = {
             this.audioPlayer.pause();
         }
         this.audioPlayer.src = '';
-        this.state.currentlyPlayingFile = null;
+        State.currentlyPlayingFile = null;
         document.querySelectorAll('.play-button.playing').forEach(btn => {
             btn.classList.remove('playing');
         });
@@ -239,8 +192,8 @@ const AudioMetadataEditor = {
         const divider2 = document.getElementById('divider2');
 
         // Apply saved or default sizes
-        folders.style.flex = `0 0 ${this.state.savedPaneSizes.folders}%`;
-        files.style.flex = `0 0 ${this.state.savedPaneSizes.files}%`;
+        folders.style.flex = `0 0 ${State.savedPaneSizes.folders}%`;
+        files.style.flex = `0 0 ${State.savedPaneSizes.files}%`;
         metadata.style.flex = `1`;
 
         divider1.addEventListener('mousedown', (e) => this.startResize(e, 'divider1'));
@@ -253,14 +206,14 @@ const AudioMetadataEditor = {
         const files = document.querySelector('.files');
         const metadata = document.querySelector('.metadata');
 
-        this.state.isResizing = true;
-        this.state.currentDivider = dividerId;
-        this.state.startX = e.clientX;
+        State.isResizing = true;
+        State.currentDivider = dividerId;
+        State.startX = e.clientX;
 
         const containerWidth = container.offsetWidth;
-        this.state.startWidths.folders = (folders.offsetWidth / containerWidth) * 100;
-        this.state.startWidths.files = (files.offsetWidth / containerWidth) * 100;
-        this.state.startWidths.metadata = (metadata.offsetWidth / containerWidth) * 100;
+        State.startWidths.folders = (folders.offsetWidth / containerWidth) * 100;
+        State.startWidths.files = (files.offsetWidth / containerWidth) * 100;
+        State.startWidths.metadata = (metadata.offsetWidth / containerWidth) * 100;
 
         document.getElementById(dividerId).classList.add('dragging');
         document.body.style.userSelect = 'none';
@@ -271,25 +224,25 @@ const AudioMetadataEditor = {
     },
 
     handleResize(e) {
-        if (!this.state.isResizing) return;
+        if (!State.isResizing) return;
 
         const container = document.querySelector('.container');
         const folders = document.querySelector('.folders');
         const files = document.querySelector('.files');
 
         const containerWidth = container.offsetWidth;
-        const deltaX = e.clientX - this.state.startX;
+        const deltaX = e.clientX - State.startX;
         const deltaPercent = (deltaX / containerWidth) * 100;
 
-        if (this.state.currentDivider === 'divider1') {
-            const newFoldersWidth = Math.max(15, Math.min(40, this.state.startWidths.folders + deltaPercent));
-            const newFilesWidth = Math.max(20, Math.min(50, this.state.startWidths.files - deltaPercent));
+        if (State.currentDivider === 'divider1') {
+            const newFoldersWidth = Math.max(15, Math.min(40, State.startWidths.folders + deltaPercent));
+            const newFilesWidth = Math.max(20, Math.min(50, State.startWidths.files - deltaPercent));
             
             folders.style.flex = `0 0 ${newFoldersWidth}%`;
             files.style.flex = `0 0 ${newFilesWidth}%`;
-        } else if (this.state.currentDivider === 'divider2') {
-            const newFilesWidth = Math.max(20, Math.min(50, this.state.startWidths.files + deltaPercent));
-            const remainingWidth = 100 - this.state.startWidths.folders - newFilesWidth;
+        } else if (State.currentDivider === 'divider2') {
+            const newFilesWidth = Math.max(20, Math.min(50, State.startWidths.files + deltaPercent));
+            const remainingWidth = 100 - State.startWidths.folders - newFilesWidth;
             
             if (remainingWidth >= 30) {
                 files.style.flex = `0 0 ${newFilesWidth}%`;
@@ -298,12 +251,12 @@ const AudioMetadataEditor = {
     },
 
     stopResize() {
-        if (!this.state.isResizing) return;
+        if (!State.isResizing) return;
 
-        this.state.isResizing = false;
+        State.isResizing = false;
 
-        if (this.state.currentDivider) {
-            document.getElementById(this.state.currentDivider).classList.remove('dragging');
+        if (State.currentDivider) {
+            document.getElementById(State.currentDivider).classList.remove('dragging');
         }
 
         document.body.style.userSelect = '';
@@ -313,13 +266,13 @@ const AudioMetadataEditor = {
         const folders = document.querySelector('.folders');
         const files = document.querySelector('.files');
         const containerWidth = container.offsetWidth;
-        this.state.savedPaneSizes.folders = (folders.offsetWidth / containerWidth) * 100;
-        this.state.savedPaneSizes.files = (files.offsetWidth / containerWidth) * 100;
+        State.savedPaneSizes.folders = (folders.offsetWidth / containerWidth) * 100;
+        State.savedPaneSizes.files = (files.offsetWidth / containerWidth) * 100;
 
         document.removeEventListener('mousemove', this.handleResize.bind(this));
         document.removeEventListener('mouseup', this.stopResize.bind(this));
 
-        this.state.currentDivider = null;
+        State.currentDivider = null;
     },
     
     startHistoryPaneResize(e) {
@@ -329,9 +282,9 @@ const AudioMetadataEditor = {
         const historyContent = document.querySelector('.history-content');
         const historyList = document.querySelector('.history-list');
         
-        this.state.isResizingHistoryPane = true;
-        this.state.startX = e.clientX;
-        this.state.startHistoryListWidth = (historyList.offsetWidth / historyContent.offsetWidth) * 100;
+        State.isResizingHistoryPane = true;
+        State.startX = e.clientX;
+        State.startHistoryListWidth = (historyList.offsetWidth / historyContent.offsetWidth) * 100;
         
         document.getElementById('history-divider').classList.add('dragging');
         document.body.style.userSelect = 'none';
@@ -342,17 +295,17 @@ const AudioMetadataEditor = {
     },
     
     handleHistoryPaneResize(e) {
-        if (!this.state.isResizingHistoryPane) return;
+        if (!State.isResizingHistoryPane) return;
         
         const historyContent = document.querySelector('.history-content');
         const historyList = document.querySelector('.history-list');
         const historyDetails = document.querySelector('.history-details');
         
         const contentWidth = historyContent.offsetWidth;
-        const deltaX = e.clientX - this.state.startX;
+        const deltaX = e.clientX - State.startX;
         const deltaPercent = (deltaX / contentWidth) * 100;
         
-        const newListWidth = Math.max(30, Math.min(70, this.state.startHistoryListWidth + deltaPercent));
+        const newListWidth = Math.max(30, Math.min(70, State.startHistoryListWidth + deltaPercent));
         const newDetailsWidth = 100 - newListWidth;
         
         historyList.style.flex = `0 0 ${newListWidth}%`;
@@ -360,9 +313,9 @@ const AudioMetadataEditor = {
     },
     
     stopHistoryPaneResize() {
-        if (!this.state.isResizingHistoryPane) return;
+        if (!State.isResizingHistoryPane) return;
         
-        this.state.isResizingHistoryPane = false;
+        State.isResizingHistoryPane = false;
         
         document.getElementById('history-divider').classList.remove('dragging');
         document.body.style.userSelect = '';
@@ -371,7 +324,7 @@ const AudioMetadataEditor = {
         // Save the current width
         const historyContent = document.querySelector('.history-content');
         const historyList = document.querySelector('.history-list');
-        this.state.historyListWidth = (historyList.offsetWidth / historyContent.offsetWidth) * 100;
+        State.historyListWidth = (historyList.offsetWidth / historyContent.offsetWidth) * 100;
         
         document.removeEventListener('mousemove', this.handleHistoryPaneResize.bind(this));
         document.removeEventListener('mouseup', this.stopHistoryPaneResize.bind(this));
@@ -418,7 +371,7 @@ const AudioMetadataEditor = {
                     const newHeight = Math.max(50, Math.min(window.innerHeight * 0.6, startHeight + deltaY));
                     
                     panel.style.height = `${newHeight}px`;
-                    this.state.historyPanelHeight = newHeight;
+                    State.historyPanelHeight = newHeight;
                     
                     const metadataContent = document.querySelector('.metadata-content');
                     if (panel.classList.contains('expanded')) {
@@ -505,7 +458,7 @@ const AudioMetadataEditor = {
             
             const updateControlsVisibility = () => {
                 const hasValue = input.value.trim().length > 0;
-                const hasChanged = input.value !== (this.state.originalMetadata[field] || '');
+                const hasChanged = input.value !== (State.originalMetadata[field] || '');
                 
                 if (hasValue && hasChanged) {
                     controls.classList.add('visible');
@@ -521,7 +474,7 @@ const AudioMetadataEditor = {
     
     // NEW: Save individual field to file
     async saveFieldToFile(field) {
-        if (!this.state.currentFile) return;
+        if (!State.currentFile) return;
         
         const button = document.querySelector(`.apply-file-btn[data-field="${field}"]`);
         const value = document.getElementById(field).value.trim();
@@ -535,15 +488,11 @@ const AudioMetadataEditor = {
         data[field] = value;
         
         try {
-            const result = await this.apiCall(`/metadata/${encodeURIComponent(this.state.currentFile)}`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(data)
-            });
+            const result = await API.setMetadata(State.currentFile, data);
             
             if (result.status === 'success') {
                 this.showButtonStatus(button, 'Saved to file!', 'success', 2000);
-                this.state.originalMetadata[field] = value;
+                State.originalMetadata[field] = value;
                 
                 // Hide controls after successful save
                 setTimeout(() => {
@@ -574,7 +523,7 @@ const AudioMetadataEditor = {
             
             // Click handler for empty fields
             input.addEventListener('click', (e) => {
-                if (input.value.trim() === '' && !input.disabled && this.state.currentFile) {
+                if (input.value.trim() === '' && !input.disabled && State.currentFile) {
                     this.showInferenceSuggestions(field);
                 }
             });
@@ -595,26 +544,26 @@ const AudioMetadataEditor = {
     
     // NEW: Show inference suggestions
     async showInferenceSuggestions(field) {
-        if (this.state.inferenceActive[field]) return;
+        if (State.inferenceActive[field]) return;
         
         const loading = document.getElementById(`${field}-loading`);
         const suggestions = document.getElementById(`${field}-suggestions`);
         
         // Cancel any existing request
-        if (this.state.inferenceAbortControllers[field]) {
-            this.state.inferenceAbortControllers[field].abort();
+        if (State.inferenceAbortControllers[field]) {
+            State.inferenceAbortControllers[field].abort();
         }
         
         // Create new abort controller
         const abortController = new AbortController();
-        this.state.inferenceAbortControllers[field] = abortController;
+        State.inferenceAbortControllers[field] = abortController;
         
         // Show loading
         loading.classList.add('active');
-        this.state.inferenceActive[field] = true;
+        State.inferenceActive[field] = true;
         
         try {
-            const response = await fetch(`/infer/${encodeURIComponent(this.state.currentFile)}/${field}`, {
+            const response = await fetch(`/infer/${encodeURIComponent(State.currentFile)}/${field}`, {
                 signal: abortController.signal
             });
             
@@ -628,7 +577,7 @@ const AudioMetadataEditor = {
             loading.classList.remove('active');
             
             // Display suggestions if still active
-            if (this.state.inferenceActive[field]) {
+            if (State.inferenceActive[field]) {
                 this.displaySuggestions(field, data.suggestions);
             }
         } catch (error) {
@@ -646,7 +595,7 @@ const AudioMetadataEditor = {
             }
         }
         
-        this.state.inferenceActive[field] = false;
+        State.inferenceActive[field] = false;
     },
     
     // NEW: Display suggestions
@@ -710,29 +659,29 @@ const AudioMetadataEditor = {
         const suggestions = document.getElementById(`${field}-suggestions`);
         
         // Cancel any ongoing request
-        if (this.state.inferenceAbortControllers[field]) {
-            this.state.inferenceAbortControllers[field].abort();
-            delete this.state.inferenceAbortControllers[field];
+        if (State.inferenceAbortControllers[field]) {
+            State.inferenceAbortControllers[field].abort();
+            delete State.inferenceAbortControllers[field];
         }
         
         loading.classList.remove('active');
         suggestions.classList.remove('active');
-        this.state.inferenceActive[field] = false;
+        State.inferenceActive[field] = false;
     },
 
     // Keyboard navigation
     setupKeyboardNavigation() {
         // Pane click handlers
         document.querySelector('.folders').addEventListener('click', (e) => {
-            this.state.focusedPane = 'folders';
+            State.focusedPane = 'folders';
             this.updatePaneFocus();
         });
         
         document.querySelector('.files').addEventListener('click', (e) => {
-            this.state.focusedPane = 'files';
+            State.focusedPane = 'files';
             this.updatePaneFocus();
-            if (this.state.loadFileDebounceTimer) {
-                clearTimeout(this.state.loadFileDebounceTimer);
+            if (State.loadFileDebounceTimer) {
+                clearTimeout(State.loadFileDebounceTimer);
             }
         });
         
@@ -756,34 +705,34 @@ const AudioMetadataEditor = {
                 }
                 
                 // Clear any existing repeat timer and delay timer
-                if (this.state.keyRepeatDelayTimer) {
-                    clearTimeout(this.state.keyRepeatDelayTimer);
-                    this.state.keyRepeatDelayTimer = null;
+                if (State.keyRepeatDelayTimer) {
+                    clearTimeout(State.keyRepeatDelayTimer);
+                    State.keyRepeatDelayTimer = null;
                 }
-                if (this.state.keyRepeatTimer) {
-                    clearInterval(this.state.keyRepeatTimer);
-                    this.state.keyRepeatTimer = null;
+                if (State.keyRepeatTimer) {
+                    clearInterval(State.keyRepeatTimer);
+                    State.keyRepeatTimer = null;
                 }
                 
                 // Store which key is being held
-                this.state.keyHeldDown = e.key;
-                this.state.isKeyRepeating = false;
+                State.keyHeldDown = e.key;
+                State.isKeyRepeating = false;
                 
                 // Perform the initial navigation
                 this.navigateWithArrows(e.key === 'ArrowUp' ? 'up' : 'down');
                 
                 // Set up custom repeat with initial delay
-                this.state.keyRepeatDelayTimer = setTimeout(() => {
+                State.keyRepeatDelayTimer = setTimeout(() => {
                     // Only start repeating if the same key is still held down
-                    if (this.state.keyHeldDown === e.key) {
-                        this.state.isKeyRepeating = true;
-                        this.state.keyRepeatTimer = setInterval(() => {
-                            if (this.state.keyHeldDown === e.key) {
+                    if (State.keyHeldDown === e.key) {
+                        State.isKeyRepeating = true;
+                        State.keyRepeatTimer = setInterval(() => {
+                            if (State.keyHeldDown === e.key) {
                                 this.navigateWithArrows(e.key === 'ArrowUp' ? 'up' : 'down');
                             }
-                        }, this.state.keyRepeatInterval);
+                        }, State.keyRepeatInterval);
                     }
-                }, this.state.keyRepeatDelay);
+                }, State.keyRepeatDelay);
                 
             } else if (e.key === 'Enter') {
                 e.preventDefault();
@@ -793,7 +742,7 @@ const AudioMetadataEditor = {
                 e.preventDefault();
                 
                 // Determine where we're switching TO
-                const switchingToFiles = this.state.focusedPane === 'folders';
+                const switchingToFiles = State.focusedPane === 'folders';
                 
                 // If switching to files, check if there are valid files
                 if (switchingToFiles) {
@@ -810,17 +759,17 @@ const AudioMetadataEditor = {
                     });
                     
                     // Switch to files pane
-                    this.state.focusedPane = 'files';
+                    State.focusedPane = 'files';
                     this.updatePaneFocus();
                     
                     // Add focus to files pane
-                    if (!this.state.selectedListItem || !validFileItems.includes(this.state.selectedListItem)) {
+                    if (!State.selectedListItem || !validFileItems.includes(State.selectedListItem)) {
                         // No file is selected or the selected file is not in the current file list
                         this.selectFileItem(validFileItems[0], true);
                         validFileItems[0].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
                     } else {
                         // A file is already selected and it's in the current list, just add keyboard focus to it
-                        this.state.selectedListItem.classList.add('keyboard-focus');
+                        State.selectedListItem.classList.add('keyboard-focus');
                     }
                 } else {
                     // Switching from files to folders
@@ -831,12 +780,12 @@ const AudioMetadataEditor = {
                     });
                     
                     // Switch to folders pane
-                    this.state.focusedPane = 'folders';
+                    State.focusedPane = 'folders';
                     this.updatePaneFocus();
                     
                     // Add focus to folders pane
-                    if (this.state.selectedTreeItem) {
-                        this.state.selectedTreeItem.classList.add('keyboard-focus');
+                    if (State.selectedTreeItem) {
+                        State.selectedTreeItem.classList.add('keyboard-focus');
                     }
                 }
             }
@@ -849,39 +798,39 @@ const AudioMetadataEditor = {
             }
             
             // If this key was being held down, stop the repeat
-            if (this.state.keyHeldDown === e.key) {
-                this.state.keyHeldDown = null;
-                this.state.isKeyRepeating = false;
+            if (State.keyHeldDown === e.key) {
+                State.keyHeldDown = null;
+                State.isKeyRepeating = false;
                 
                 // Remove keyboard navigating class
                 document.querySelector('.folders').classList.remove('keyboard-navigating');
                 document.querySelector('.files').classList.remove('keyboard-navigating');
                 
                 // Clear BOTH the delay timer and repeat timer  // UPDATED COMMENT
-                if (this.state.keyRepeatDelayTimer) {           // ADD THESE 4 LINES
-                    clearTimeout(this.state.keyRepeatDelayTimer);
-                    this.state.keyRepeatDelayTimer = null;
+                if (State.keyRepeatDelayTimer) {           // ADD THESE 4 LINES
+                    clearTimeout(State.keyRepeatDelayTimer);
+                    State.keyRepeatDelayTimer = null;
                 }
-                if (this.state.keyRepeatTimer) {
-                    clearInterval(this.state.keyRepeatTimer);
-                    this.state.keyRepeatTimer = null;
+                if (State.keyRepeatTimer) {
+                    clearInterval(State.keyRepeatTimer);
+                    State.keyRepeatTimer = null;
                 }
             }
         });
                         
         // Clear key state on window blur to prevent stuck keys
         window.addEventListener('blur', () => {
-            this.state.keyHeldDown = null;
-            this.state.isKeyRepeating = false;
+            State.keyHeldDown = null;
+            State.isKeyRepeating = false;
             
             // Clear BOTH timers on blur
-            if (this.state.keyRepeatDelayTimer) {
-                clearTimeout(this.state.keyRepeatDelayTimer);
-                this.state.keyRepeatDelayTimer = null;
+            if (State.keyRepeatDelayTimer) {
+                clearTimeout(State.keyRepeatDelayTimer);
+                State.keyRepeatDelayTimer = null;
             }
-            if (this.state.keyRepeatTimer) {
-                clearInterval(this.state.keyRepeatTimer);
-                this.state.keyRepeatTimer = null;
+            if (State.keyRepeatTimer) {
+                clearInterval(State.keyRepeatTimer);
+                State.keyRepeatTimer = null;
             }
         });
     },
@@ -914,7 +863,7 @@ const AudioMetadataEditor = {
         
         // Use instant scrolling during key repeat for smooth performance
         // Only use smooth scrolling for single key presses
-        if (this.state.isKeyRepeating) {
+        if (State.isKeyRepeating) {
             container.scrollTop = Math.max(0, Math.min(newScroll, maxScroll));
         } else {
             container.scrollTo({
@@ -957,9 +906,9 @@ const AudioMetadataEditor = {
     },
 
     navigateWithArrows(direction) {
-        if (this.state.focusedPane === 'folders') {
+        if (State.focusedPane === 'folders') {
             this.navigateFolders(direction);
-        } else if (this.state.focusedPane === 'files') {
+        } else if (State.focusedPane === 'files') {
             this.navigateFiles(direction);
         }
     },
@@ -969,8 +918,8 @@ const AudioMetadataEditor = {
         if (visibleFolders.length === 0) return;
         
         let currentIndex = -1;
-        if (this.state.selectedTreeItem) {
-            currentIndex = visibleFolders.findIndex(item => item === this.state.selectedTreeItem);
+        if (State.selectedTreeItem) {
+            currentIndex = visibleFolders.findIndex(item => item === State.selectedTreeItem);
         }
         
         let newIndex;
@@ -997,8 +946,8 @@ const AudioMetadataEditor = {
         if (fileItems.length === 0) return;
         
         let currentIndex = -1;
-        if (this.state.selectedListItem) {
-            currentIndex = fileItems.findIndex(item => item === this.state.selectedListItem);
+        if (State.selectedListItem) {
+            currentIndex = fileItems.findIndex(item => item === State.selectedListItem);
         }
         
         let newIndex;
@@ -1040,8 +989,8 @@ const AudioMetadataEditor = {
     },
 
     selectTreeItem(item, isKeyboard = false) {
-        if (this.state.selectedTreeItem) {
-            this.state.selectedTreeItem.classList.remove('selected', 'keyboard-focus');
+        if (State.selectedTreeItem) {
+            State.selectedTreeItem.classList.remove('selected', 'keyboard-focus');
         }
         item.classList.add('selected');
         // Always add keyboard-focus when selecting, regardless of input method
@@ -1052,26 +1001,26 @@ const AudioMetadataEditor = {
             el.classList.remove('keyboard-focus');
         });
         
-        this.state.selectedTreeItem = item;
-        this.state.focusedPane = 'folders';
+        State.selectedTreeItem = item;
+        State.focusedPane = 'folders';
         this.updatePaneFocus();
         
         // Always load files when a folder is selected (remove the isKeyboard check)
-        if (this.state.loadFileDebounceTimer) {
-            clearTimeout(this.state.loadFileDebounceTimer);
+        if (State.loadFileDebounceTimer) {
+            clearTimeout(State.loadFileDebounceTimer);
         }
         
         const folderPath = item.dataset.path;
         if (folderPath !== undefined) { // folderPath can be empty string for root
-            this.state.loadFileDebounceTimer = setTimeout(() => {
+            State.loadFileDebounceTimer = setTimeout(() => {
                 this.loadFiles(folderPath);
             }, 300);
         }
     },
 
     selectFileItem(item, isKeyboard = false) {
-        if (this.state.selectedListItem) {
-            this.state.selectedListItem.classList.remove('selected', 'keyboard-focus');
+        if (State.selectedListItem) {
+            State.selectedListItem.classList.remove('selected', 'keyboard-focus');
         }
         
         item.classList.add('selected');
@@ -1085,35 +1034,35 @@ const AudioMetadataEditor = {
         
         // Load file if keyboard navigation
         if (isKeyboard) {
-            if (this.state.loadFileDebounceTimer) {
-                clearTimeout(this.state.loadFileDebounceTimer);
+            if (State.loadFileDebounceTimer) {
+                clearTimeout(State.loadFileDebounceTimer);
             }
             
             const filepath = item.dataset.filepath;
             if (filepath) {
-                this.state.loadFileDebounceTimer = setTimeout(() => {
+                State.loadFileDebounceTimer = setTimeout(() => {
                     this.loadFile(filepath, item);
                 }, 300);
             }
         }
         
-        this.state.selectedListItem = item;
-        this.state.focusedPane = 'files';
+        State.selectedListItem = item;
+        State.focusedPane = 'files';
         this.updatePaneFocus();
     },
 
     activateCurrentItem() {
-        if (this.state.focusedPane === 'folders' && this.state.selectedTreeItem) {
-            const children = this.state.selectedTreeItem.querySelector('.tree-children');
-            const folderPath = this.state.selectedTreeItem.dataset.path;
+        if (State.focusedPane === 'folders' && State.selectedTreeItem) {
+            const children = State.selectedTreeItem.querySelector('.tree-children');
+            const folderPath = State.selectedTreeItem.dataset.path;
             
             // Check if we haven't loaded this folder's data yet
-            const dataNotLoaded = !this.state.treeData.hasOwnProperty(folderPath);
+            const dataNotLoaded = !State.treeData.hasOwnProperty(folderPath);
             
             // Check if this folder has subfolders in the data
             const hasSubfolders = dataNotLoaded || 
-                                 (this.state.treeData[folderPath] && 
-                                  this.state.treeData[folderPath].some(item => item.type === 'folder'));
+                                 (State.treeData[folderPath] && 
+                                  State.treeData[folderPath].some(item => item.type === 'folder'));
             
             // Check if already expanded and has visible subfolder elements
             const hasVisibleSubfolders = children && children.classList.contains('expanded') && 
@@ -1121,7 +1070,7 @@ const AudioMetadataEditor = {
             
             if (hasSubfolders || hasVisibleSubfolders) {
                 // Has subfolders - just toggle expand/collapse without loading files
-                const icon = this.state.selectedTreeItem.querySelector('.tree-icon');
+                const icon = State.selectedTreeItem.querySelector('.tree-icon');
                 const isExpanded = children.classList.contains('expanded');
                 
                 if (!isExpanded) {
@@ -1131,12 +1080,12 @@ const AudioMetadataEditor = {
                         this.loadTreeChildren(folderPath, children, this.getLevel(folderPath) + 1);
                     }
                     children.classList.add('expanded');
-                    this.state.expandedFolders.add(folderPath);
+                    State.expandedFolders.add(folderPath);
                     if (icon) icon.innerHTML = '📂';
                 } else {
                     // Collapse
                     children.classList.remove('expanded');
-                    this.state.expandedFolders.delete(folderPath);
+                    State.expandedFolders.delete(folderPath);
                     if (icon) icon.innerHTML = '📁';
                 }
                 // DO NOT load files, DO NOT move focus - just return
@@ -1145,10 +1094,10 @@ const AudioMetadataEditor = {
                 // No subfolders - do nothing
                 return;
             }
-        } else if (this.state.focusedPane === 'files' && this.state.selectedListItem) {
-            const filepath = this.state.selectedListItem.dataset.filepath;
+        } else if (State.focusedPane === 'files' && State.selectedListItem) {
+            const filepath = State.selectedListItem.dataset.filepath;
             if (filepath) {
-                this.loadFile(filepath, this.state.selectedListItem);
+                this.loadFile(filepath, State.selectedListItem);
             }
         }
     },
@@ -1162,17 +1111,17 @@ const AudioMetadataEditor = {
             });
         });
         
-        const activeOption = document.getElementById(`sort-${this.state.currentSort.method}`);
+        const activeOption = document.getElementById(`sort-${State.currentSort.method}`);
         activeOption.classList.add('active');
-        activeOption.querySelector(`.sort-arrow[data-dir="${this.state.currentSort.direction}"]`).classList.add('active');
+        activeOption.querySelector(`.sort-arrow[data-dir="${State.currentSort.direction}"]`).classList.add('active');
     },
 
     setSortMethod(method) {
-        if (this.state.currentSort.method === method) {
-            this.state.currentSort.direction = this.state.currentSort.direction === 'asc' ? 'desc' : 'asc';
+        if (State.currentSort.method === method) {
+            State.currentSort.direction = State.currentSort.direction === 'asc' ? 'desc' : 'asc';
         } else {
-            this.state.currentSort.method = method;
-            this.state.currentSort.direction = 'asc';
+            State.currentSort.method = method;
+            State.currentSort.direction = 'asc';
         }
         
         this.updateSortUI();
@@ -1183,21 +1132,21 @@ const AudioMetadataEditor = {
         return items.sort((a, b) => {
             let comparison = 0;
             
-            if (this.state.currentSort.method === 'name') {
+            if (State.currentSort.method === 'name') {
                 comparison = a.name.toLowerCase().localeCompare(b.name.toLowerCase());
-            } else if (this.state.currentSort.method === 'date') {
+            } else if (State.currentSort.method === 'date') {
                 comparison = (a.created || 0) - (b.created || 0);
             }
             
-            return this.state.currentSort.direction === 'asc' ? comparison : -comparison;
+            return State.currentSort.direction === 'asc' ? comparison : -comparison;
         });
     },
 
     // Tree functionality
     async loadTree() {
         try {
-            const data = await this.apiCall('/tree/');
-            this.state.treeData[''] = data.items;
+            const data = await API.loadTree();
+            State.treeData[''] = data.items;
             this.buildTreeFromData();
         } catch (err) {
             console.error('Error loading tree:', err);
@@ -1209,7 +1158,7 @@ const AudioMetadataEditor = {
         const tree = document.getElementById('folder-tree');
         tree.innerHTML = '';
         
-        const sortedItems = this.sortItems(this.state.treeData[''] || []);
+        const sortedItems = this.sortItems(State.treeData[''] || []);
         
         sortedItems.forEach(item => {
             if (item.type === 'folder') {
@@ -1219,11 +1168,11 @@ const AudioMetadataEditor = {
         
         // Auto-select the first folder on initial load
         const firstTreeItem = tree.querySelector('.tree-item');
-        if (firstTreeItem && !this.state.selectedTreeItem) {
+        if (firstTreeItem && !State.selectedTreeItem) {
             // Select with keyboard focus to show both highlight and focus indicator
             this.selectTreeItem(firstTreeItem, true);
             // Also set the focused pane to folders
-            this.state.focusedPane = 'folders';
+            State.focusedPane = 'folders';
             this.updatePaneFocus();
         }
     },
@@ -1231,23 +1180,23 @@ const AudioMetadataEditor = {
     rebuildTree() {
         this.buildTreeFromData();
         
-        this.state.expandedFolders.forEach(path => {
+        State.expandedFolders.forEach(path => {
             const element = document.querySelector(`[data-path="${path}"]`);
-            if (element && this.state.treeData[path]) {
+            if (element && State.treeData[path]) {
                 const children = element.querySelector('.tree-children');
-                if (children && this.state.treeData[path].length > 0) {
+                if (children && State.treeData[path].length > 0) {
                     this.rebuildChildren(path, children, this.getLevel(path) + 1);
                     children.classList.add('expanded');
                 }
             }
         });
         
-        if (this.state.selectedTreeItem) {
-            const path = this.state.selectedTreeItem.dataset.path;
+        if (State.selectedTreeItem) {
+            const path = State.selectedTreeItem.dataset.path;
             const newSelected = document.querySelector(`[data-path="${path}"]`);
             if (newSelected) {
                 newSelected.classList.add('selected');
-                this.state.selectedTreeItem = newSelected;
+                State.selectedTreeItem = newSelected;
             }
         }
     },
@@ -1258,7 +1207,7 @@ const AudioMetadataEditor = {
 
     rebuildChildren(path, container, level) {
         container.innerHTML = '';
-        const sortedItems = this.sortItems(this.state.treeData[path] || []);
+        const sortedItems = this.sortItems(State.treeData[path] || []);
         
         sortedItems.forEach(item => {
             if (item.type === 'folder') {
@@ -1278,7 +1227,7 @@ const AudioMetadataEditor = {
         
         const icon = document.createElement('span');
         icon.className = 'tree-icon';
-        icon.innerHTML = this.state.expandedFolders.has(item.path) ? '📂' : '📁';
+        icon.innerHTML = State.expandedFolders.has(item.path) ? '📂' : '📁';
         
         const name = document.createElement('span');
         name.textContent = item.name;
@@ -1297,8 +1246,8 @@ const AudioMetadataEditor = {
             this.selectTreeItem(div);
             
             // Check if this folder has subfolders
-            const hasSubfolders = this.state.treeData[item.path] && 
-                                 this.state.treeData[item.path].some(child => child.type === 'folder');
+            const hasSubfolders = State.treeData[item.path] && 
+                                 State.treeData[item.path].some(child => child.type === 'folder');
             
             const isExpanded = children.classList.contains('expanded');
             
@@ -1307,11 +1256,11 @@ const AudioMetadataEditor = {
                     this.loadTreeChildren(item.path, children, level + 1);
                 }
                 children.classList.add('expanded');
-                this.state.expandedFolders.add(item.path);
+                State.expandedFolders.add(item.path);
                 icon.innerHTML = '📂';
             } else {
                 children.classList.remove('expanded');
-                this.state.expandedFolders.delete(item.path);
+                State.expandedFolders.delete(item.path);
                 icon.innerHTML = '📁';
             }
             
@@ -1320,8 +1269,8 @@ const AudioMetadataEditor = {
             this.loadFiles(item.path);
         };
         
-        if (this.state.treeData[item.path] && this.state.treeData[item.path].length > 0 && this.state.expandedFolders.has(item.path)) {
-            const sortedItems = this.sortItems(this.state.treeData[item.path]);
+        if (State.treeData[item.path] && State.treeData[item.path].length > 0 && State.expandedFolders.has(item.path)) {
+            const sortedItems = this.sortItems(State.treeData[item.path]);
             sortedItems.forEach(child => {
                 if (child.type === 'folder') {
                     children.appendChild(this.createTreeItem(child, level + 1));
@@ -1336,8 +1285,8 @@ const AudioMetadataEditor = {
 
     async loadTreeChildren(path, container, level) {
         try {
-            const data = await this.apiCall(`/tree/${encodeURIComponent(path)}`);
-            this.state.treeData[path] = data.items;
+            const data = await API.loadTreeChildren(path);
+            State.treeData[path] = data.items;
             
             const sortedItems = this.sortItems(data.items);
             
@@ -1353,13 +1302,13 @@ const AudioMetadataEditor = {
 
     // File operations
     async loadFiles(folderPath) {
-        this.state.currentPath = folderPath;
+        State.currentPath = folderPath;
         document.getElementById('file-count').textContent = '(loading...)';
         
         this.stopPlayback();
         
         try {
-            const data = await this.apiCall(`/files/${encodeURIComponent(folderPath)}`);
+            const data = await API.loadFiles(folderPath);
             const list = document.getElementById('file-list');
             list.innerHTML = '';
             
@@ -1433,7 +1382,7 @@ const AudioMetadataEditor = {
 
     async loadFile(filepath, listItem) {
         // Increment request ID to track this as the latest request
-        const requestId = ++this.state.loadFileRequestId;
+        const requestId = ++State.loadFileRequestId;
         
         // Stop any current playback when selecting a different file
         this.stopPlayback();
@@ -1442,16 +1391,16 @@ const AudioMetadataEditor = {
         const fields = ['title', 'artist', 'album', 'albumartist', 'date', 'genre', 'track', 'disc'];
         fields.forEach(field => this.hideInferenceSuggestions(field));
         
-        if (this.state.loadFileDebounceTimer) {
-            clearTimeout(this.state.loadFileDebounceTimer);
-            this.state.loadFileDebounceTimer = null;
+        if (State.loadFileDebounceTimer) {
+            clearTimeout(State.loadFileDebounceTimer);
+            State.loadFileDebounceTimer = null;
         }
         
         this.selectFileItem(listItem);
         
-        this.state.currentFile = filepath;
-        this.state.originalFilename = filepath.split('/').pop();
-        document.getElementById('current-filename').textContent = this.state.originalFilename;
+        State.currentFile = filepath;
+        State.originalFilename = filepath.split('/').pop();
+        document.getElementById('current-filename').textContent = State.originalFilename;
         document.getElementById('no-file-message').style.display = 'none';
         document.getElementById('metadata-section').style.display = 'block';
         
@@ -1466,21 +1415,21 @@ const AudioMetadataEditor = {
             this.showStatus('Loading metadata...', 'success');
         }
         
-        this.state.currentAlbumArt = null;
-        this.state.pendingAlbumArt = null;
-        this.state.shouldRemoveArt = false;
+        State.currentAlbumArt = null;
+        State.pendingAlbumArt = null;
+        State.shouldRemoveArt = false;
         
         this.setFormEnabled(false);
         
         try {
-            const data = await this.apiCall(`/metadata/${encodeURIComponent(filepath)}`);
+            const data = await API.getMetadata(filepath);
             
-            if (requestId !== this.state.loadFileRequestId) {
+            if (requestId !== State.loadFileRequestId) {
                 // A newer request has been made, discard this response
                 return;
             }
             
-            this.state.originalMetadata = {
+            State.originalMetadata = {
                 title: data.title || '',
                 artist: data.artist || '',
                 album: data.album || '',
@@ -1491,7 +1440,7 @@ const AudioMetadataEditor = {
                 disc: data.disc || ''
             };
             
-            Object.entries(this.state.originalMetadata).forEach(([field, value]) => {
+            Object.entries(State.originalMetadata).forEach(([field, value]) => {
                 document.getElementById(field).value = value;
             });
             
@@ -1550,7 +1499,7 @@ const AudioMetadataEditor = {
                 uploadBtn.title = '';
                 
                 if (data.hasArt && data.art) {
-                    this.state.currentAlbumArt = data.art;
+                    State.currentAlbumArt = data.art;
                     artDisplay.innerHTML = `<img src="data:image/jpeg;base64,${data.art}" class="album-art">`;
                     deleteBtn.style.display = 'block';
                     saveImageBtn.style.display = 'none';
@@ -1570,7 +1519,7 @@ const AudioMetadataEditor = {
             }
         } catch (err) {
             // Check if this is still the most recent request before showing error
-            if (requestId === this.state.loadFileRequestId) {
+            if (requestId === State.loadFileRequestId) {
                 console.error('Error loading metadata:', err);
                 this.showStatus('Error loading metadata', 'error');
                 this.setFormEnabled(true);
@@ -1585,13 +1534,13 @@ const AudioMetadataEditor = {
     },
     
     resetFilename() {
-        document.getElementById('filename-input').value = this.state.originalFilename;
+        document.getElementById('filename-input').value = State.originalFilename;
     },
     
     async saveFilename() {
         const button = document.querySelector('.filename-save');
         const newName = document.getElementById('filename-input').value.trim();
-        if (!newName || newName === this.state.originalFilename) {
+        if (!newName || newName === State.originalFilename) {
             this.cancelFilenameEdit();
             return;
         }
@@ -1600,22 +1549,15 @@ const AudioMetadataEditor = {
         this.showButtonStatus(button, 'Renaming...', 'processing');
         
         try {
-            const result = await this.apiCall('/rename', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    oldPath: this.state.currentFile,
-                    newName: newName
-                })
-            });
+            const result = await API.renameFile(State.currentFile, newName);
             
             if (result.status === 'success') {
-                this.state.currentFile = result.newPath;
-                this.state.originalFilename = newName;
+                State.currentFile = result.newPath;
+                State.originalFilename = newName;
                 document.getElementById('current-filename').textContent = newName;
                 this.cancelFilenameEdit();
                 this.showButtonStatus(button, 'Renamed!', 'success');
-                this.loadFiles(this.state.currentPath);
+                this.loadFiles(State.currentPath);
                 this.loadHistory();
             } else {
                 this.showButtonStatus(button, result.error || 'Error', 'error');
@@ -1635,11 +1577,11 @@ const AudioMetadataEditor = {
         
         const reader = new FileReader();
         reader.onload = (e) => {
-            this.state.pendingAlbumArt = e.target.result;
-            this.state.shouldRemoveArt = false;
+            State.pendingAlbumArt = e.target.result;
+            State.shouldRemoveArt = false;
             
             const artDisplay = document.getElementById('art-display');
-            artDisplay.innerHTML = `<img src="${this.state.pendingAlbumArt}" class="album-art">`;
+            artDisplay.innerHTML = `<img src="${State.pendingAlbumArt}" class="album-art">`;
             document.querySelector('.delete-art-btn').style.display = 'block';
             document.querySelector('.save-image-btn').style.display = 'block';
             document.querySelector('.apply-folder-btn').style.display = 'block';
@@ -1653,8 +1595,8 @@ const AudioMetadataEditor = {
 
     deleteAlbumArt() {
         const button = document.querySelector('.delete-art-btn');
-        this.state.shouldRemoveArt = true;
-        this.state.pendingAlbumArt = null;
+        State.shouldRemoveArt = true;
+        State.pendingAlbumArt = null;
         
         const artDisplay = document.getElementById('art-display');
         artDisplay.innerHTML = '<div class="album-art-placeholder">No album art</div>';
@@ -1666,23 +1608,19 @@ const AudioMetadataEditor = {
     },
 
     async saveAlbumArt() {
-        if (!this.state.currentFile || !this.state.pendingAlbumArt) return;
+        if (!State.currentFile || !State.pendingAlbumArt) return;
         
         const button = document.querySelector('.save-image-btn');
         button.disabled = true;
         this.showButtonStatus(button, 'Saving...', 'processing');
         
         try {
-            const result = await this.apiCall(`/metadata/${encodeURIComponent(this.state.currentFile)}`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ art: this.state.pendingAlbumArt })
-            });
-            
+            const result = await API.setMetadata(State.currentFile, { art: State.pendingAlbumArt });
+          
             if (result.status === 'success') {
                 this.showButtonStatus(button, 'Saved!', 'success');
-                this.state.currentAlbumArt = this.state.pendingAlbumArt;
-                this.state.pendingAlbumArt = null;
+                State.currentAlbumArt = State.pendingAlbumArt;
+                State.pendingAlbumArt = null;
                 
                 setTimeout(() => {
                     document.querySelector('.save-image-btn').style.display = 'none';
@@ -1702,16 +1640,16 @@ const AudioMetadataEditor = {
     },
 
     async applyArtToFolder() {
-        if (!this.state.currentFile || (!this.state.pendingAlbumArt && !this.state.currentAlbumArt)) return;
+        if (!State.currentFile || (!State.pendingAlbumArt && !State.currentAlbumArt)) return;
         
         const button = document.querySelector('.apply-folder-btn');
-        const artToApply = this.state.pendingAlbumArt || (this.state.currentAlbumArt ? `data:image/jpeg;base64,${this.state.currentAlbumArt}` : null);
+        const artToApply = State.pendingAlbumArt || (State.currentAlbumArt ? `data:image/jpeg;base64,${State.currentAlbumArt}` : null);
         if (!artToApply) {
             this.showButtonStatus(button, 'No art', 'error', 2000);
             return;
         }
         
-        const folderPath = this.state.currentFile.substring(0, this.state.currentFile.lastIndexOf('/'));
+        const folderPath = State.currentFile.substring(0, State.currentFile.lastIndexOf('/'));
         
         if (!confirm(`Apply this album art to all files in the folder "${folderPath || 'root'}"? This will replace any existing album art.`)) {
             return;
@@ -1722,21 +1660,14 @@ const AudioMetadataEditor = {
         this.showButtonStatus(button, 'Applying...', 'processing');
         
         try {
-            const result = await this.apiCall('/apply-art-to-folder', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    folderPath: folderPath,
-                    art: artToApply
-                })
-            });
-            
+            const result = await API.applyArtToFolder(folderPath, artToApply);
+
             if (result.status === 'success') {
                 this.showButtonStatus(button, `Applied to ${result.filesUpdated} files!`, 'success', 3000);
                 
-                if (this.state.pendingAlbumArt) {
-                    this.state.currentAlbumArt = this.state.pendingAlbumArt;
-                    this.state.pendingAlbumArt = null;
+                if (State.pendingAlbumArt) {
+                    State.currentAlbumArt = State.pendingAlbumArt;
+                    State.pendingAlbumArt = null;
                     setTimeout(() => {
                         document.querySelector('.save-image-btn').style.display = 'none';
                         document.querySelector('.apply-folder-btn').style.display = 'none';
@@ -1757,13 +1688,13 @@ const AudioMetadataEditor = {
     },
 
     async applyFieldToFolder(field) {
-        if (!this.state.currentFile) return;
+        if (!State.currentFile) return;
         
         const button = document.querySelector(`.apply-folder-btn-new[data-field="${field}"]`);
         const value = document.getElementById(field).value.trim();
         if (!value && value !== '') return; // Allow empty string to clear field
         
-        const folderPath = this.state.currentFile.substring(0, this.state.currentFile.lastIndexOf('/'));
+        const folderPath = State.currentFile.substring(0, State.currentFile.lastIndexOf('/'));
         const fieldLabel = document.querySelector(`label[for="${field}"]`).textContent;
         
         if (!confirm(`Apply "${fieldLabel}" value "${value}" to all files in the folder "${folderPath || 'root'}"?`)) {
@@ -1775,19 +1706,11 @@ const AudioMetadataEditor = {
         this.showButtonStatus(button, 'Applying to folder...', 'processing');
         
         try {
-            const result = await this.apiCall('/apply-field-to-folder', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    folderPath: folderPath,
-                    field: field,
-                    value: value
-                })
-            });
+            const result = await API.applyFieldToFolder(folderPath, field, value);
             
             if (result.status === 'success') {
                 this.showButtonStatus(button, `Applied to ${result.filesUpdated} files!`, 'success', 3000);
-                this.state.originalMetadata[field] = value;
+                State.originalMetadata[field] = value;
                 setTimeout(() => {
                     const controls = document.querySelector(`.apply-field-controls[data-field="${field}"]`);
                     controls.classList.remove('visible');
@@ -1808,7 +1731,7 @@ const AudioMetadataEditor = {
 
     // Update the save method to handle format-specific errors
     async save() {
-        if (!this.state.currentFile) return;
+        if (!State.currentFile) return;
         
         const button = document.querySelector('.save-btn');
         const data = {
@@ -1822,9 +1745,9 @@ const AudioMetadataEditor = {
             disc: document.getElementById('disc').value
         };
         
-        if (this.state.pendingAlbumArt) {
-            data.art = this.state.pendingAlbumArt;
-        } else if (this.state.shouldRemoveArt) {
+        if (State.pendingAlbumArt) {
+            data.art = State.pendingAlbumArt;
+        } else if (State.shouldRemoveArt) {
             data.removeArt = true;
         }
         
@@ -1832,18 +1755,14 @@ const AudioMetadataEditor = {
         this.showButtonStatus(button, 'Saving...', 'processing');
         
         try {
-            const result = await this.apiCall(`/metadata/${encodeURIComponent(this.state.currentFile)}`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(data)
-            });
+            const result = await API.setMetadata(State.currentFile, data);
             
             if (result.status === 'success') {
                 this.showButtonStatus(button, 'Saved!', 'success', 3000);
                 
                 Object.keys(data).forEach(key => {
                     if (key !== 'art' && key !== 'removeArt') {
-                        this.state.originalMetadata[key] = data[key];
+                        State.originalMetadata[key] = data[key];
                     }
                 });
                 
@@ -1851,15 +1770,15 @@ const AudioMetadataEditor = {
                     controls.classList.remove('visible');
                 });
                 
-                if (this.state.pendingAlbumArt) {
-                    this.state.currentAlbumArt = this.state.pendingAlbumArt;
+                if (State.pendingAlbumArt) {
+                    State.currentAlbumArt = State.pendingAlbumArt;
                     document.querySelector('.save-image-btn').style.display = 'none';
                     document.querySelector('.apply-folder-btn').style.display = 'none';
-                } else if (this.state.shouldRemoveArt) {
-                    this.state.currentAlbumArt = null;
+                } else if (State.shouldRemoveArt) {
+                    State.currentAlbumArt = null;
                 }
-                this.state.pendingAlbumArt = null;
-                this.state.shouldRemoveArt = false;
+                State.pendingAlbumArt = null;
+                State.shouldRemoveArt = false;
                 
                 this.loadHistory();
             } else {
@@ -1936,15 +1855,15 @@ const AudioMetadataEditor = {
     },
 
     async resetForm() {
-        if (!this.state.currentFile) return;
+        if (!State.currentFile) return;
         
         const button = document.querySelector('.clear-btn');
         this.showButtonStatus(button, 'Resetting...', 'processing');
         
         try {
-            const data = await this.apiCall(`/metadata/${encodeURIComponent(this.state.currentFile)}`);
+            const data = await API.getMetadata(State.currentFile);
             
-            this.state.originalMetadata = {
+            State.originalMetadata = {
                 title: data.title || '',
                 artist: data.artist || '',
                 album: data.album || '',
@@ -1955,7 +1874,7 @@ const AudioMetadataEditor = {
                 disc: data.disc || ''
             };
             
-            Object.entries(this.state.originalMetadata).forEach(([field, value]) => {
+            Object.entries(State.originalMetadata).forEach(([field, value]) => {
                 document.getElementById(field).value = value;
             });
             
@@ -1963,8 +1882,8 @@ const AudioMetadataEditor = {
                 controls.classList.remove('visible');
             });
             
-            this.state.pendingAlbumArt = null;
-            this.state.shouldRemoveArt = false;
+            State.pendingAlbumArt = null;
+            State.shouldRemoveArt = false;
             
             const artDisplay = document.getElementById('art-display');
             const deleteBtn = document.querySelector('.delete-art-btn');
@@ -1972,13 +1891,13 @@ const AudioMetadataEditor = {
             const applyFolderBtn = document.querySelector('.apply-folder-btn');
             
             if (data.hasArt && data.art) {
-                this.state.currentAlbumArt = data.art;
+                State.currentAlbumArt = data.art;
                 artDisplay.innerHTML = `<img src="data:image/jpeg;base64,${data.art}" class="album-art">`;
                 deleteBtn.style.display = 'block';
                 saveImageBtn.style.display = 'none';
                 applyFolderBtn.style.display = 'none';
             } else {
-                this.state.currentAlbumArt = null;
+                State.currentAlbumArt = null;
                 artDisplay.innerHTML = '<div class="album-art-placeholder">No album art</div>';
                 deleteBtn.style.display = 'none';
                 saveImageBtn.style.display = 'none';
@@ -1995,8 +1914,8 @@ const AudioMetadataEditor = {
     // History functionality
     async loadHistory() {
         try {
-            const data = await this.apiCall('/history');
-            this.state.historyActions = data.actions;
+            const data = await API.loadHistory();
+            State.historyActions = data.actions;
             this.updateHistoryList();
         } catch (err) {
             console.error('Error loading history:', err);
@@ -2008,18 +1927,18 @@ const AudioMetadataEditor = {
         const historyList = document.getElementById('history-list');
         historyList.innerHTML = '';
         
-        if (this.state.historyActions.length === 0) {
+        if (State.historyActions.length === 0) {
             historyList.innerHTML = '<div class="history-loading">No editing history yet</div>';
             return;
         }
         
-        this.state.historyActions.forEach(action => {
+        State.historyActions.forEach(action => {
             const item = document.createElement('div');
             item.className = 'history-item';
             if (action.is_undone) {
                 item.className += ' undone';
             }
-            if (this.state.selectedHistoryAction === action.id) {
+            if (State.selectedHistoryAction === action.id) {
                 item.className += ' selected';
             }
             
@@ -2044,7 +1963,7 @@ const AudioMetadataEditor = {
             item.appendChild(typeDiv);
             
             // Add action buttons for selected item
-            if (this.state.selectedHistoryAction === action.id) {
+            if (State.selectedHistoryAction === action.id) {
                 const actionsDiv = document.createElement('div');
                 actionsDiv.className = 'history-item-actions';
                 
@@ -2080,7 +1999,7 @@ const AudioMetadataEditor = {
     },
     
     async selectHistoryAction(actionId, skipListUpdate = false) {
-        this.state.selectedHistoryAction = actionId;
+        State.selectedHistoryAction = actionId;
         
         // Update list UI - this will recreate all items with correct button states
         if (!skipListUpdate) {
@@ -2089,7 +2008,7 @@ const AudioMetadataEditor = {
         
         // Load details
         try {
-            const details = await this.apiCall(`/history/${actionId}`);
+            const details = await API.getHistoryAction(actionId);
             this.displayHistoryDetails(details);
         } catch (err) {
             console.error('Error loading action details:', err);
@@ -2259,23 +2178,21 @@ const AudioMetadataEditor = {
     },
                 
     async undoAction() {
-        if (!this.state.selectedHistoryAction) return;
+        if (!State.selectedHistoryAction) return;
         
         try {
             // Get action details before undo
-            const actionDetails = await this.apiCall(`/history/${this.state.selectedHistoryAction}`);
+            const actionDetails = await API.getHistoryAction(State.selectedHistoryAction);
             
             // Remember current state
-            const currentFileBefore = this.state.currentFile;
-            const currentPathBefore = this.state.currentPath;
+            const currentFileBefore = State.currentFile;
+            const currentPathBefore = State.currentPath;
             
             console.log('Undoing action:', actionDetails.action_type);
             console.log('Current file before undo:', currentFileBefore);
             
             // Perform the undo
-            const result = await this.apiCall(`/history/${this.state.selectedHistoryAction}/undo`, {
-                method: 'POST'
-            });
+            const result = await API.undoAction(State.selectedHistoryAction);
             
             if (result.status === 'success' || result.status === 'partial') {
                 this.showStatus(`Undo successful! ${result.filesUpdated} file(s) reverted.`, 'success');
@@ -2288,9 +2205,9 @@ const AudioMetadataEditor = {
                     // Use the newPath provided by the backend
                     console.log('File rename undo - new path from backend:', result.newPath);
                     
-                    this.state.currentFile = result.newPath;
-                    this.state.originalFilename = result.newPath.split('/').pop();
-                    document.getElementById('current-filename').textContent = this.state.originalFilename;
+                    State.currentFile = result.newPath;
+                    State.originalFilename = result.newPath.split('/').pop();
+                    document.getElementById('current-filename').textContent = State.originalFilename;
                     
                     // Reload metadata after a short delay
                     setTimeout(async () => {
@@ -2314,9 +2231,9 @@ const AudioMetadataEditor = {
                 
                 // Update the action in our local state if provided
                 if (result.action) {
-                    const actionIndex = this.state.historyActions.findIndex(a => a.id === result.action.id);
+                    const actionIndex = State.historyActions.findIndex(a => a.id === result.action.id);
                     if (actionIndex !== -1) {
-                        this.state.historyActions[actionIndex] = result.action;
+                        State.historyActions[actionIndex] = result.action;
                     }
                 }
                 
@@ -2328,9 +2245,9 @@ const AudioMetadataEditor = {
                 
                 // Update the action state even on error
                 if (result.action) {
-                    const actionIndex = this.state.historyActions.findIndex(a => a.id === result.action.id);
+                    const actionIndex = State.historyActions.findIndex(a => a.id === result.action.id);
                     if (actionIndex !== -1) {
-                        this.state.historyActions[actionIndex] = result.action;
+                        State.historyActions[actionIndex] = result.action;
                     }
                     this.updateHistoryList();
                 }
@@ -2342,23 +2259,21 @@ const AudioMetadataEditor = {
     },
     
     async redoAction() {
-        if (!this.state.selectedHistoryAction) return;
+        if (!State.selectedHistoryAction) return;
         
         try {
             // Get action details before redo
-            const actionDetails = await this.apiCall(`/history/${this.state.selectedHistoryAction}`);
+            const actionDetails = await API.getHistoryAction(State.selectedHistoryAction);
             
             // Remember current state
-            const currentFileBefore = this.state.currentFile;
-            const currentPathBefore = this.state.currentPath;
+            const currentFileBefore = State.currentFile;
+            const currentPathBefore = State.currentPath;
             
             console.log('Redoing action:', actionDetails.action_type);
             console.log('Current file before redo:', currentFileBefore);
             
             // Perform the redo
-            const result = await this.apiCall(`/history/${this.state.selectedHistoryAction}/redo`, {
-                method: 'POST'
-            });
+            const result = await API.redoAction(State.selectedHistoryAction);
             
             if (result.status === 'success' || result.status === 'partial') {
                 this.showStatus(`Redo successful! ${result.filesUpdated} file(s) updated.`, 'success');
@@ -2371,9 +2286,9 @@ const AudioMetadataEditor = {
                     // Use the newPath provided by the backend
                     console.log('File rename redo - new path from backend:', result.newPath);
                     
-                    this.state.currentFile = result.newPath;
-                    this.state.originalFilename = result.newPath.split('/').pop();
-                    document.getElementById('current-filename').textContent = this.state.originalFilename;
+                    State.currentFile = result.newPath;
+                    State.originalFilename = result.newPath.split('/').pop();
+                    document.getElementById('current-filename').textContent = State.originalFilename;
                     
                     // Reload metadata after a short delay
                     setTimeout(async () => {
@@ -2397,9 +2312,9 @@ const AudioMetadataEditor = {
                 
                 // Update the action in our local state if provided
                 if (result.action) {
-                    const actionIndex = this.state.historyActions.findIndex(a => a.id === result.action.id);
+                    const actionIndex = State.historyActions.findIndex(a => a.id === result.action.id);
                     if (actionIndex !== -1) {
-                        this.state.historyActions[actionIndex] = result.action;
+                        State.historyActions[actionIndex] = result.action;
                     }
                 }
                 
@@ -2409,7 +2324,7 @@ const AudioMetadataEditor = {
                 // Force re-selection of the current action to ensure proper button states
                 // Use setTimeout to ensure DOM has updated
                 //setTimeout(async () => {
-                //    await this.selectHistoryAction(this.state.selectedHistoryAction, true);
+                //    await this.selectHistoryAction(State.selectedHistoryAction, true);
                 //}, 0);
                 
             } else {
@@ -2417,9 +2332,9 @@ const AudioMetadataEditor = {
                 
                 // Update the action state even on error
                 if (result.action) {
-                    const actionIndex = this.state.historyActions.findIndex(a => a.id === result.action.id);
+                    const actionIndex = State.historyActions.findIndex(a => a.id === result.action.id);
                     if (actionIndex !== -1) {
-                        this.state.historyActions[actionIndex] = result.action;
+                        State.historyActions[actionIndex] = result.action;
                     }
                     this.updateHistoryList();
                 }
@@ -2441,14 +2356,12 @@ const AudioMetadataEditor = {
         button.innerHTML = '<span class="spinner"></span> Clearing...';
         
         try {
-            const result = await this.apiCall('/history/clear', {
-                method: 'POST'
-            });
+            const result = await API.clearHistory();
             
             if (result.status === 'success') {
                 this.showStatus('History cleared successfully', 'success');
-                this.state.historyActions = [];
-                this.state.selectedHistoryAction = null;
+                State.historyActions = [];
+                State.selectedHistoryAction = null;
                 this.updateHistoryList();
                 document.getElementById('history-details').innerHTML = '<div class="history-details-empty">Select an action to view details</div>';
             } else {
@@ -2471,32 +2384,32 @@ const AudioMetadataEditor = {
             panel.classList.remove('collapsed');
             panel.classList.add('expanded');
             // Apply the stored height
-            panel.style.height = `${this.state.historyPanelHeight}px`;
-            this.state.historyPanelExpanded = true;
+            panel.style.height = `${State.historyPanelHeight}px`;
+            State.historyPanelExpanded = true;
             
             // ADD THIS: Set padding-bottom to accommodate expanded panel
-            metadataContent.style.paddingBottom = `${this.state.historyPanelHeight + 20}px`;
+            metadataContent.style.paddingBottom = `${State.historyPanelHeight + 20}px`;
             
             const historyList = document.querySelector('.history-list');
             const historyDetails = document.querySelector('.history-details');
             if (historyList && historyDetails) {
-                historyList.style.flex = `0 0 ${this.state.historyListWidth}%`;
-                historyDetails.style.flex = `0 0 ${100 - this.state.historyListWidth}%`;
+                historyList.style.flex = `0 0 ${State.historyListWidth}%`;
+                historyDetails.style.flex = `0 0 ${100 - State.historyListWidth}%`;
             }
             
             // Load history if not already loaded
-            if (this.state.historyActions.length === 0) {
+            if (State.historyActions.length === 0) {
                 this.loadHistory();
             }
         } else {
             // Store current height before collapsing
             if (panel.offsetHeight > 50) {
-                this.state.historyPanelHeight = panel.offsetHeight;
+                State.historyPanelHeight = panel.offsetHeight;
             }
             panel.classList.remove('expanded');
             panel.classList.add('collapsed');
             panel.style.height = '';  // Reset to CSS default
-            this.state.historyPanelExpanded = false;
+            State.historyPanelExpanded = false;
             
             // ADD THIS: Remove padding when collapsed
             metadataContent.style.paddingBottom = '';
@@ -2506,7 +2419,7 @@ const AudioMetadataEditor = {
     startHistoryAutoRefresh() {
         // Auto-refresh history every 5 seconds when panel is expanded
         setInterval(() => {
-            if (this.state.historyPanelExpanded) {
+            if (State.historyPanelExpanded) {
                 this.loadHistory();
             }
         }, 5000);
@@ -2611,11 +2524,11 @@ function clearHistory() {
 // Filename edit click handler
 document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('current-filename').onclick = function() {
-        if (!AudioMetadataEditor.state.currentFile) return;
+        if (!State.currentFile) return;
         
         document.getElementById('current-filename').style.display = 'none';
         document.querySelector('.filename-edit').style.display = 'flex';
-        document.getElementById('filename-input').value = AudioMetadataEditor.state.originalFilename;
+        document.getElementById('filename-input').value = State.originalFilename;
         document.getElementById('filename-input').focus();
     };
     
