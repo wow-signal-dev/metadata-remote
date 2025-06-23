@@ -146,6 +146,9 @@
             document.getElementById('current-filename').textContent = State.originalFilename;
             document.getElementById('no-file-message').style.display = 'none';
             document.getElementById('metadata-section').style.display = 'block';
+
+            // Clear all button statuses when loading a new file
+            window.MetadataRemote.UI.ButtonStatus.clearAllButtonStatuses();
             
             this.cancelFilenameEdit();
             UIUtils.hideStatus();
