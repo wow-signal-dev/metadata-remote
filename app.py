@@ -853,10 +853,19 @@ def set_metadata(filename):
         
         # Track album art changes
         if art_data or remove_art:
+            # Save album art to history's temporary storage
+            old_art_path = history.save_album_art(current_art) if current_art else ''
+            new_art_path = history.save_album_art(art_data) if art_data else ''
+            
             if remove_art:
                 action = create_album_art_action(filepath, current_art, None, is_delete=True)
             else:
                 action = create_album_art_action(filepath, current_art, art_data)
+            
+            # Update the action with the saved paths
+            action.old_values[filepath] = old_art_path
+            action.new_values[filepath] = new_art_path
+            
             history.add_action(action)
         
         # Apply changes
@@ -959,8 +968,18 @@ def apply_art_to_folder():
     if response.status_code == 200:
         response_data = response.get_json()
         if response_data.get('status') in ['success', 'partial']:
+            # Save the new album art to history's temporary storage
+            new_art_path = history.save_album_art(art_data)
+            
             # Add to history if successful
             action = create_batch_album_art_action(folder_path, art_data, file_changes)
+            
+            # Update the action with saved art paths
+            for filepath, old_art in file_changes:
+                old_art_path = history.save_album_art(old_art) if old_art else ''
+                action.old_values[filepath] = old_art_path
+                action.new_values[filepath] = new_art_path
+            
             history.add_action(action)
     
     return response
