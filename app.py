@@ -57,6 +57,7 @@ from core.metadata.normalizer import normalize_metadata_tags, get_metadata_field
 from core.metadata.ffmpeg import run_ffprobe
 from core.metadata.reader import read_metadata
 from core.metadata.writer import apply_metadata_to_file
+from core.album_art.extractor import extract_album_art
 
 app = Flask(__name__)
 
@@ -77,20 +78,6 @@ def add_cache_headers(response):
 @app.route('/')
 def index():
     return render_template('index.html')
-
-def extract_album_art(filepath):
-    """Extract album art from audio file"""
-    # Check if format supports album art
-    _, _, base_format = get_file_format(filepath)
-    if base_format in FORMAT_METADATA_CONFIG.get('no_embedded_art', []):
-        return None
-    
-    art_cmd = ['ffmpeg', '-i', filepath, '-an', '-vcodec', 'copy', '-f', 'image2pipe', '-']
-    result = subprocess.run(art_cmd, capture_output=True)
-    
-    if result.returncode == 0 and result.stdout:
-        return base64.b64encode(result.stdout).decode('utf-8')
-    return None
 
 def detect_corrupted_album_art(filepath):
     """Detect if album art in the file is corrupted"""
