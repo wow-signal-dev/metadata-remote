@@ -125,6 +125,16 @@
                     delete button._originalWidth;
                 }, 300);
             }
+        },
+        
+        /**
+         * Clear all button statuses on the page
+         */
+        clearAllButtonStatuses() {
+            // Find all buttons with status classes
+            document.querySelectorAll('.btn-status.processing, .btn-status.success, .btn-status.error, .btn-status.warning').forEach(button => {
+                this.clearButtonStatus(button);
+            });
         }
     };
 })();
