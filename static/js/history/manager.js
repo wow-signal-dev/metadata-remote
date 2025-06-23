@@ -91,9 +91,9 @@
                     actionsDiv.className = 'history-item-actions';
                     
                     const undoBtn = document.createElement('button');
-                    undoBtn.className = 'history-btn undo-btn';
+                    undoBtn.className = 'history-btn undo-btn btn-status';
                     undoBtn.id = 'undo-btn';
-                    undoBtn.textContent = '↶ Undo';
+                    undoBtn.innerHTML = '<span class="btn-status-content">↶ Undo</span><span class="btn-status-message"></span>';
                     undoBtn.disabled = action.is_undone;
                     undoBtn.onclick = (e) => {
                         e.stopPropagation();
@@ -101,9 +101,9 @@
                     };
                     
                     const redoBtn = document.createElement('button');
-                    redoBtn.className = 'history-btn redo-btn';
+                    redoBtn.className = 'history-btn redo-btn btn-status';
                     redoBtn.id = 'redo-btn';
-                    redoBtn.textContent = '↷ Redo';
+                    redoBtn.innerHTML = '<span class="btn-status-content">↷ Redo</span><span class="btn-status-message"></span>';
                     redoBtn.disabled = !action.is_undone;
                     redoBtn.onclick = (e) => {
                         e.stopPropagation();
