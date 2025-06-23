@@ -54,6 +54,7 @@ from core.history import (
 from core.inference import inference_engine
 from core.file_utils import validate_path, fix_file_ownership, get_file_format
 from core.metadata.normalizer import normalize_metadata_tags, get_metadata_field_mapping
+from core.metadata.ffmpeg import run_ffprobe
 
 app = Flask(__name__)
 
@@ -74,17 +75,6 @@ def add_cache_headers(response):
 @app.route('/')
 def index():
     return render_template('index.html')
-
-def run_ffprobe(filepath):
-    """Run ffprobe and return parsed JSON data"""
-    cmd = ['ffprobe', '-v', 'quiet', '-print_format', 'json', '-show_format', filepath]
-    result = subprocess.run(cmd, capture_output=True, text=True)
-    
-    if result.returncode != 0:
-        logger.error(f"FFprobe error: {result.stderr}")
-        raise Exception('Failed to read metadata')
-    
-    return json.loads(result.stdout)
 
 def extract_album_art(filepath):
     """Extract album art from audio file"""
