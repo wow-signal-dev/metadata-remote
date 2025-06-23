@@ -47,8 +47,7 @@ from config import (
 
 from core.history import (
     history, ActionType, HistoryAction,
-    create_metadata_action, create_batch_metadata_action,
-    create_album_art_action, create_batch_album_art_action
+    create_metadata_action, create_batch_metadata_action
 )
 
 from core.inference import inference_engine
@@ -59,6 +58,10 @@ from core.metadata.reader import read_metadata
 from core.metadata.writer import apply_metadata_to_file
 from core.album_art.extractor import extract_album_art
 from core.album_art.processor import detect_corrupted_album_art, fix_corrupted_album_art
+from core.album_art.manager import (
+    save_album_art_to_file, process_album_art_change, 
+    prepare_batch_album_art_change, record_batch_album_art_history
+)
 
 app = Flask(__name__)
 
@@ -308,41 +311,26 @@ def set_metadata(filename):
         tags = probe_data.get('format', {}).get('tags', {})
         _, _, base_format = get_file_format(filepath)
         current_metadata = normalize_metadata_tags(tags, base_format)
-        current_art = extract_album_art(filepath)
         
         # Separate metadata from special operations
         metadata_tags = {k: v for k, v in data.items() if k not in ['art', 'removeArt']}
-        art_data = data.get('art')
-        remove_art = data.get('removeArt', False)
         
-        # Track individual field changes
+        # Process album art changes
+        has_art_change, art_data, remove_art = process_album_art_change(filepath, data, current_metadata)
+        
+        # Track individual metadata field changes
         for field, new_value in metadata_tags.items():
             old_value = current_metadata.get(field, '')
             if old_value != new_value:
                 action = create_metadata_action(filepath, field, old_value, new_value)
                 history.add_action(action)
         
-        # Track album art changes
-        if art_data or remove_art:
-            # Save album art to history's temporary storage
-            old_art_path = history.save_album_art(current_art) if current_art else ''
-            new_art_path = history.save_album_art(art_data) if art_data else ''
-            
-            if remove_art:
-                action = create_album_art_action(filepath, current_art, None, is_delete=True)
-            else:
-                action = create_album_art_action(filepath, current_art, art_data)
-            
-            # Update the action with the saved paths
-            action.old_values[filepath] = old_art_path
-            action.new_values[filepath] = new_art_path
-            
-            history.add_action(action)
-        
-        # Apply changes
-        apply_metadata_to_file(filepath, metadata_tags, art_data, remove_art)
-        
-        return jsonify({'status': 'success'})
+        # Handle album art changes
+        if has_art_change:
+            save_album_art_to_file(filepath, art_data, remove_art, track_history=True)
+        else:
+            # Just apply metadata changes without album art
+            apply_metadata_to_file(filepath, metadata_tags)
         
     except ValueError:
         return jsonify({'error': 'Invalid path'}), 403
@@ -416,18 +404,16 @@ def apply_art_to_folder():
     if not art_data:
         return jsonify({'error': 'No album art provided'}), 400
     
-    # Collect changes before applying
-    file_changes = []
+    # Get list of audio files
     abs_folder_path = validate_path(os.path.join(MUSIC_DIR, folder_path) if folder_path else MUSIC_DIR)
-    
+    audio_files = []
     for filename in os.listdir(abs_folder_path):
         file_path = os.path.join(abs_folder_path, filename)
         if os.path.isfile(file_path) and filename.lower().endswith(AUDIO_EXTENSIONS):
-            try:
-                current_art = extract_album_art(file_path)
-                file_changes.append((file_path, current_art))
-            except:
-                pass
+            audio_files.append(file_path)
+    
+    # Prepare for batch changes
+    file_changes = prepare_batch_album_art_change(folder_path, art_data, audio_files)
     
     def apply_art(file_path):
         apply_metadata_to_file(file_path, {}, art_data)
@@ -439,19 +425,8 @@ def apply_art_to_folder():
     if response.status_code == 200:
         response_data = response.get_json()
         if response_data.get('status') in ['success', 'partial']:
-            # Save the new album art to history's temporary storage
-            new_art_path = history.save_album_art(art_data)
-            
-            # Add to history if successful
-            action = create_batch_album_art_action(folder_path, art_data, file_changes)
-            
-            # Update the action with saved art paths
-            for filepath, old_art in file_changes:
-                old_art_path = history.save_album_art(old_art) if old_art else ''
-                action.old_values[filepath] = old_art_path
-                action.new_values[filepath] = new_art_path
-            
-            history.add_action(action)
+            # Record batch changes in history
+            record_batch_album_art_history(folder_path, art_data, file_changes)
     
     return response
 
