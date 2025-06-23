@@ -131,9 +131,36 @@
          * Clear all button statuses on the page
          */
         clearAllButtonStatuses() {
-            // Find all buttons with status classes
-            document.querySelectorAll('.btn-status.processing, .btn-status.success, .btn-status.error, .btn-status.warning').forEach(button => {
-                this.clearButtonStatus(button);
+            // Clear ALL btn-status buttons, not just ones with active status classes
+            document.querySelectorAll('.btn-status').forEach(button => {
+                // Clear any pending timeouts first
+                if (button._statusTimeout) {
+                    clearTimeout(button._statusTimeout);
+                    delete button._statusTimeout;
+                }
+                
+                // Remove all status classes
+                button.classList.remove('processing', 'success', 'error', 'warning');
+                button.title = '';
+                
+                // Reset message content
+                const messageEl = button.querySelector('.btn-status-message');
+                if (messageEl) {
+                    messageEl.textContent = '';
+                    messageEl.innerHTML = '';
+                }
+                
+                // Ensure the original content is visible
+                const contentEl = button.querySelector('.btn-status-content');
+                if (contentEl) {
+                    contentEl.style.opacity = '';  // Remove any inline opacity
+                }
+                
+                // Clear any width modifications
+                if (button._originalWidth) {
+                    button.style.width = '';
+                    delete button._originalWidth;
+                }
             });
         }
     };
