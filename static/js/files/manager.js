@@ -28,6 +28,7 @@
             selectFileItemCallback = callbacks.selectFileItem;
             showInferenceSuggestionsCallback = callbacks.showInferenceSuggestions;
             hideInferenceSuggestionsCallback = callbacks.hideInferenceSuggestions;
+            this.setupFilterBox();
         },
         
         /**
@@ -321,6 +322,32 @@
             }
             
             UIUtils.setFormEnabled(true);
-        }
+        },
+        
+        /**
+         * Set up the filter box for file filtering
+         */
+        setupFilterBox() {
+            const filterBox = document.getElementById('filter-box');
+            if (filterBox) {
+                filterBox.addEventListener('input', (e) => {
+                    const value = e.target.value.toLowerCase().trim();
+                    const fileListItems = document.querySelectorAll('#file-list > li');
+                    
+                    fileListItems.forEach(li => {
+                        const fileName = li.querySelector('.file-info > div');
+                        if (fileName) {
+                            const fileNameText = fileName.innerText.toLowerCase();
+                            // If the filtered value does not match name, hide item
+                            if (value.length > 0 && !fileNameText.includes(value)) {
+                                li.setAttribute("aria-hidden", "true");
+                            } else {
+                                li.removeAttribute("aria-hidden");
+                            }
+                        }
+                    });
+                });
+            }
+        },
     };
 })();
