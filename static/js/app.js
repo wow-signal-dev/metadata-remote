@@ -1,12 +1,18 @@
 /**
  * Main Application Logic for Metadata Remote
- * Coordinates between state, API, and UI components
+ * 
+ * This file serves as the central coordinator for all modules:
+ * - Initializes all modules with proper callbacks
+ * - Provides global functions for HTML event handlers
+ * - Manages cross-module communication through delegation
  */
 
 // Ensure namespace exists
 window.MetadataRemote = window.MetadataRemote || {};
 
-// Create shortcuts for easier access
+// =============================
+// Module References (Shortcuts)
+// =============================
 const State = window.MetadataRemote.State;
 const API = window.MetadataRemote.API;
 const ButtonStatus = window.MetadataRemote.UI.ButtonStatus;
@@ -21,100 +27,125 @@ const AlbumArt = window.MetadataRemote.Metadata.AlbumArt;
 const InferenceUI = window.MetadataRemote.Metadata.Inference;
 const HistoryManager = window.MetadataRemote.History.Manager;
 
+// =============================
+// Main Application Coordinator
+// =============================
 const AudioMetadataEditor = {
-    // Initialize the application
+    /**
+     * Initialize the entire application
+     * Sets up all modules with proper callbacks and initializes UI
+     */
     init() {
         // Reset state to ensure clean start
         State.reset();
-        TreeNav.init(this.selectTreeItem.bind(this), this.loadFiles.bind(this));
-        AudioPlayer.init(document.getElementById('audio-player'));
+        
+        // Initialize all modules with their required callbacks
+        this.initializeModules();
+        
+        // Load initial data
+        TreeNav.loadTree();
+        TreeNav.updateSortUI();
+        HistoryManager.loadHistory();
+        
+        // Set up UI state
+        this.setupInitialUIState();
+    },
+    
+    /**
+     * Initialize all modules with their required callbacks
+     */
+    initializeModules() {
+        // Navigation modules
+        TreeNav.init(
+            this.selectTreeItem.bind(this), 
+            this.loadFiles.bind(this)
+        );
+        
         KeyboardNav.init({
             selectTreeItem: this.selectTreeItem.bind(this),
             selectFileItem: this.selectFileItem.bind(this),
             loadFile: this.loadFile.bind(this),
             loadFiles: this.loadFiles.bind(this)
         });
+        
+        // File management
         FilesManager.init({
             selectFileItem: this.selectFileItem.bind(this)
         });
+        
+        // Audio player
+        AudioPlayer.init(document.getElementById('audio-player'));
+        
+        // Metadata modules
         MetadataEditor.init({
             loadHistory: () => HistoryManager.loadHistory(),
-            hideInferenceSuggestions: this.hideInferenceSuggestions.bind(this)
+            hideInferenceSuggestions: (field) => InferenceUI.hideInferenceSuggestions(field)
         });
+        
         AlbumArt.init({
-            showStatus: this.showStatus.bind(this),
+            showStatus: UIUtils.showStatus,
             loadHistory: () => HistoryManager.loadHistory(),
-            setFormEnabled: this.setFormEnabled.bind(this)
+            setFormEnabled: UIUtils.setFormEnabled
         });
-        TreeNav.loadTree();
-        TreeNav.updateSortUI();
-        MetadataEditor.setupMetadataFieldListeners();
+        
         InferenceUI.setupInferenceHandlers();
+        MetadataEditor.setupMetadataFieldListeners();
+        
+        // History management
         HistoryManager.init({
-            showStatus: this.showStatus.bind(this),
+            showStatus: UIUtils.showStatus,
             loadFiles: this.loadFiles.bind(this),
             loadFile: this.loadFile.bind(this)
         });
+        
+        // UI components
         PaneResize.initializePaneResize();
         PaneResize.initializeHistoryPanelResize(() => HistoryManager.toggleHistoryPanel());
-        HistoryManager.loadHistory();
+    },
+    
+    /**
+     * Set up initial UI state
+     */
+    setupInitialUIState() {
         const historyPanel = document.getElementById('history-panel');
         const metadataContent = document.querySelector('.metadata-content');
+        
         if (historyPanel.classList.contains('expanded')) {
             metadataContent.style.paddingBottom = `${State.historyPanelHeight + 20}px`;
         }
-    },
-   
-    // Button status management
-    showButtonStatus(button, message, type = 'processing', duration = 3000) {
-        ButtonStatus.showButtonStatus(button, message, type, duration);
-    },
-    
-    clearButtonStatus(button) {
-        ButtonStatus.clearButtonStatus(button);
+        
+        // Set up filename edit click handler
+        const filenameDisplay = document.getElementById('current-filename');
+        if (filenameDisplay) {
+            filenameDisplay.onclick = this.handleFilenameEditClick.bind(this);
+        }
     },
     
-    togglePlayback(filepath, button) {
-        AudioPlayer.togglePlayback(filepath, button);
-    },
-
-    stopPlayback() {
-        AudioPlayer.stopPlayback();
-    },
-
-    // Inference UI delegation methods
-    showInferenceSuggestions(field) {
-        InferenceUI.showInferenceSuggestions(field);
-    },
+    // =============================
+    // Core Navigation Methods
+    // =============================
     
-    hideInferenceSuggestions(field) {
-        InferenceUI.hideInferenceSuggestions(field);
-    },
-
     selectTreeItem(item, isKeyboard = false) {
         if (State.selectedTreeItem) {
             State.selectedTreeItem.classList.remove('selected', 'keyboard-focus');
         }
-        item.classList.add('selected');
-        // Always add keyboard-focus when selecting, regardless of input method
-        item.classList.add('keyboard-focus');
         
-        // Remove keyboard-focus from files pane when selecting a folder
+        item.classList.add('selected', 'keyboard-focus');
+        State.selectedTreeItem = item;
+        State.focusedPane = 'folders';
+        
+        // Remove keyboard focus from files pane
         document.querySelectorAll('.files .keyboard-focus').forEach(el => {
             el.classList.remove('keyboard-focus');
         });
         
-        State.selectedTreeItem = item;
-        State.focusedPane = 'folders';
-        // Note: updatePaneFocus is now handled by the keyboard module
-        
-        // Always load files when a folder is selected (remove the isKeyboard check)
+        // Load files for the selected folder
         if (State.loadFileDebounceTimer) {
             clearTimeout(State.loadFileDebounceTimer);
         }
         
         const folderPath = item.dataset.path;
-        if (folderPath !== undefined) { // folderPath can be empty string for root
+        if (folderPath !== undefined) {
             State.loadFileDebounceTimer = setTimeout(() => {
                 this.loadFiles(folderPath);
             }, 300);
@@ -126,11 +157,11 @@ const AudioMetadataEditor = {
             State.selectedListItem.classList.remove('selected', 'keyboard-focus');
         }
         
-        item.classList.add('selected');
-        // Always add keyboard-focus when selecting, regardless of input method
-        item.classList.add('keyboard-focus');
+        item.classList.add('selected', 'keyboard-focus');
+        State.selectedListItem = item;
+        State.focusedPane = 'files';
         
-        // Remove keyboard-focus from folders pane when selecting a file
+        // Remove keyboard focus from folders pane
         document.querySelectorAll('.folders .keyboard-focus').forEach(el => {
             el.classList.remove('keyboard-focus');
         });
@@ -148,13 +179,12 @@ const AudioMetadataEditor = {
                 }, 300);
             }
         }
-        
-        State.selectedListItem = item;
-        State.focusedPane = 'files';
-        // Note: updatePaneFocus is now handled by the keyboard module
     },
 
-    // File operations
+    // =============================
+    // File Operations
+    // =============================
+    
     async loadFiles(folderPath) {
         await FilesManager.loadFiles(folderPath);
     },
@@ -163,54 +193,53 @@ const AudioMetadataEditor = {
         await FilesManager.loadFile(filepath, listItem);
     },
     
-    // Filename editing
-    cancelFilenameEdit() {
-        FilesManager.cancelFilenameEdit();
-    },
+    // =============================
+    // UI Event Handlers
+    // =============================
     
-    resetFilename() {
-        FilesManager.resetFilename();
+    handleFilenameEditClick() {
+        if (!State.currentFile) return;
+        
+        document.getElementById('current-filename').style.display = 'none';
+        document.querySelector('.filename-edit').style.display = 'flex';
+        const input = document.getElementById('filename-input');
+        input.value = State.originalFilename;
+        input.focus();
     },
     
     async saveFilename() {
         await FilesManager.saveFilename(
-            this.showButtonStatus.bind(this),
+            ButtonStatus.showButtonStatus,
             this.loadFiles.bind(this),
             () => HistoryManager.loadHistory()
         );
-    },
-
-    // Utility functions
-    setFormEnabled(enabled) {
-        UIUtils.setFormEnabled(enabled);
-    },
-
-    showStatus(message, type) {
-        UIUtils.showStatus(message, type);
-    },
-
-    hideStatus() {
-        UIUtils.hideStatus();
-    },
+    }
 };
 
-// Global function bindings for onclick handlers in HTML
+// =============================
+// Global Function Bindings
+// =============================
+// These functions are required for HTML onclick handlers
+
+// Navigation
 function setSortMethod(method) {
-    window.MetadataRemote.Navigation.Tree.setSortMethod(method);
+    TreeNav.setSortMethod(method);
 }
 
+// File operations
 function saveFilename() {
     AudioMetadataEditor.saveFilename();
 }
 
 function resetFilename() {
-    AudioMetadataEditor.resetFilename();
+    FilesManager.resetFilename();
 }
 
 function cancelFilenameEdit() {
-    AudioMetadataEditor.cancelFilenameEdit();
+    FilesManager.cancelFilenameEdit();
 }
 
+// Album art operations
 function handleArtUpload(event) {
     AlbumArt.handleArtUpload(event);
 }
@@ -227,31 +256,27 @@ function applyArtToFolder() {
     AlbumArt.applyArtToFolder();
 }
 
+// Metadata operations
 function applyFieldToFolder(field) {
     MetadataEditor.applyFieldToFolder(field, 
-        AudioMetadataEditor.showButtonStatus.bind(AudioMetadataEditor),
-        AudioMetadataEditor.setFormEnabled.bind(AudioMetadataEditor)
+        ButtonStatus.showButtonStatus,
+        UIUtils.setFormEnabled
     );
 }
 
 function saveFieldToFile(field) {
-    MetadataEditor.saveFieldToFile(field,
-        AudioMetadataEditor.showButtonStatus.bind(AudioMetadataEditor)
-    );
+    MetadataEditor.saveFieldToFile(field, ButtonStatus.showButtonStatus);
 }
 
 function save() {
-    MetadataEditor.save(
-        AudioMetadataEditor.showButtonStatus.bind(AudioMetadataEditor)
-    );
+    MetadataEditor.save(ButtonStatus.showButtonStatus);
 }
 
 function resetForm() {
-    MetadataEditor.resetForm(
-        AudioMetadataEditor.showButtonStatus.bind(AudioMetadataEditor)
-    );
+    MetadataEditor.resetForm(ButtonStatus.showButtonStatus);
 }
 
+// History operations
 function toggleHistoryPanel() {
     HistoryManager.toggleHistoryPanel();
 }
@@ -268,34 +293,9 @@ function clearHistory() {
     HistoryManager.clearHistory();
 }
 
-// Filename edit click handler
+// =============================
+// Application Initialization
+// =============================
 document.addEventListener('DOMContentLoaded', () => {
-    document.getElementById('current-filename').onclick = function() {
-        if (!State.currentFile) return;
-        
-        document.getElementById('current-filename').style.display = 'none';
-        document.querySelector('.filename-edit').style.display = 'flex';
-        document.getElementById('filename-input').value = State.originalFilename;
-        document.getElementById('filename-input').focus();
-    };
-    
-    // Initialize the application
     AudioMetadataEditor.init();
-});
-
-// Filter box on input handler
-const filter_box = document.getElementById('filter-box');
-filter_box.addEventListener('input', (e) => {
-  const value = e.target.value.toLowerCase().trim();
-  const file_list_li = document.querySelectorAll('#file-list > li');
-  for (let i = 0; i < file_list_li.length; i++) {
-    const li = file_list_li[i];
-    const file_name = li.querySelector('.file-info > div').innerText.toLowerCase();
-    // if the filterd value does not match name, hide item
-    if (value.length > 0 && !file_name.includes(value)) {
-      li.setAttribute("aria-hidden", "true");
-    } else {
-      li.removeAttribute("aria-hidden");
-    }
-  }
 });
