@@ -25,8 +25,8 @@ def apply_metadata_to_file(filepath, new_tags, art_data=None, remove_art=False):
     Raises:
         Exception: For any errors during metadata writing
     """
-    # Import these here to avoid circular imports since they're still in app.py
-    from app import detect_corrupted_album_art, fix_corrupted_album_art
+    # Import from the processor module
+    from core.album_art.processor import detect_corrupted_album_art, fix_corrupted_album_art
     
     # Get file format
     output_format, use_uppercase, base_format = get_file_format(filepath)
