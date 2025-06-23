@@ -47,7 +47,8 @@ from config import (
 
 from core.history import (
     history, ActionType, HistoryAction,
-    create_metadata_action, create_batch_metadata_action
+    create_metadata_action, create_batch_metadata_action,
+    create_album_art_action
 )
 
 from core.inference import inference_engine
@@ -325,12 +326,15 @@ def set_metadata(filename):
                 action = create_metadata_action(filepath, field, old_value, new_value)
                 history.add_action(action)
         
-        # Handle album art changes
+        # Apply all changes
         if has_art_change:
-            save_album_art_to_file(filepath, art_data, remove_art, track_history=True)
+            # This will apply both metadata and album art, and track art history
+            save_album_art_to_file(filepath, art_data, remove_art, metadata_tags, track_history=True)
         else:
             # Just apply metadata changes without album art
             apply_metadata_to_file(filepath, metadata_tags)
+        
+        return jsonify({'status': 'success'})
         
     except ValueError:
         return jsonify({'error': 'Invalid path'}), 403
