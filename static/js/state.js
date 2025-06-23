@@ -60,6 +60,8 @@ window.MetadataRemote.State = {
     historyListWidth: 50,
     isResizingHistoryPane: false,
     startHistoryListWidth: 50,
+    processingUndoActionId: null,
+    processingRedoActionId: null,  
     
     // State management methods
     reset() {
