@@ -138,7 +138,7 @@
                     delete button._originalWidth;
                 }, 300);
             }
-        }
+        },
         
         /**
          * Clear all button statuses on the page
