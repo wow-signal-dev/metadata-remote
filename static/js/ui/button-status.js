@@ -118,6 +118,19 @@
             button.classList.remove('processing', 'success', 'error', 'warning');
             button.title = ''; // Clear tooltip
             
+            // Ensure the original content is visible
+            const contentEl = button.querySelector('.btn-status-content');
+            if (contentEl) {
+                contentEl.style.opacity = '';  // Remove any inline opacity
+            }
+            
+            // Reset message content
+            const messageEl = button.querySelector('.btn-status-message');
+            if (messageEl) {
+                messageEl.textContent = '';
+                messageEl.innerHTML = '';
+            }
+            
             // Don't restore width for apply-field buttons
             if (!button.classList.contains('apply-field-btn') && button._originalWidth) {
                 setTimeout(() => {
@@ -125,7 +138,7 @@
                     delete button._originalWidth;
                 }, 300);
             }
-        },
+        }
         
         /**
          * Clear all button statuses on the page
