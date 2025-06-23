@@ -55,6 +55,7 @@ from core.inference import inference_engine
 from core.file_utils import validate_path, fix_file_ownership, get_file_format
 from core.metadata.normalizer import normalize_metadata_tags, get_metadata_field_mapping
 from core.metadata.ffmpeg import run_ffprobe
+from core.metadata.reader import read_metadata
 
 app = Flask(__name__)
 
@@ -672,35 +673,16 @@ def get_metadata(filename):
     try:
         filepath = validate_path(os.path.join(MUSIC_DIR, filename))
         
-        if not os.path.exists(filepath):
-            return jsonify({'error': 'File not found'}), 404
+        metadata = read_metadata(filepath)
         
-        # Get metadata
-        probe_data = run_ffprobe(filepath)
-        tags = probe_data.get('format', {}).get('tags', {})
-        
-        # Get format info for proper normalization
-        _, _, base_format = get_file_format(filepath)
-        
-        # Normalize tags
-        metadata = normalize_metadata_tags(tags, base_format)
-        
-        # Get album art
         art = extract_album_art(filepath)
         metadata['hasArt'] = bool(art)
         metadata['art'] = art
         
-        # Add format info for client
-        metadata['format'] = base_format
-        
-        # Add format limitations info
-        metadata['formatLimitations'] = {
-            'supportsAlbumArt': base_format not in FORMAT_METADATA_CONFIG.get('no_embedded_art', []),
-            'hasLimitedMetadata': base_format in FORMAT_METADATA_CONFIG.get('limited', [])
-        }
-        
         return jsonify(metadata)
         
+    except FileNotFoundError:
+        return jsonify({'error': 'File not found'}), 404
     except ValueError:
         return jsonify({'error': 'Invalid path'}), 403
     except Exception as e:
