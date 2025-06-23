@@ -127,7 +127,11 @@
             
             // Hide all inference suggestions
             const fields = ['title', 'artist', 'album', 'albumartist', 'date', 'genre', 'track', 'disc'];
-            fields.forEach(field => hideInferenceSuggestionsCallback(field));
+            fields.forEach(field => {
+                if (window.MetadataRemote.Metadata.Inference) {
+                    window.MetadataRemote.Metadata.Inference.hideInferenceSuggestions(field);
+                }
+            });
             
             if (State.loadFileDebounceTimer) {
                 clearTimeout(State.loadFileDebounceTimer);
