@@ -2,7 +2,7 @@
 
 ## Overview
 
-Metadata Remote is a web-based audio metadata editor built with a modular JavaScript architecture. The application consists of 12 specialized modules coordinated by a central application controller, providing clean separation of concerns and maintainability.
+Metadata Remote's JavaScript code has a modular architecture. It consists of 12 specialized modules coordinated by a central application controller, providing clean separation of concerns and maintainability.
 
 ## Architecture Diagram
 
