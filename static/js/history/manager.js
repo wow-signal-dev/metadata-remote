@@ -101,7 +101,7 @@
                     };
 
                     if (State.processingUndoActionId === action.id) {
-                        window.MetadataRemote.UI.ButtonStatus.showButtonStatus(undoBtn, 'Processing...', 'processing');
+                        window.MetadataRemote.UI.ButtonStatus.showButtonStatus(undoBtn, '', 'processing');
                     }
                     
                     const redoBtn = document.createElement('button');
@@ -115,7 +115,7 @@
                     };
 
                     if (State.processingRedoActionId === action.id) {
-                        window.MetadataRemote.UI.ButtonStatus.showButtonStatus(redoBtn, 'Processing...', 'processing');
+                        window.MetadataRemote.UI.ButtonStatus.showButtonStatus(redoBtn, '', 'processing');
                     }
                     
                     actionsDiv.appendChild(undoBtn);
