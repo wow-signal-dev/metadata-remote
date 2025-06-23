@@ -34,9 +34,7 @@ const AudioMetadataEditor = {
             loadFiles: this.loadFiles.bind(this)
         });
         FilesManager.init({
-            selectFileItem: this.selectFileItem.bind(this),
-            showInferenceSuggestions: InferenceUI.showInferenceSuggestions.bind(InferenceUI),
-            hideInferenceSuggestions: InferenceUI.hideInferenceSuggestions.bind(InferenceUI)
+            selectFileItem: this.selectFileItem.bind(this)
         });
         MetadataEditor.init({
             loadHistory: this.loadHistory.bind(this),
@@ -76,6 +74,15 @@ const AudioMetadataEditor = {
 
     stopPlayback() {
         AudioPlayer.stopPlayback();
+    },
+
+    // Inference UI delegation methods
+    showInferenceSuggestions(field) {
+        InferenceUI.showInferenceSuggestions(field);
+    },
+    
+    hideInferenceSuggestions(field) {
+        InferenceUI.hideInferenceSuggestions(field);
     },
 
     selectTreeItem(item, isKeyboard = false) {
