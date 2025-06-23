@@ -14,6 +14,7 @@ const UIUtils = window.MetadataRemote.UI.Utilities;
 const AudioPlayer = window.MetadataRemote.Audio.Player;
 const PaneResize = window.MetadataRemote.UI.PaneResize;
 const TreeNav = window.MetadataRemote.Navigation.Tree;
+const KeyboardNav = window.MetadataRemote.Navigation.Keyboard;
 
 const AudioMetadataEditor = {
     // Initialize the application
@@ -22,9 +23,14 @@ const AudioMetadataEditor = {
         State.reset();
         TreeNav.init(this.selectTreeItem.bind(this), this.loadFiles.bind(this));
         AudioPlayer.init(document.getElementById('audio-player'));
+        KeyboardNav.init({
+            selectTreeItem: this.selectTreeItem.bind(this),
+            selectFileItem: this.selectFileItem.bind(this),
+            loadFile: this.loadFile.bind(this),
+            loadFiles: this.loadFiles.bind(this)
+        });
         TreeNav.loadTree();
         TreeNav.updateSortUI();
-        this.setupKeyboardNavigation();
         this.setupMetadataFieldListeners();
         PaneResize.initializePaneResize();
         PaneResize.initializeHistoryPanelResize(this.toggleHistoryPanel.bind(this));
@@ -259,7 +265,6 @@ const AudioMetadataEditor = {
         container.classList.add('active');
     },
     
-    // NEW: Hide inference suggestions
     hideInferenceSuggestions(field) {
         const loading = document.getElementById(`${field}-loading`);
         const suggestions = document.getElementById(`${field}-suggestions`);
@@ -273,325 +278,6 @@ const AudioMetadataEditor = {
         loading.classList.remove('active');
         suggestions.classList.remove('active');
         State.inferenceActive[field] = false;
-    },
-
-    // Keyboard navigation
-    setupKeyboardNavigation() {
-        // Pane click handlers
-        document.querySelector('.folders').addEventListener('click', (e) => {
-            State.focusedPane = 'folders';
-            this.updatePaneFocus();
-        });
-        
-        document.querySelector('.files').addEventListener('click', (e) => {
-            State.focusedPane = 'files';
-            this.updatePaneFocus();
-            if (State.loadFileDebounceTimer) {
-                clearTimeout(State.loadFileDebounceTimer);
-            }
-        });
-        
-        this.updatePaneFocus();
-        
-        // Global keyboard handler with custom repeat
-        document.addEventListener('keydown', (e) => {
-            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
-                return;
-            }
-            
-            if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-                e.preventDefault();
-
-                document.querySelector('.folders').classList.add('keyboard-navigating');
-                document.querySelector('.files').classList.add('keyboard-navigating');
-
-                // If this is a repeat event from the browser, ignore it
-                if (e.repeat) {
-                    return;
-                }
-                
-                // Clear any existing repeat timer and delay timer
-                if (State.keyRepeatDelayTimer) {
-                    clearTimeout(State.keyRepeatDelayTimer);
-                    State.keyRepeatDelayTimer = null;
-                }
-                if (State.keyRepeatTimer) {
-                    clearInterval(State.keyRepeatTimer);
-                    State.keyRepeatTimer = null;
-                }
-                
-                // Store which key is being held
-                State.keyHeldDown = e.key;
-                State.isKeyRepeating = false;
-                
-                // Perform the initial navigation
-                this.navigateWithArrows(e.key === 'ArrowUp' ? 'up' : 'down');
-                
-                // Set up custom repeat with initial delay
-                State.keyRepeatDelayTimer = setTimeout(() => {
-                    // Only start repeating if the same key is still held down
-                    if (State.keyHeldDown === e.key) {
-                        State.isKeyRepeating = true;
-                        State.keyRepeatTimer = setInterval(() => {
-                            if (State.keyHeldDown === e.key) {
-                                this.navigateWithArrows(e.key === 'ArrowUp' ? 'up' : 'down');
-                            }
-                        }, State.keyRepeatInterval);
-                    }
-                }, State.keyRepeatDelay);
-                
-            } else if (e.key === 'Enter') {
-                e.preventDefault();
-                this.activateCurrentItem();
-            }
-            else if (e.key === 'Tab') {
-                e.preventDefault();
-                
-                // Determine where we're switching TO
-                const switchingToFiles = State.focusedPane === 'folders';
-                
-                // If switching to files, check if there are valid files
-                if (switchingToFiles) {
-                    const fileItems = Array.from(document.querySelectorAll('#file-list li:not([aria-hidden="true"])'));
-                    const validFileItems = fileItems.filter(item => item.dataset.filepath);
-                    
-                    if (validFileItems.length === 0) {
-                        return; // Don't switch if no valid files
-                    }
-                    
-                    // Remove keyboard focus from folders
-                    document.querySelectorAll('.folders .keyboard-focus').forEach(el => {
-                        el.classList.remove('keyboard-focus');
-                    });
-                    
-                    // Switch to files pane
-                    State.focusedPane = 'files';
-                    this.updatePaneFocus();
-                    
-                    // Add focus to files pane
-                    if (!State.selectedListItem || !validFileItems.includes(State.selectedListItem)) {
-                        // No file is selected or the selected file is not in the current file list
-                        this.selectFileItem(validFileItems[0], true);
-                        validFileItems[0].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-                    } else {
-                        // A file is already selected and it's in the current list, just add keyboard focus to it
-                        State.selectedListItem.classList.add('keyboard-focus');
-                    }
-                } else {
-                    // Switching from files to folders
-                    
-                    // Remove keyboard focus from files
-                    document.querySelectorAll('.files .keyboard-focus').forEach(el => {
-                        el.classList.remove('keyboard-focus');
-                    });
-                    
-                    // Switch to folders pane
-                    State.focusedPane = 'folders';
-                    this.updatePaneFocus();
-                    
-                    // Add focus to folders pane
-                    if (State.selectedTreeItem) {
-                        State.selectedTreeItem.classList.add('keyboard-focus');
-                    }
-                }
-            }
-        });
-        
-        // Keyup handler to stop custom repeat
-        document.addEventListener('keyup', (e) => {
-            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
-                return;
-            }
-            
-            // If this key was being held down, stop the repeat
-            if (State.keyHeldDown === e.key) {
-                State.keyHeldDown = null;
-                State.isKeyRepeating = false;
-                
-                // Remove keyboard navigating class
-                document.querySelector('.folders').classList.remove('keyboard-navigating');
-                document.querySelector('.files').classList.remove('keyboard-navigating');
-                
-                // Clear BOTH the delay timer and repeat timer  // UPDATED COMMENT
-                if (State.keyRepeatDelayTimer) {           // ADD THESE 4 LINES
-                    clearTimeout(State.keyRepeatDelayTimer);
-                    State.keyRepeatDelayTimer = null;
-                }
-                if (State.keyRepeatTimer) {
-                    clearInterval(State.keyRepeatTimer);
-                    State.keyRepeatTimer = null;
-                }
-            }
-        });
-                        
-        // Clear key state on window blur to prevent stuck keys
-        window.addEventListener('blur', () => {
-            State.keyHeldDown = null;
-            State.isKeyRepeating = false;
-            
-            // Clear BOTH timers on blur
-            if (State.keyRepeatDelayTimer) {
-                clearTimeout(State.keyRepeatDelayTimer);
-                State.keyRepeatDelayTimer = null;
-            }
-            if (State.keyRepeatTimer) {
-                clearInterval(State.keyRepeatTimer);
-                State.keyRepeatTimer = null;
-            }
-        });
-    },
-
-    updatePaneFocus() {
-        // Visual focus indicator handled by CSS :focus-within
-    },
-    
-    scrollItemToCenter(item, container) {
-        const containerRect = container.getBoundingClientRect();
-        const itemRect = item.getBoundingClientRect();
-        
-        // Calculate the center position of the container
-        const containerCenter = containerRect.top + (containerRect.height / 2);
-        
-        // Calculate where the item currently is
-        const itemCenter = itemRect.top + (itemRect.height / 2);
-        
-        // Calculate how much we need to scroll
-        const scrollOffset = itemCenter - containerCenter;
-        
-        // Get current scroll position
-        const currentScroll = container.scrollTop;
-        
-        // Calculate new scroll position
-        const newScroll = currentScroll + scrollOffset;
-        
-        // Check boundaries
-        const maxScroll = container.scrollHeight - container.clientHeight;
-        
-        // Use instant scrolling during key repeat for smooth performance
-        // Only use smooth scrolling for single key presses
-        if (State.isKeyRepeating) {
-            container.scrollTop = Math.max(0, Math.min(newScroll, maxScroll));
-        } else {
-            container.scrollTo({
-                top: Math.max(0, Math.min(newScroll, maxScroll)),
-                behavior: 'smooth'
-            });
-        }
-    },
-
-    // Immediate centering without animation
-    immediateScrollToCenter(item, container) {
-        const containerRect = container.getBoundingClientRect();
-        const itemRect = item.getBoundingClientRect();
-        
-        const containerTop = containerRect.top;
-        const containerBottom = containerRect.bottom;
-        const itemTop = itemRect.top;
-        const itemBottom = itemRect.bottom;
-        
-        // Define a margin (e.g., 30% of container height)
-        const margin = containerRect.height * 0.3;
-        
-        let scrollAdjustment = 0;
-        
-        // If item is above the visible area (with margin)
-        if (itemTop < containerTop + margin) {
-            scrollAdjustment = itemTop - containerTop - margin;
-        }
-        // If item is below the visible area (with margin)
-        else if (itemBottom > containerBottom - margin) {
-            scrollAdjustment = itemBottom - containerBottom + margin;
-        }
-        
-        if (scrollAdjustment !== 0) {
-            const currentScroll = container.scrollTop;
-            const newScroll = currentScroll + scrollAdjustment;
-            const maxScroll = container.scrollHeight - container.clientHeight;
-            container.scrollTop = Math.max(0, Math.min(newScroll, maxScroll));
-        }
-    },
-
-    navigateWithArrows(direction) {
-        if (State.focusedPane === 'folders') {
-            this.navigateFolders(direction);
-        } else if (State.focusedPane === 'files') {
-            this.navigateFiles(direction);
-        }
-    },
-
-    navigateFolders(direction) {
-        const visibleFolders = this.getVisibleFolders();
-        if (visibleFolders.length === 0) return;
-        
-        let currentIndex = -1;
-        if (State.selectedTreeItem) {
-            currentIndex = visibleFolders.findIndex(item => item === State.selectedTreeItem);
-        }
-        
-        let newIndex;
-        if (currentIndex === -1) {
-            newIndex = direction === 'up' ? visibleFolders.length - 1 : 0;
-        } else if (direction === 'up') {
-            newIndex = currentIndex > 0 ? currentIndex - 1 : 0;
-        } else {
-            newIndex = currentIndex < visibleFolders.length - 1 ? currentIndex + 1 : visibleFolders.length - 1;
-        }
-        
-        if (visibleFolders[newIndex]) {
-            this.selectTreeItem(visibleFolders[newIndex], true);
-            
-            // Always use immediate scrolling during arrow navigation for smooth performance
-            const container = document.querySelector('.folders');
-            this.immediateScrollToCenter(visibleFolders[newIndex], container);
-        }
-    },
-
-    navigateFiles(direction) {
-        const fileItems = Array.from(document.querySelectorAll('#file-list li:not([aria-hidden="true"])'))
-            .filter(item => item.dataset.filepath);
-        if (fileItems.length === 0) return;
-        
-        let currentIndex = -1;
-        if (State.selectedListItem) {
-            currentIndex = fileItems.findIndex(item => item === State.selectedListItem);
-        }
-        
-        let newIndex;
-        if (currentIndex === -1) {
-            newIndex = direction === 'up' ? fileItems.length - 1 : 0;
-        } else if (direction === 'up') {
-            newIndex = currentIndex > 0 ? currentIndex - 1 : 0;
-        } else {
-            newIndex = currentIndex < fileItems.length - 1 ? currentIndex + 1 : fileItems.length - 1;
-        }
-        
-        if (fileItems[newIndex]) {
-            this.selectFileItem(fileItems[newIndex], true);
-            
-            // Always use immediate scrolling during arrow navigation for smooth performance
-            const container = document.querySelector('.files');
-            this.immediateScrollToCenter(fileItems[newIndex], container);
-        }
-    },
-
-    getVisibleFolders() {
-        const folders = [];
-        
-        const collectVisible = (container) => {
-            const items = container.children;
-            for (let item of items) {
-                if (item.classList.contains('tree-item')) {
-                    folders.push(item);
-                    const children = item.querySelector('.tree-children');
-                    if (children && children.classList.contains('expanded')) {
-                        collectVisible(children);
-                    }
-                }
-            }
-        };
-        
-        collectVisible(document.getElementById('folder-tree'));
-        return folders;
     },
 
     selectTreeItem(item, isKeyboard = false) {
@@ -609,7 +295,7 @@ const AudioMetadataEditor = {
         
         State.selectedTreeItem = item;
         State.focusedPane = 'folders';
-        this.updatePaneFocus();
+        // Note: updatePaneFocus is now handled by the keyboard module
         
         // Always load files when a folder is selected (remove the isKeyboard check)
         if (State.loadFileDebounceTimer) {
@@ -654,57 +340,7 @@ const AudioMetadataEditor = {
         
         State.selectedListItem = item;
         State.focusedPane = 'files';
-        this.updatePaneFocus();
-    },
-
-    activateCurrentItem() {
-        if (State.focusedPane === 'folders' && State.selectedTreeItem) {
-            const children = State.selectedTreeItem.querySelector('.tree-children');
-            const folderPath = State.selectedTreeItem.dataset.path;
-            
-            // Check if we haven't loaded this folder's data yet
-            const dataNotLoaded = !State.treeData.hasOwnProperty(folderPath);
-            
-            // Check if this folder has subfolders in the data
-            const hasSubfolders = dataNotLoaded || 
-                                 (State.treeData[folderPath] && 
-                                  State.treeData[folderPath].some(item => item.type === 'folder'));
-            
-            // Check if already expanded and has visible subfolder elements
-            const hasVisibleSubfolders = children && children.classList.contains('expanded') && 
-                                        children.querySelectorAll('.tree-item').length > 0;
-            
-            if (hasSubfolders || hasVisibleSubfolders) {
-                // Has subfolders - just toggle expand/collapse without loading files
-                const icon = State.selectedTreeItem.querySelector('.tree-icon');
-                const isExpanded = children.classList.contains('expanded');
-                
-                if (!isExpanded) {
-                    // Expand
-                    if (children.children.length === 0) {
-                        // Load children if not already loaded
-                        TreeNav.loadTreeChildren(folderPath, children, TreeNav.getLevel(folderPath) + 1);                    }
-                    children.classList.add('expanded');
-                    State.expandedFolders.add(folderPath);
-                    if (icon) icon.innerHTML = '📂';
-                } else {
-                    // Collapse
-                    children.classList.remove('expanded');
-                    State.expandedFolders.delete(folderPath);
-                    if (icon) icon.innerHTML = '📁';
-                }
-                // DO NOT load files, DO NOT move focus - just return
-                return;
-            } else {
-                // No subfolders - do nothing
-                return;
-            }
-        } else if (State.focusedPane === 'files' && State.selectedListItem) {
-            const filepath = State.selectedListItem.dataset.filepath;
-            if (filepath) {
-                this.loadFile(filepath, State.selectedListItem);
-            }
-        }
+        // Note: updatePaneFocus is now handled by the keyboard module
     },
 
     // File operations
