@@ -94,21 +94,29 @@
                     undoBtn.className = 'history-btn undo-btn btn-status';
                     undoBtn.id = 'undo-btn';
                     undoBtn.innerHTML = '<span class="btn-status-content">↶ Undo</span><span class="btn-status-message"></span>';
-                    undoBtn.disabled = action.is_undone;
+                    undoBtn.disabled = action.is_undone || State.processingUndoActionId === action.id;
                     undoBtn.onclick = (e) => {
                         e.stopPropagation();
                         this.undoAction();
                     };
+
+                    if (State.processingUndoActionId === action.id) {
+                        window.MetadataRemote.UI.ButtonStatus.showButtonStatus(undoBtn, 'Processing...', 'processing');
+                    }
                     
                     const redoBtn = document.createElement('button');
                     redoBtn.className = 'history-btn redo-btn btn-status';
                     redoBtn.id = 'redo-btn';
                     redoBtn.innerHTML = '<span class="btn-status-content">↷ Redo</span><span class="btn-status-message"></span>';
-                    redoBtn.disabled = !action.is_undone;
+                    redoBtn.disabled = !action.is_undone || State.processingRedoActionId === action.id;
                     redoBtn.onclick = (e) => {
                         e.stopPropagation();
                         this.redoAction();
                     };
+
+                    if (State.processingRedoActionId === action.id) {
+                        window.MetadataRemote.UI.ButtonStatus.showButtonStatus(redoBtn, 'Processing...', 'processing');
+                    }
                     
                     actionsDiv.appendChild(undoBtn);
                     actionsDiv.appendChild(redoBtn);
@@ -314,6 +322,10 @@
          */
         async undoAction() {
             if (!State.selectedHistoryAction) return;
+
+            // Track that we're processing this action
+            State.processingUndoActionId = State.selectedHistoryAction;
+            this.updateHistoryList(); // Re-render to show processing state
             
             try {
                 // Get action details before undo
@@ -390,6 +402,10 @@
             } catch (err) {
                 console.error('Error undoing action:', err);
                 showStatusCallback('Error undoing action', 'error');
+            } finally {
+                // Clear processing state
+                State.processingUndoActionId = null;
+                this.updateHistoryList(); // Re-render to clear processing state
             }
         },
         
@@ -398,6 +414,10 @@
          */
         async redoAction() {
             if (!State.selectedHistoryAction) return;
+
+            // Track that we're processing this action
+            State.processingRedoActionId = State.selectedHistoryAction;
+            this.updateHistoryList(); // Re-render to show processing state
             
             try {
                 // Get action details before redo
@@ -474,6 +494,10 @@
             } catch (err) {
                 console.error('Error redoing action:', err);
                 showStatusCallback('Error redoing action', 'error');
+            } finally {
+                // Clear processing state
+                State.processingRedoActionId = null;
+                this.updateHistoryList(); // Re-render to clear processing state
             }
         },
         
