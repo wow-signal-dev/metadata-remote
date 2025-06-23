@@ -11,7 +11,7 @@ from core.history import (
 from core.album_art.extractor import extract_album_art
 from core.metadata.writer import apply_metadata_to_file
 
-def save_album_art_to_file(filepath, art_data=None, remove_art=False, track_history=True):
+def save_album_art_to_file(filepath, art_data=None, remove_art=False, metadata_tags=None, track_history=True):
     """
     Save or remove album art for a single file with optional history tracking
     
@@ -19,6 +19,7 @@ def save_album_art_to_file(filepath, art_data=None, remove_art=False, track_hist
         filepath: Path to the audio file
         art_data: Base64 encoded album art data (optional)
         remove_art: Whether to remove existing album art
+        metadata_tags: Additional metadata to save along with album art
         track_history: Whether to track this change in history
         
     Returns:
@@ -47,8 +48,8 @@ def save_album_art_to_file(filepath, art_data=None, remove_art=False, track_hist
             
             history.add_action(action)
         
-        # Apply the change
-        apply_metadata_to_file(filepath, {}, art_data, remove_art)
+        # Apply the changes (including any metadata)
+        apply_metadata_to_file(filepath, metadata_tags or {}, art_data, remove_art)
         
         logger.info(f"Successfully {'removed' if remove_art else 'updated'} album art for {filepath}")
         return True, old_art_path, new_art_path
