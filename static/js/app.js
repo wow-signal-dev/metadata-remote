@@ -17,6 +17,7 @@ const TreeNav = window.MetadataRemote.Navigation.Tree;
 const KeyboardNav = window.MetadataRemote.Navigation.Keyboard;
 const FilesManager = window.MetadataRemote.Files.Manager;
 const MetadataEditor = window.MetadataRemote.Metadata.Editor;
+const AlbumArt = window.MetadataRemote.Metadata.AlbumArt;
 
 const AudioMetadataEditor = {
     // Initialize the application
@@ -39,6 +40,11 @@ const AudioMetadataEditor = {
         MetadataEditor.init({
             loadHistory: this.loadHistory.bind(this),
             hideInferenceSuggestions: this.hideInferenceSuggestions.bind(this)
+        });
+        AlbumArt.init({
+            showStatus: this.showStatus.bind(this),
+            loadHistory: this.loadHistory.bind(this),
+            setFormEnabled: this.setFormEnabled.bind(this)
         });
         TreeNav.loadTree();
         TreeNav.updateSortUI();
@@ -313,123 +319,6 @@ const AudioMetadataEditor = {
             this.loadFiles.bind(this),
             this.loadHistory.bind(this)
         );
-    },
-
-    // Album art functions
-    handleArtUpload(event) {
-        const file = event.target.files[0];
-        if (!file) return;
-        
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            State.pendingAlbumArt = e.target.result;
-            State.shouldRemoveArt = false;
-            
-            const artDisplay = document.getElementById('art-display');
-            artDisplay.innerHTML = `<img src="${State.pendingAlbumArt}" class="album-art">`;
-            document.querySelector('.delete-art-btn').style.display = 'block';
-            document.querySelector('.save-image-btn').style.display = 'block';
-            document.querySelector('.apply-folder-btn').style.display = 'block';
-            
-            this.showStatus('Image loaded. Click "Save Image" to save only the image, or "Save" to save all changes.', 'success');
-        };
-        reader.readAsDataURL(file);
-        
-        event.target.value = '';
-    },
-
-    deleteAlbumArt() {
-        const button = document.querySelector('.delete-art-btn');
-        State.shouldRemoveArt = true;
-        State.pendingAlbumArt = null;
-        
-        const artDisplay = document.getElementById('art-display');
-        artDisplay.innerHTML = '<div class="album-art-placeholder">No album art</div>';
-        document.querySelector('.delete-art-btn').style.display = 'none';
-        document.querySelector('.save-image-btn').style.display = 'none';
-        document.querySelector('.apply-folder-btn').style.display = 'none';
-        
-        this.showButtonStatus(button, 'Marked for deletion', 'warning', 2000);
-    },
-
-    async saveAlbumArt() {
-        if (!State.currentFile || !State.pendingAlbumArt) return;
-        
-        const button = document.querySelector('.save-image-btn');
-        button.disabled = true;
-        this.showButtonStatus(button, 'Saving...', 'processing');
-        
-        try {
-            const result = await API.setMetadata(State.currentFile, { art: State.pendingAlbumArt });
-          
-            if (result.status === 'success') {
-                this.showButtonStatus(button, 'Saved!', 'success');
-                State.currentAlbumArt = State.pendingAlbumArt;
-                State.pendingAlbumArt = null;
-                
-                setTimeout(() => {
-                    document.querySelector('.save-image-btn').style.display = 'none';
-                    document.querySelector('.apply-folder-btn').style.display = 'none';
-                }, 2000);
-                
-                this.loadHistory();
-            } else {
-                this.showButtonStatus(button, 'Error', 'error');
-            }
-        } catch (err) {
-            console.error('Error saving album art:', err);
-            this.showButtonStatus(button, 'Error', 'error');
-        }
-        
-        button.disabled = false;
-    },
-
-    async applyArtToFolder() {
-        if (!State.currentFile || (!State.pendingAlbumArt && !State.currentAlbumArt)) return;
-        
-        const button = document.querySelector('.apply-folder-btn');
-        const artToApply = State.pendingAlbumArt || (State.currentAlbumArt ? `data:image/jpeg;base64,${State.currentAlbumArt}` : null);
-        if (!artToApply) {
-            this.showButtonStatus(button, 'No art', 'error', 2000);
-            return;
-        }
-        
-        const folderPath = State.currentFile.substring(0, State.currentFile.lastIndexOf('/'));
-        
-        if (!confirm(`Apply this album art to all files in the folder "${folderPath || 'root'}"? This will replace any existing album art.`)) {
-            return;
-        }
-        
-        button.disabled = true;
-        this.setFormEnabled(false);
-        this.showButtonStatus(button, 'Applying...', 'processing');
-        
-        try {
-            const result = await API.applyArtToFolder(folderPath, artToApply);
-
-            if (result.status === 'success') {
-                this.showButtonStatus(button, `Applied to ${result.filesUpdated} files!`, 'success', 3000);
-                
-                if (State.pendingAlbumArt) {
-                    State.currentAlbumArt = State.pendingAlbumArt;
-                    State.pendingAlbumArt = null;
-                    setTimeout(() => {
-                        document.querySelector('.save-image-btn').style.display = 'none';
-                        document.querySelector('.apply-folder-btn').style.display = 'none';
-                    }, 3000);
-                }
-                
-                this.loadHistory();
-            } else {
-                this.showButtonStatus(button, result.error || 'Error', 'error');
-            }
-        } catch (err) {
-            console.error('Error applying album art to folder:', err);
-            this.showButtonStatus(button, 'Error', 'error');
-        }
-        
-        button.disabled = false;
-        this.setFormEnabled(true);
     },
 
     // History functionality
@@ -978,19 +867,19 @@ function cancelFilenameEdit() {
 }
 
 function handleArtUpload(event) {
-    AudioMetadataEditor.handleArtUpload(event);
+    AlbumArt.handleArtUpload(event);
 }
 
 function deleteAlbumArt() {
-    AudioMetadataEditor.deleteAlbumArt();
+    AlbumArt.deleteAlbumArt();
 }
 
 function saveAlbumArt() {
-    AudioMetadataEditor.saveAlbumArt();
+    AlbumArt.saveAlbumArt();
 }
 
 function applyArtToFolder() {
-    AudioMetadataEditor.applyArtToFolder();
+    AlbumArt.applyArtToFolder();
 }
 
 function applyFieldToFolder(field) {
