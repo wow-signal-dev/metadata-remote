@@ -642,10 +642,10 @@ input:autofill {
     box-shadow: inset 0 0 0 1px var(--accent-glow);
 }
 
-.folders h3 {
-    padding: 0.5rem 1.25rem;
+/* Pane headers - unified style for both folders and files */
+.pane-header {
     background: linear-gradient(180deg, #1f1f1f 0%, #1a1a1a 100%);
-    color: var(--text-primary);
+    padding: 0.5rem 1.25rem;
     position: sticky;
     top: 0;
     z-index: 10;
@@ -657,58 +657,190 @@ input:autofill {
     font-size: 0.9rem;
     letter-spacing: 0.05em;
     text-transform: capitalize;
+    min-height: 44px;
     backdrop-filter: blur(5px);
 }
 
-.sort-controls {
-    display: flex;
-    gap: 0.5rem;
-    font-size: 0.75rem;
-    text-transform: none;
+.pane-header:hover .control-icon {
+    opacity: 1;
+    transition-delay: 0.1s;
 }
 
-.sort-option {
+/* Icon controls */
+.icon-controls {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    position: relative;
+}
+
+.icon-controls::before {
+    content: '';
+    position: absolute;
+    left: 26px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 1px;
+    height: 16px;
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.control-icon {
+    background: none;
+    border: none;
+    padding: 4px;
     display: flex;
     align-items: center;
-    gap: 0.25rem;
+    justify-content: center;
     cursor: pointer;
-    user-select: none;
-    color: var(--text-muted);
     transition: all var(--transition-fast);
-    padding: 0.25rem 0.75rem;
-    border-radius: 6px;
-    background: rgba(255, 255, 255, 0.02);
-    border: 1px solid transparent;
+    font-size: 15px;
+    color: #555;
+    position: relative;
+    opacity: 0.6;
 }
 
-.sort-option:hover {
+.control-icon:hover {
     color: var(--text-primary);
-    background: rgba(255, 255, 255, 0.05);
-    border-color: rgba(255, 255, 255, 0.1);
-}
-
-.sort-option.active {
-    color: var(--accent-primary);
-    background: rgba(74, 127, 255, 0.1);
-    border-color: rgba(74, 127, 255, 0.3);
-}
-
-.sort-arrows {
-    display: flex;
-    flex-direction: column;
-    font-size: 0.5rem;
-    line-height: 0.5;
-}
-
-.sort-arrow {
-    opacity: 0.3;
-    transition: all var(--transition-fast);
-}
-
-.sort-arrow.active {
     opacity: 1;
+    transform: scale(1.15);
+}
+
+.control-icon:active {
+    transform: scale(1.05);
+}
+
+.control-icon.active {
     color: var(--accent-primary);
+    opacity: 1;
     text-shadow: 0 0 8px var(--accent-glow);
+}
+
+/* Sort controls specific styling */
+.sort-controls {
+    display: flex;
+    gap: 0;
+    align-items: center;
+    margin-left: 2px;
+    position: relative;
+}
+
+.sort-field-btn {
+    padding-right: 3px;
+}
+
+.sort-field-btn:hover {
+    color: var(--text-primary);
+}
+
+.sort-direction-btn {
+    padding-left: 0;
+    padding-right: 4px;
+    font-size: 11px;
+    color: var(--accent-primary);
+    opacity: 0.7;
+}
+
+.sort-direction-btn:hover {
+    color: #6a9fff;
+    opacity: 1;
+    transform: scale(1.2);
+    text-shadow: 0 0 6px rgba(74, 127, 255, 0.5);
+}
+
+.sort-direction-btn .sort-indicator {
+    font-size: 11px;
+    font-weight: bold;
+    display: block;
+    transition: transform var(--transition-fast);
+}
+
+.sort-direction-btn:active .sort-indicator {
+    transform: rotate(180deg);
+}
+
+/* Filter container */
+.filter-container {
+    position: absolute;
+    top: 44px;
+    left: 0;
+    right: 0;
+    background: #1a1a1a;
+    border-bottom: 2px solid var(--accent-primary);
+    padding: 10px 12px;
+    z-index: 20;
+    display: none;
+    animation: slideDown var(--transition-fast);
+}
+
+.filter-container.active {
+    display: block;
+}
+
+.filter-input {
+    width: 100%;
+    background: var(--bg-input);
+    border: 1px solid var(--border-color);
+    padding: 6px 10px;
+    color: var(--text-primary);
+    border-radius: 4px;
+    font-size: 13px;
+}
+
+.filter-input:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+/* Sort dropdown */
+.sort-dropdown {
+    position: absolute;
+    top: 36px;
+    right: 0;
+    background: #1a1a1a;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.7);
+    min-width: 140px;
+    display: none;
+    z-index: 30;
+    overflow: hidden;
+}
+
+.sort-dropdown.active {
+    display: block;
+    animation: fadeIn 0.15s ease;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-5px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.sort-dropdown .sort-option {
+    padding: 10px 14px;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13px;
+    transition: background var(--transition-fast);
+}
+
+.sort-dropdown .sort-option:hover {
+    background: rgba(74, 127, 255, 0.1);
+}
+
+.sort-dropdown .sort-option.active {
+    background: rgba(74, 127, 255, 0.15);
+    color: var(--accent-primary);
 }
 
 .tree {
@@ -817,36 +949,12 @@ input:autofill {
     box-shadow: inset 0 0 0 1px var(--accent-glow);
 }
 
-.files h3 {
-    color: var(--text-primary);
-    font-weight: 500;
-    font-size: 0.9rem;
-    letter-spacing: 0.05em;
-    text-transform: capitalize;
-}
-
-#file-count {
+/* File count styling update */
+.file-count {
     font-weight: 400;
     color: var(--text-muted);
     margin-left: 0.5rem;
     font-size: 0.85rem;
-}        
-
-.files .files-header {
-    display: flex;
-    justify-content: space-between;
-    place-items: center;
-    padding: 0.4rem 1.25rem;
-    border-bottom: 1px solid var(--border-color);
-    position: sticky;
-    top: 0;
-    z-index: 10;
-    backdrop-filter: blur(5px);
-    background: linear-gradient(180deg, #1f1f1f 0%, #1a1a1a 100%);
-}
-
-.files .files-header #filter-box {
-    padding-block: 0.25rem;
 }
 
 #file-list {
