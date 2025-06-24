@@ -56,11 +56,13 @@
                 <div class="sort-option" data-sort="date">Date Modified</div>
                 <div class="sort-option" data-sort="size">Size</div>
             </div>
-            <div id="folder-tree" class="tree"></div>
+            <div class="folders-scroll-area">
+                <div id="folder-tree" class="tree"></div>
+            </div>
         </div>
         
         <div class="divider" id="divider1"></div>
-        
+
         <div class="files" tabindex="0" id="files-pane">
             <div class="pane-header">
                 <span>Files <span class="file-count" id="file-count">(0)</span></span>
@@ -87,7 +89,9 @@
                 <div class="sort-option" data-sort="type">Type</div>
                 <div class="sort-option" data-sort="size">Size</div>
             </div>
-            <ul id="file-list"></ul>
+            <div class="files-scroll-area">
+                <ul id="file-list"></ul>
+            </div>
         </div>
         
         <div class="divider" id="divider2"></div>
