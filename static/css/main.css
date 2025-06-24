@@ -648,7 +648,6 @@ input:autofill {
     outline: none;
     height: 100%;
     position: relative;
-    padding-top: 44px;
 }
 
 .folders:focus-within {
@@ -661,7 +660,6 @@ input:autofill {
     padding: 0.5rem 1.25rem;
     position: sticky;
     top: 0;
-    margin-top: -44px;
     z-index: 10;
     border-bottom: 1px solid var(--border-color);
     font-weight: 500;
@@ -927,7 +925,6 @@ input:autofill {
     outline: none;
     height: 100%;
     position: relative;
-    padding-top: 44px;
 }
 
 .files:focus-within {
