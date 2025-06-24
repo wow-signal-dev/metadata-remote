@@ -18,6 +18,7 @@ window.MetadataRemote.State = {
     pendingAlbumArt: null,
     shouldRemoveArt: false,
     originalMetadata: {},
+    currentFiles: [],
     
     // Tree and folder state
     treeData: {},
