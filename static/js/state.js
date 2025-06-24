@@ -49,6 +49,7 @@ window.MetadataRemote.State = {
     currentDivider: null,
     startX: 0,
     startWidths: {},
+    helpBoxOpen: false,
     
     // Audio playback
     currentlyPlayingFile: null,
