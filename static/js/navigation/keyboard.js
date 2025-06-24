@@ -64,10 +64,10 @@
                 
                 if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
                     e.preventDefault();
-
+            
                     document.querySelector('.folders').classList.add('keyboard-navigating');
                     document.querySelector('.files').classList.add('keyboard-navigating');
-
+            
                     // If this is a repeat event from the browser, ignore it
                     if (e.repeat) {
                         return;
@@ -103,6 +103,22 @@
                         }
                     }, State.keyRepeatDelay);
                     
+                } else if (e.key === 'PageUp' || e.key === 'PageDown') {
+                    e.preventDefault();
+                    
+                    // Add keyboard navigating class for consistent behavior
+                    document.querySelector('.folders').classList.add('keyboard-navigating');
+                    document.querySelector('.files').classList.add('keyboard-navigating');
+                    
+                    // Navigate by page
+                    this.navigateByPage(e.key === 'PageUp' ? 'up' : 'down');
+                    
+                    // Remove keyboard navigating class after a short delay
+                    setTimeout(() => {
+                        document.querySelector('.folders').classList.remove('keyboard-navigating');
+                        document.querySelector('.files').classList.remove('keyboard-navigating');
+                    }, 100);
+                    
                 } else if (e.key === 'Enter') {
                     e.preventDefault();
                     this.activateCurrentItem();
@@ -136,6 +152,12 @@
                         clearInterval(State.keyRepeatTimer);
                         State.keyRepeatTimer = null;
                     }
+                }
+                // Handle PageUp/PageDown keyup to ensure clean state
+                if (e.key === 'PageUp' || e.key === 'PageDown') {
+                    // Remove keyboard navigating class if it's still there
+                    document.querySelector('.folders').classList.remove('keyboard-navigating');
+                    document.querySelector('.files').classList.remove('keyboard-navigating');
                 }
             });
                             
@@ -303,6 +325,114 @@
             }
         },
 
+        /**
+         * Navigate by page with PageUp/PageDown keys
+         * @param {string} direction - 'up' or 'down'
+         */
+        navigateByPage(direction) {
+            if (State.focusedPane === 'folders') {
+                this.navigateFoldersByPage(direction);
+            } else if (State.focusedPane === 'files') {
+                this.navigateFilesByPage(direction);
+            }
+        },
+        
+        /**
+         * Calculate visible items per page for a container
+         * @param {HTMLElement} container - Container element
+         * @param {string} itemSelector - Selector for items
+         * @returns {number} Number of visible items per page
+         */
+        calculateItemsPerPage(container, itemSelector) {
+            const containerHeight = container.clientHeight;
+            const items = container.querySelectorAll(itemSelector);
+            
+            if (items.length === 0) return 10; // Default fallback
+            
+            // Get average item height from first few items
+            let totalHeight = 0;
+            let count = Math.min(5, items.length);
+            
+            for (let i = 0; i < count; i++) {
+                totalHeight += items[i].offsetHeight;
+            }
+            
+            const avgItemHeight = totalHeight / count;
+            
+            // Account for headers and padding
+            const effectiveHeight = containerHeight - 60; // Approximate header height
+            
+            // Calculate items per page (leave one item for context)
+            return Math.max(1, Math.floor(effectiveHeight / avgItemHeight) - 1);
+        },
+        
+        /**
+         * Navigate folders by page
+         * @param {string} direction - 'up' or 'down'
+         */
+        navigateFoldersByPage(direction) {
+            const visibleFolders = this.getVisibleFolders();
+            if (visibleFolders.length === 0) return;
+            
+            const container = document.querySelector('.folders');
+            const itemsPerPage = this.calculateItemsPerPage(container, '.tree-item:not(.collapsed)');
+            
+            let currentIndex = -1;
+            if (State.selectedTreeItem) {
+                currentIndex = visibleFolders.findIndex(item => item === State.selectedTreeItem);
+            }
+            
+            let newIndex;
+            if (currentIndex === -1) {
+                newIndex = direction === 'up' ? visibleFolders.length - 1 : 0;
+            } else if (direction === 'up') {
+                newIndex = Math.max(0, currentIndex - itemsPerPage);
+            } else {
+                newIndex = Math.min(visibleFolders.length - 1, currentIndex + itemsPerPage);
+            }
+            
+            if (visibleFolders[newIndex] && newIndex !== currentIndex) {
+                selectTreeItemCallback(visibleFolders[newIndex], true);
+                
+                // Scroll to the new item
+                this.immediateScrollToCenter(visibleFolders[newIndex], container);
+            }
+        },
+        
+        /**
+         * Navigate files by page
+         * @param {string} direction - 'up' or 'down'
+         */
+        navigateFilesByPage(direction) {
+            const fileItems = Array.from(document.querySelectorAll('#file-list li:not([aria-hidden="true"])'))
+                .filter(item => item.dataset.filepath);
+            if (fileItems.length === 0) return;
+            
+            const container = document.querySelector('.files');
+            const itemsPerPage = this.calculateItemsPerPage(container, '#file-list li:not([aria-hidden="true"])');
+            
+            let currentIndex = -1;
+            if (State.selectedListItem) {
+                currentIndex = fileItems.findIndex(item => item === State.selectedListItem);
+            }
+            
+            let newIndex;
+            if (currentIndex === -1) {
+                newIndex = direction === 'up' ? fileItems.length - 1 : 0;
+            } else if (direction === 'up') {
+                newIndex = Math.max(0, currentIndex - itemsPerPage);
+            } else {
+                newIndex = Math.min(fileItems.length - 1, currentIndex + itemsPerPage);
+            }
+            
+            if (fileItems[newIndex] && newIndex !== currentIndex) {
+                selectFileItemCallback(fileItems[newIndex], true);
+                
+                // Scroll to the new item
+                this.immediateScrollToCenter(fileItems[newIndex], container);
+            }
+        },
+        
         /**
          * Navigate folders with arrow keys
          * @param {string} direction - 'up' or 'down'
