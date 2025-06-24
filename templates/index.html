@@ -27,7 +27,7 @@
 <body>
     <div class="header">
         <h1><b>metadata</b>&nbsp;<img src="{{ url_for('static', filename='favicon.ico') }}" alt="" style="width: 1.2em; height: 1.2em; vertical-align: middle; display: inline-block;">&nbsp;&nbsp;<b>remote</b></h1>
-        <div class="header-hint">Use ↑↓ arrow keys to navigate, PgUp/PgDn to jump pages, Enter to expand folders, Tab to switch panes</div>
+        <button class="help-button" id="help-button" title="Show keyboard shortcuts">?</button>
     </div>
     
     <div class="container">
@@ -370,7 +370,104 @@
     
     <!-- Hidden audio player -->
     <audio id="audio-player"></audio>
-    
+
+    <!-- Help Box Modal -->
+    <div class="help-overlay" id="help-overlay"></div>
+    <div class="help-box" id="help-box">
+        <button class="help-close" id="help-close">✕</button>
+        
+        <div class="help-app-name">
+            <h2>Metadata Remote (mdrm)</h2>
+        </div>
+        
+        <div class="help-content">
+            <div class="help-section">
+                <h3 class="help-section-title">Navigation</h3>
+                <div class="help-shortcut-list">
+                    <div class="help-shortcut-item">
+                        <span class="help-description">Navigate items</span>
+                        <span class="help-keys">
+                            <span class="help-key">↑</span>
+                            <span class="help-key">↓</span>
+                        </span>
+                    </div>
+                    <div class="help-shortcut-item">
+                        <span class="help-description">Jump pages</span>
+                        <span class="help-keys">
+                            <span class="help-key">PageUp</span>
+                            <span class="help-key">PageDown</span>
+                        </span>
+                    </div>
+                    <div class="help-shortcut-item">
+                        <span class="help-description">Expand folders / Load file</span>
+                        <span class="help-keys">
+                            <span class="help-key">Enter</span>
+                        </span>
+                    </div>
+                    <div class="help-shortcut-item">
+                        <span class="help-description">Switch between panes</span>
+                        <span class="help-keys">
+                            <span class="help-key">Tab</span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="help-section">
+                <h3 class="help-section-title">Filtering</h3>
+                <div class="help-shortcut-list">
+                    <div class="help-shortcut-item">
+                        <span class="help-description">Toggle filter for active pane</span>
+                        <span class="help-keys">
+                            <span class="help-key">/</span>
+                        </span>
+                    </div>
+                    <div class="help-shortcut-item">
+                        <span class="help-description">Toggle filter (alternative)</span>
+                        <span class="help-keys">
+                            <span class="help-key">Ctrl</span>
+                            <span class="help-key-plus">+</span>
+                            <span class="help-key">F</span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="help-section">
+                <h3 class="help-section-title">Sorting</h3>
+                <div class="help-shortcut-list">
+                    <div class="help-shortcut-item">
+                        <span class="help-description">Reverse sort order</span>
+                        <span class="help-keys">
+                            <span class="help-key">Ctrl</span>
+                            <span class="help-key-plus">+</span>
+                            <span class="help-key">Shift</span>
+                            <span class="help-key-plus">+</span>
+                            <span class="help-key">S</span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="help-section">
+                <h3 class="help-section-title">General</h3>
+                <div class="help-shortcut-list">
+                    <div class="help-shortcut-item">
+                        <span class="help-description">Close filter boxes / Cancel operations</span>
+                        <span class="help-keys">
+                            <span class="help-key">Esc</span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="help-footer">
+            <div class="help-copyright">© 2025 Dr. William Nelson Leonard</div>
+            <a href="https://github.com/wow-signal-dev/metadata-remote" target="_blank" class="help-github-link">View on GitHub</a>
+        </div>
+    </div>
+  
     <!-- Core modules -->
     <script src="{{ url_for('static', filename='js/state.js') }}"></script>
     <script src="{{ url_for('static', filename='js/api.js') }}"></script>
