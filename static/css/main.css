@@ -96,6 +96,9 @@ input:autofill {
     backdrop-filter: blur(10px);
     position: relative;
     z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .header h1 {
@@ -109,11 +112,36 @@ input:autofill {
     background-clip: text;
 }
 
-.header-hint {
-    font-size: 0.8rem;
-    color: var(--text-muted);
-    margin-top: 0.25rem;
-    opacity: 0.8;
+/* Help button */
+.help-button {
+    position: absolute;
+    right: 1.5rem;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--text-secondary);
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.help-button:hover {
+    background: rgba(74, 127, 255, 0.1);
+    border-color: var(--accent-primary);
+    color: var(--accent-primary);
+    transform: translateY(-50%) scale(1.1);
+}
+
+.help-button:active {
+    transform: translateY(-50%) scale(0.95);
 }
 
 /* Container */
@@ -1891,6 +1919,218 @@ button:disabled {
 .folders.keyboard-navigating .tree-item-content,
 .files.keyboard-navigating #file-list li {
     transition: none !important;
+}
+
+/* Help Box Modal */
+.help-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(5px);
+    z-index: 999;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--transition-normal);
+}
+
+.help-overlay.active {
+    opacity: 1;
+    pointer-events: all;
+}
+
+.help-box {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0.9);
+    background: linear-gradient(135deg, rgba(26, 26, 26, 0.95) 0%, rgba(20, 20, 20, 0.95) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
+    width: 90%;
+    max-width: 600px;
+    max-height: 80vh;
+    overflow-y: auto;
+    z-index: 1000;
+    opacity: 0;
+    pointer-events: none;
+    transition: all var(--transition-normal);
+    backdrop-filter: blur(10px);
+}
+
+.help-box.active {
+    opacity: 1;
+    pointer-events: all;
+    transform: translate(-50%, -50%) scale(1);
+}
+
+.help-close {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--text-secondary);
+    font-size: 16px;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.help-close:hover {
+    background: rgba(255, 107, 107, 0.2);
+    border-color: var(--error);
+    color: var(--error);
+    transform: rotate(90deg);
+}
+
+.help-app-name {
+    text-align: center;
+    padding: 2rem 2rem 1rem 2rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.help-app-name h2 {
+    font-weight: 300;
+    font-size: 1.8rem;
+    letter-spacing: 0.1em;
+    background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-hover) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin: 0;
+}
+
+.help-content {
+    padding: 2rem;
+}
+
+.help-section {
+    margin-bottom: 2rem;
+}
+
+.help-section:last-child {
+    margin-bottom: 0;
+}
+
+.help-section-title {
+    font-size: 1rem;
+    font-weight: 500;
+    color: var(--accent-primary);
+    margin-bottom: 1rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+}
+
+.help-shortcut-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.help-shortcut-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    transition: all var(--transition-fast);
+}
+
+.help-shortcut-item:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+.help-description {
+    color: var(--text-primary);
+    font-size: 0.9rem;
+}
+
+.help-keys {
+    display: flex;
+    gap: 0.25rem;
+    align-items: center;
+}
+
+.help-key {
+    padding: 0.25rem 0.5rem;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 6px;
+    color: var(--text-primary);
+    font-size: 0.8rem;
+    font-family: monospace;
+    font-weight: 500;
+    min-width: 28px;
+    text-align: center;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.help-key-plus {
+    color: var(--text-muted);
+    font-size: 0.7rem;
+    margin: 0 0.25rem;
+}
+
+.help-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem 2rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.help-copyright {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+}
+
+.help-github-link {
+    color: var(--accent-primary);
+    text-decoration: none;
+    font-size: 0.85rem;
+    transition: all var(--transition-fast);
+    padding: 0.25rem 0.75rem;
+    border-radius: 6px;
+    background: rgba(74, 127, 255, 0.1);
+    border: 1px solid transparent;
+}
+
+.help-github-link:hover {
+    background: rgba(74, 127, 255, 0.2);
+    border-color: var(--accent-primary);
+    transform: translateY(-1px);
+}
+
+/* Scrollbar styling for help box */
+.help-box::-webkit-scrollbar {
+    width: 8px;
+}
+
+.help-box::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 4px;
+}
+
+.help-box::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+}
+
+.help-box::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.15);
 }
 
 /* Scrollbar styling */
