@@ -118,16 +118,15 @@ input:autofill {
     right: 1.5rem;
     top: 50%;
     transform: translateY(-50%);
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
+    padding: 0.25rem 0.4rem;
+    border-radius: 4px;
     background: rgba(255, 255, 255, 0.05);
     border: 1px solid rgba(255, 255, 255, 0.1);
     color: var(--text-secondary);
-    font-size: 16px;
+    font-size: 14px;
     font-weight: 600;
     cursor: pointer;
-    transition: all var(--transition-fast);
+    transition: none;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -137,11 +136,10 @@ input:autofill {
     background: rgba(74, 127, 255, 0.1);
     border-color: var(--accent-primary);
     color: var(--accent-primary);
-    transform: translateY(-50%) scale(1.1);
 }
 
 .help-button:active {
-    transform: translateY(-50%) scale(0.95);
+    background: rgba(74, 127, 255, 0.2);
 }
 
 /* Container */
@@ -1969,17 +1967,16 @@ button:disabled {
 
 .help-close {
     position: absolute;
-    top: 1rem;
-    right: 1rem;
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
+    top: 0.75rem;
+    right: 0.75rem;
+    padding: 0.15rem 0.35rem;
+    border-radius: 4px;
     background: rgba(255, 255, 255, 0.05);
     border: 1px solid rgba(255, 255, 255, 0.1);
     color: var(--text-secondary);
-    font-size: 16px;
+    font-size: 14px;
     cursor: pointer;
-    transition: all var(--transition-fast);
+    transition: none;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1989,18 +1986,17 @@ button:disabled {
     background: rgba(255, 107, 107, 0.2);
     border-color: var(--error);
     color: var(--error);
-    transform: rotate(90deg);
 }
 
 .help-app-name {
     text-align: center;
-    padding: 2rem 2rem 1rem 2rem;
+    padding: 1.25rem 1.25rem 0.75rem 1.25rem;
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .help-app-name h2 {
     font-weight: 300;
-    font-size: 1.8rem;
+    font-size: 1.2rem;
     letter-spacing: 0.1em;
     background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-hover) 100%);
     -webkit-background-clip: text;
@@ -2010,11 +2006,11 @@ button:disabled {
 }
 
 .help-content {
-    padding: 2rem;
+    padding: 1rem 1.25rem;
 }
 
 .help-section {
-    margin-bottom: 2rem;
+    margin-bottom: 1rem;
 }
 
 .help-section:last-child {
@@ -2022,10 +2018,10 @@ button:disabled {
 }
 
 .help-section-title {
-    font-size: 1rem;
+    font-size: 0.8rem;
     font-weight: 500;
     color: var(--accent-primary);
-    margin-bottom: 1rem;
+    margin-bottom: 0.5rem;
     text-transform: uppercase;
     letter-spacing: 0.1em;
 }
@@ -2033,28 +2029,23 @@ button:disabled {
 .help-shortcut-list {
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
+    gap: 0.4rem;
 }
 
 .help-shortcut-item {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 0.75rem 1rem;
+    padding: 0.4rem 0.6rem;
     background: rgba(255, 255, 255, 0.02);
-    border-radius: 8px;
+    border-radius: 6px;
     border: 1px solid rgba(255, 255, 255, 0.05);
-    transition: all var(--transition-fast);
-}
-
-.help-shortcut-item:hover {
-    background: rgba(255, 255, 255, 0.05);
-    border-color: rgba(255, 255, 255, 0.1);
+    transition: none;
 }
 
 .help-description {
     color: var(--text-primary);
-    font-size: 0.9rem;
+    font-size: 0.8rem;
 }
 
 .help-keys {
@@ -2064,46 +2055,46 @@ button:disabled {
 }
 
 .help-key {
-    padding: 0.25rem 0.5rem;
+    padding: 0.15rem 0.35rem;
     background: rgba(255, 255, 255, 0.1);
     border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 6px;
+    border-radius: 4px;
     color: var(--text-primary);
-    font-size: 0.8rem;
+    font-size: 0.7rem;
     font-family: monospace;
     font-weight: 500;
-    min-width: 28px;
+    min-width: 24px;
     text-align: center;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
 .help-key-plus {
     color: var(--text-muted);
-    font-size: 0.7rem;
-    margin: 0 0.25rem;
+    font-size: 0.6rem;
+    margin: 0 0.15rem;
 }
 
 .help-footer {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 1.5rem 2rem;
+    padding: 0.75rem 1.25rem;
     border-top: 1px solid rgba(255, 255, 255, 0.05);
     background: rgba(0, 0, 0, 0.2);
 }
 
 .help-copyright {
     color: var(--text-muted);
-    font-size: 0.85rem;
+    font-size: 0.7rem;
 }
 
 .help-github-link {
     color: var(--accent-primary);
     text-decoration: none;
-    font-size: 0.85rem;
-    transition: all var(--transition-fast);
-    padding: 0.25rem 0.75rem;
-    border-radius: 6px;
+    font-size: 0.7rem;
+    transition: none;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
     background: rgba(74, 127, 255, 0.1);
     border: 1px solid transparent;
 }
@@ -2111,7 +2102,6 @@ button:disabled {
 .help-github-link:hover {
     background: rgba(74, 127, 255, 0.2);
     border-color: var(--accent-primary);
-    transform: translateY(-1px);
 }
 
 /* Scrollbar styling for help box */
