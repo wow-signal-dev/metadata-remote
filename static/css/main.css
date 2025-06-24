@@ -643,11 +643,18 @@ input:autofill {
     flex: 0 0 25%;
     min-width: 200px;
     background: var(--bg-tertiary);
-    overflow-y: auto;
-    overflow-x: hidden;
+    overflow: hidden;
     outline: none;
     height: 100%;
     position: relative;
+    display: flex;
+    flex-direction: column;
+}
+
+.folders-scroll-area {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
 }
 
 .folders:focus-within {
@@ -658,8 +665,6 @@ input:autofill {
 .pane-header {
     background: linear-gradient(180deg, #1f1f1f 0%, #1a1a1a 100%);
     padding: 0.5rem 1.25rem;
-    position: sticky;
-    top: 0;
     z-index: 10;
     border-bottom: 1px solid var(--border-color);
     font-weight: 500;
@@ -671,6 +676,7 @@ input:autofill {
     text-transform: capitalize;
     min-height: 44px;
     backdrop-filter: blur(5px);
+    flex-shrink: 0;
 }
 
 .pane-header:hover .control-icon {
@@ -782,6 +788,7 @@ input:autofill {
     display: none;
     max-height: 0;
     overflow: hidden;
+    flex-shrink: 0;
 }
 
 .filter-container.active {
@@ -809,7 +816,7 @@ input:autofill {
 /* Sort dropdown */
 .sort-dropdown {
     position: absolute;
-    top: 36px;
+    top: 44px;
     right: 0;
     background: #1a1a1a;
     border: 1px solid rgba(255, 255, 255, 0.1);
@@ -920,11 +927,18 @@ input:autofill {
     flex: 0 0 35%;
     min-width: 250px;
     background: var(--bg-card);
-    overflow-y: auto;
-    overflow-x: hidden;
+    overflow: hidden;
     outline: none;
     height: 100%;
     position: relative;
+    display: flex;
+    flex-direction: column;
+}
+
+.files-scroll-area {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
 }
 
 .files:focus-within {
