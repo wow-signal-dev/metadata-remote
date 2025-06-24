@@ -49,6 +49,7 @@ const AudioMetadataEditor = {
         
         // Set up UI state
         this.setupInitialUIState();
+        this.setupHelpBox();
     },
     
     /**
@@ -119,6 +120,67 @@ const AudioMetadataEditor = {
         if (filenameDisplay) {
             filenameDisplay.onclick = this.handleFilenameEditClick.bind(this);
         }
+    },
+
+    /**
+     * Set up help box functionality
+     */
+    setupHelpBox() {
+        const helpButton = document.getElementById('help-button');
+        const helpOverlay = document.getElementById('help-overlay');
+        const helpBox = document.getElementById('help-box');
+        const helpClose = document.getElementById('help-close');
+        
+        // Show help box
+        const showHelp = () => {
+            helpOverlay.classList.add('active');
+            helpBox.classList.add('active');
+            State.helpBoxOpen = true;
+        };
+        
+        // Hide help box
+        const hideHelp = () => {
+            helpOverlay.classList.remove('active');
+            helpBox.classList.remove('active');
+            State.helpBoxOpen = false;
+        };
+        
+        // Help button click
+        helpButton.addEventListener('click', (e) => {
+            e.stopPropagation();
+            showHelp();
+        });
+        
+        // Close button click
+        helpClose.addEventListener('click', (e) => {
+            e.stopPropagation();
+            hideHelp();
+        });
+        
+        // Overlay click (outside help box)
+        helpOverlay.addEventListener('click', hideHelp);
+        
+        // Prevent clicks inside help box from closing it
+        helpBox.addEventListener('click', (e) => {
+            e.stopPropagation();
+        });
+        
+        // Close on any key press
+        document.addEventListener('keydown', (e) => {
+            if (State.helpBoxOpen) {
+                e.preventDefault();
+                hideHelp();
+            }
+        });
+        
+        // Also add help shortcut (?) when not in an input
+        document.addEventListener('keydown', (e) => {
+            if (e.key === '?' && !State.helpBoxOpen && 
+                e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+                e.preventDefault();
+                showHelp();
+            }
+        });
     },
     
     // =============================
