@@ -22,14 +22,24 @@ window.MetadataRemote.State = {
     // Tree and folder state
     treeData: {},
     expandedFolders: new Set(),
-    currentSort: { 
-        folders: { method: 'name', direction: 'asc' },
-        files: { method: 'name', direction: 'asc' }
+    
+    // Separate sort state for folders and files
+    foldersSort: {
+        method: 'name',      // 'name', 'date', 'size'
+        direction: 'asc'     // 'asc', 'desc'
     },
-    filterState: {
-        folders: '',
-        files: ''
+    filesSort: {
+        method: 'name',      // 'name', 'date', 'type', 'size'
+        direction: 'asc'     // 'asc', 'desc'
     },
+    
+    // Filter state for both panes
+    foldersFilter: '',       // Filter text for folders
+    filesFilter: '',         // Filter text for files
+    
+    // UI state for active dropdowns/filters
+    activeFilterPane: null,      // 'folders', 'files', or null
+    activeSortDropdown: null,    // 'folders', 'files', or null
     
     // UI state
     focusedPane: 'folders',
@@ -84,6 +94,14 @@ window.MetadataRemote.State = {
         this.originalMetadata = {};
         this.currentlyPlayingFile = null;
         
+        // Reset new filter/sort state
+        this.foldersSort = { method: 'name', direction: 'asc' };
+        this.filesSort = { method: 'name', direction: 'asc' };
+        this.foldersFilter = '';
+        this.filesFilter = '';
+        this.activeFilterPane = null;
+        this.activeSortDropdown = null;
+        
         // Clear timers
         if (this.loadFileDebounceTimer) {
             clearTimeout(this.loadFileDebounceTimer);
@@ -108,7 +126,12 @@ window.MetadataRemote.State = {
             focusedPane: this.focusedPane,
             historyPanelExpanded: this.historyPanelExpanded,
             expandedFolders: Array.from(this.expandedFolders),
-            currentSort: { ...this.currentSort }
+            foldersSort: { ...this.foldersSort },
+            filesSort: { ...this.filesSort },
+            foldersFilter: this.foldersFilter,
+            filesFilter: this.filesFilter,
+            activeFilterPane: this.activeFilterPane,
+            activeSortDropdown: this.activeSortDropdown
         };
     }
 };
