@@ -88,7 +88,7 @@ input:autofill {
 .header {
     background: linear-gradient(180deg, #1a1a1a 0%, #141414 100%);
     color: var(--text-primary);
-    padding: 0.5rem 1.5rem 0.75rem 1.5rem;
+    padding: 0.5rem 1.5rem 0.5rem 1.5rem;
     text-align: center;
     box-shadow: 0 4px 20px rgba(0,0,0,0.8);
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
@@ -104,7 +104,7 @@ input:autofill {
 .header h1 {
     font-weight: 300;
     letter-spacing: 0.15em;
-    margin-bottom: 0.25rem;
+    margin-bottom: 0rem;
     font-size: 1.5rem;
     background: linear-gradient(135deg, #fff 0%, #999 100%);
     -webkit-background-clip: text;
