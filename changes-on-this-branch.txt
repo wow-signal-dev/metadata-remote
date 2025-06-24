@@ -1,0 +1,2 @@
+(1) Entire codebase refactored into modular architecture.
+(2) PGUP/PGDN feature added for better keyboard navigation.
