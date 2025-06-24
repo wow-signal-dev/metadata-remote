@@ -674,17 +674,6 @@ input:autofill {
     position: relative;
 }
 
-.icon-controls::before {
-    content: '';
-    position: absolute;
-    left: 26px;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 1px;
-    height: 16px;
-    background: rgba(255, 255, 255, 0.08);
-}
-
 .control-icon {
     background: none;
     border: none;
