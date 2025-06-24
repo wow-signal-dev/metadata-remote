@@ -395,7 +395,7 @@
             const visibleFolders = this.getVisibleFolders();
             if (visibleFolders.length === 0) return;
             
-            const container = document.querySelector('.folders');
+            const container = document.querySelector('.folders-scroll-area');
             const itemsPerPage = this.calculateItemsPerPage(container, '.tree-item:not(.collapsed)');
             
             let currentIndex = -1;
@@ -429,7 +429,7 @@
                 .filter(item => item.dataset.filepath);
             if (fileItems.length === 0) return;
             
-            const container = document.querySelector('.files');
+            const container = document.querySelector('.files-scroll-area');
             const itemsPerPage = this.calculateItemsPerPage(container, '#file-list li:not([aria-hidden="true"])');
             
             let currentIndex = -1;
@@ -480,7 +480,7 @@
                 selectTreeItemCallback(visibleFolders[newIndex], true);
                 
                 // Always use immediate scrolling during arrow navigation for smooth performance
-                const container = document.querySelector('.folders');
+                const container = document.querySelector('.folders-scroll-area');
                 this.immediateScrollToCenter(visibleFolders[newIndex], container);
             }
         },
@@ -512,7 +512,7 @@
                 selectFileItemCallback(fileItems[newIndex], true);
                 
                 // Always use immediate scrolling during arrow navigation for smooth performance
-                const container = document.querySelector('.files');
+                const container = document.querySelector('.files-scroll-area');
                 this.immediateScrollToCenter(fileItems[newIndex], container);
             }
         },
