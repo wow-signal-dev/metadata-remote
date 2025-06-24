@@ -702,7 +702,6 @@ input:autofill {
 .control-icon.active {
     color: var(--accent-primary);
     opacity: 1;
-    text-shadow: 0 0 8px var(--accent-glow);
 }
 
 /* Sort controls specific styling */
