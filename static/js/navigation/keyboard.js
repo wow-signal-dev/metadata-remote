@@ -61,6 +61,27 @@
                 if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
                     return;
                 }
+
+                // Filter shortcut: / (forward slash)
+                if (e.key === '/' && !e.ctrlKey && !e.shiftKey) {
+                    e.preventDefault();
+                    const filterBtn = document.getElementById(`${State.focusedPane}-filter-btn`);
+                    if (filterBtn) filterBtn.click();
+                }
+                
+                // Filter shortcut: Ctrl+F
+                if (e.ctrlKey && e.key === 'f') {
+                    e.preventDefault();
+                    const filterBtn = document.getElementById(`${State.focusedPane}-filter-btn`);
+                    if (filterBtn) filterBtn.click();
+                }
+                
+                // Sort reverse: Ctrl+Shift+S
+                if (e.ctrlKey && e.shiftKey && e.key === 'S') {
+                    e.preventDefault();
+                    const dirBtn = document.getElementById(`${State.focusedPane}-sort-direction`);
+                    if (dirBtn) dirBtn.click();
+                }
                 
                 if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
                     e.preventDefault();
