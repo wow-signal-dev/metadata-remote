@@ -108,7 +108,7 @@
                 console.log(`Setting timeout for ${duration}ms`);
                 button._statusTimeout = setTimeout(() => {
                     console.log(`Timeout fired for button:`, button.className);
-                    this.clearButtonStatus(button);
+                    window.MetadataRemote.UI.ButtonStatus.clearButtonStatus(button);
                 }, duration);
             }
         },
