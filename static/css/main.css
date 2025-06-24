@@ -1644,7 +1644,7 @@ button {
     border-radius: 8px;
     font-size: 0.95rem;
     cursor: pointer;
-    transition: all var(--transition-fast);
+    transition: transform var(--transition-fast), box-shadow var(--transition-fast), opacity var(--transition-fast);
     font-weight: 500;
     position: relative;
     overflow: hidden;
