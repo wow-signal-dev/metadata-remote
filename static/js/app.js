@@ -101,7 +101,6 @@ const AudioMetadataEditor = {
         // UI components
         PaneResize.initializePaneResize();
         PaneResize.initializeHistoryPanelResize(() => HistoryManager.toggleHistoryPanel());
-        window.MetadataRemote.UI.FilterSort.init();
     },
     
     /**
