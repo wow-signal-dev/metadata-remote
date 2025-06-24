@@ -225,13 +225,18 @@
             return items.sort((a, b) => {
                 let comparison = 0;
                 
-                if (State.currentSort.method === 'name') {
+                // CHANGED: Use State.foldersSort instead of State.currentSort
+                if (State.foldersSort.method === 'name') {
                     comparison = a.name.toLowerCase().localeCompare(b.name.toLowerCase());
-                } else if (State.currentSort.method === 'date') {
+                } else if (State.foldersSort.method === 'date') {
                     comparison = (a.created || 0) - (b.created || 0);
+                } else if (State.foldersSort.method === 'size') {
+                    // Size sorting will need backend support
+                    comparison = (a.size || 0) - (b.size || 0);
                 }
                 
-                return State.currentSort.direction === 'asc' ? comparison : -comparison;
+                // CHANGED: Use State.foldersSort.direction
+                return State.foldersSort.direction === 'asc' ? comparison : -comparison;
             });
         },
 
@@ -240,11 +245,12 @@
          * @param {string} method - Sort method ('name' or 'date')
          */
         setSortMethod(method) {
-            if (State.currentSort.method === method) {
-                State.currentSort.direction = State.currentSort.direction === 'asc' ? 'desc' : 'asc';
+            // CHANGED: Use State.foldersSort
+            if (State.foldersSort.method === method) {
+                State.foldersSort.direction = State.foldersSort.direction === 'asc' ? 'desc' : 'asc';
             } else {
-                State.currentSort.method = method;
-                State.currentSort.direction = 'asc';
+                State.foldersSort.method = method;
+                State.foldersSort.direction = 'asc';
             }
             
             this.updateSortUI();
@@ -255,6 +261,8 @@
          * Update the sort UI to reflect current state
          */
         updateSortUI() {
+            // Note: This method will be completely replaced in later subtasks
+            // For now, just update the state references
             document.querySelectorAll('.sort-option').forEach(opt => {
                 opt.classList.remove('active');
                 opt.querySelectorAll('.sort-arrow').forEach(arrow => {
@@ -262,9 +270,15 @@
                 });
             });
             
-            const activeOption = document.getElementById(`sort-${State.currentSort.method}`);
-            activeOption.classList.add('active');
-            activeOption.querySelector(`.sort-arrow[data-dir="${State.currentSort.direction}"]`).classList.add('active');
+            // CHANGED: Use State.foldersSort
+            const activeOption = document.getElementById(`sort-${State.foldersSort.method}`);
+            if (activeOption) {
+                activeOption.classList.add('active');
+                const arrow = activeOption.querySelector(`.sort-arrow[data-dir="${State.foldersSort.direction}"]`);
+                if (arrow) {
+                    arrow.classList.add('active');
+                }
+            }
         }
     };
 })();
