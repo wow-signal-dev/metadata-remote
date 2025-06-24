@@ -335,6 +335,10 @@
             if (filterBox) {
                 filterBox.addEventListener('input', (e) => {
                     const value = e.target.value.toLowerCase().trim();
+                    
+                    // Store filter value in state (preparation for new implementation)
+                    State.filesFilter = value;
+                    
                     const fileListItems = document.querySelectorAll('#file-list > li');
                     
                     fileListItems.forEach(li => {
