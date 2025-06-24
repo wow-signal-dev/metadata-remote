@@ -164,6 +164,30 @@
                 option.classList.toggle('active', option.dataset.sort === State.filesSort.method);
             });
         },
+
+        /**
+         * Format file size in human-readable format
+         * @param {number} bytes - Size in bytes
+         * @returns {string} Formatted size
+         */
+        formatFileSize(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+        },
+        
+        /**
+         * Format Unix timestamp to readable date
+         * @param {number} timestamp - Unix timestamp
+         * @returns {string} Formatted date
+         */
+        formatDate(timestamp) {
+            if (!timestamp) return 'Unknown';
+            const date = new Date(timestamp * 1000);
+            return date.toLocaleDateString();
+        },
         
         /**
          * Load and display files in a folder
@@ -293,6 +317,21 @@
                 nameDiv.insertAdjacentHTML('beforeend', badgeHtml);
                 
                 fileInfo.appendChild(nameDiv);
+
+                // Show date or size when sorted by those fields
+                if (State.filesSort.method === 'date' || State.filesSort.method === 'size') {
+                    const metaDiv = document.createElement('div');
+                    metaDiv.className = 'file-meta';
+                    metaDiv.style.cssText = 'font-size: 0.75rem; color: #999; margin-top: 0.2rem;';
+                    
+                    if (State.filesSort.method === 'date' && file.date) {
+                        metaDiv.textContent = this.formatDate(file.date);
+                    } else if (State.filesSort.method === 'size' && file.size) {
+                        metaDiv.textContent = this.formatFileSize(file.size);
+                    }
+                    
+                    fileInfo.appendChild(metaDiv);
+                }
                 
                 if (file.folder !== '.') {
                     const folderDiv = document.createElement('div');
