@@ -682,7 +682,7 @@ input:autofill {
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    transition: all var(--transition-fast);
+    transition: color var(--transition-fast), opacity var(--transition-fast), transform var(--transition-fast);
     font-size: 15px;
     color: #555;
     position: relative;
@@ -733,7 +733,6 @@ input:autofill {
     color: #6a9fff;
     opacity: 1;
     transform: scale(1.2);
-    text-shadow: 0 0 6px rgba(74, 127, 255, 0.5);
 }
 
 .sort-direction-btn .sort-indicator {
