@@ -169,12 +169,23 @@ def build_tree_items(path, rel_path=''):
                     if os.path.isfile(os.path.join(item_path, f))
                 )
                 
+                # Calculate folder size (optional - can be expensive for large folders)
+                folder_size = 0
+                try:
+                    # Quick size calculation - only immediate audio files, not recursive
+                    for f in os.listdir(item_path):
+                        if os.path.isfile(os.path.join(item_path, f)) and f.lower().endswith(AUDIO_EXTENSIONS):
+                            folder_size += os.path.getsize(os.path.join(item_path, f))
+                except OSError:
+                    folder_size = 0
+                
                 items.append({
                     'name': item,
                     'path': item_rel_path,
                     'type': 'folder',
                     'hasAudio': has_audio,
-                    'created': os.path.getctime(item_path)
+                    'created': os.path.getctime(item_path),
+                    'size': folder_size  # Add folder size
                 })
     except PermissionError:
         pass
@@ -217,10 +228,23 @@ def get_files(folder_path):
                 if filename.lower().endswith(AUDIO_EXTENSIONS):
                     file_path = os.path.join(root, filename)
                     rel_path = os.path.relpath(file_path, MUSIC_DIR)
+                    
+                    # Get file stats for date and size
+                    try:
+                        file_stats = os.stat(file_path)
+                        file_date = int(file_stats.st_mtime)  # Modification time as Unix timestamp
+                        file_size = file_stats.st_size         # Size in bytes
+                    except OSError:
+                        # If we can't get stats, use defaults
+                        file_date = 0
+                        file_size = 0
+                    
                     files.append({
                         'name': filename,
                         'path': rel_path,
-                        'folder': os.path.relpath(root, current_path)
+                        'folder': os.path.relpath(root, current_path),
+                        'date': file_date,
+                        'size': file_size
                     })
         
         return jsonify({'files': files})
