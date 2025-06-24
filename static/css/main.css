@@ -704,6 +704,21 @@ input:autofill {
     opacity: 1;
 }
 
+.control-icon:focus {
+    outline: none;
+    background: none !important;
+}
+
+.control-icon:active {
+    background: none !important;
+    transform: scale(1.05);
+}
+
+.sort-direction-btn:focus,
+.sort-direction-btn:active {
+    background: none !important;
+}
+
 /* Sort controls specific styling */
 .sort-controls {
     display: flex;
