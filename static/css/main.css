@@ -763,8 +763,8 @@ input:autofill {
 
 /* Filter container */
 .filter-container {
-    position: absolute;
-    top: 44px;
+    position: relative;
+    top: 0;
     left: 0;
     right: 0;
     background: #1a1a1a;
@@ -772,11 +772,15 @@ input:autofill {
     padding: 10px 12px;
     z-index: 20;
     display: none;
-    animation: slideDown var(--transition-fast);
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.2s ease, padding 0.2s ease;
 }
 
 .filter-container.active {
     display: block;
+    max-height: 60px; /* Enough for the input */
+    padding: 10px 12px;
 }
 
 .filter-input {
