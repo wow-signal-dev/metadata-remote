@@ -18,6 +18,14 @@
          */
         showButtonStatus(button, message, type = 'processing', duration = 3000) {
             if (!button || !button.classList.contains('btn-status')) return;
+
+            console.log(`showButtonStatus called for button:`, button.className, `type: ${type}, duration: ${duration}`);
+            
+            // Clear any existing timeout
+            if (button._statusTimeout) {
+                clearTimeout(button._statusTimeout);
+                console.log('Cleared existing timeout');
+            }
             
             // Clear any existing timeout
             if (button._statusTimeout) {
@@ -97,7 +105,9 @@
             
             // Auto-clear status after duration (except for processing)
             if (type !== 'processing' && duration > 0) {
+                console.log(`Setting timeout for ${duration}ms`);
                 button._statusTimeout = setTimeout(() => {
+                    console.log(`Timeout fired for button:`, button.className);
                     this.clearButtonStatus(button);
                 }, duration);
             }
@@ -109,7 +119,10 @@
          */
         clearButtonStatus(button) {
             if (!button || !button.classList.contains('btn-status')) return;
-            
+
+            console.log(`clearButtonStatus called for button:`, button.className);
+            console.log(`Button classes before:`, button.className);
+                    
             if (button._statusTimeout) {
                 clearTimeout(button._statusTimeout);
                 delete button._statusTimeout;
@@ -138,6 +151,7 @@
                     delete button._originalWidth;
                 }, 300);
             }
+            console.log(`Button classes after:`, button.className);
         },
         
         /**
