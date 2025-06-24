@@ -1,6 +1,7 @@
 /**
  * Metadata Remote - Main Stylesheet
  * Dark theme UI with glassmorphism effects
+ * Performance optimized version - no animations
  */
 
 * {
@@ -38,8 +39,6 @@
     --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
     --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
     --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
-    --transition-fast: 0.15s ease;
-    --transition-normal: 0.3s ease;
 }
 
 html {
@@ -75,7 +74,6 @@ input:-webkit-autofill:focus,
 input:-webkit-autofill:active {
     -webkit-box-shadow: 0 0 0 30px var(--bg-input) inset !important;
     -webkit-text-fill-color: var(--text-primary) !important;
-    transition: background-color 5000s ease-in-out 0s;
 }
 
 /* For other browsers */
@@ -126,7 +124,6 @@ input:autofill {
     font-size: 14px;
     font-weight: 600;
     cursor: pointer;
-    transition: none;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -156,7 +153,6 @@ input:autofill {
     cursor: col-resize;
     position: relative;
     flex-shrink: 0;
-    transition: none;
     opacity: 1;
 }
 
@@ -177,7 +173,6 @@ input:autofill {
         transparent 6px
     );
     opacity: 1;
-    transition: none;
 }
 
 .divider:hover {
@@ -218,7 +213,6 @@ input:autofill {
     cursor: col-resize;
     position: relative;
     flex-shrink: 0;
-    transition: none;
     opacity: 1;
 }
 
@@ -238,7 +232,6 @@ input:autofill {
         transparent 6px
     );
     opacity: 1;
-    transition: none;
 }
 
 .history-divider:hover {
@@ -280,7 +273,6 @@ input:autofill {
     right: 0;
     height: 5px;
     background: rgba(34,34,34,1);
-    transition: none;
     pointer-events: none;
 }
 
@@ -300,7 +292,6 @@ input:autofill {
         transparent 6px
     );
     opacity: 1;
-    transition: none;
     pointer-events: none;
 }
 
@@ -347,7 +338,6 @@ input:autofill {
     right: 0;
     background: var(--bg-card);
     border-top: 2px solid var(--border-color);
-    transition: all var(--transition-normal);
     z-index: 20;
     display: flex;
     flex-direction: column;
@@ -405,7 +395,6 @@ input:autofill {
     font-size: 0.75rem;
     font-weight: 500;
     cursor: pointer;
-    transition: all var(--transition-fast);
     text-transform: uppercase;
     letter-spacing: 0.05em;
     margin-left: auto;
@@ -433,7 +422,6 @@ input:autofill {
 .history-toggle {
     font-size: 0.8rem;
     color: var(--text-muted);
-    transition: transform var(--transition-fast);
 }
 
 .history-panel.expanded .history-toggle {
@@ -463,7 +451,6 @@ input:autofill {
     cursor: pointer;
     font-size: 0.65rem;
     font-weight: 500;
-    transition: all var(--transition-fast);
     color: white;
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -513,7 +500,6 @@ input:autofill {
     padding: 0.5rem 1.25rem;
     border-bottom: 1px solid rgba(255, 255, 255, 0.03);
     cursor: pointer;
-    transition: all var(--transition-fast);
     position: relative;
 }
 
@@ -689,7 +675,6 @@ input:autofill {
 
 .pane-header:hover .control-icon {
     opacity: 1;
-    transition-delay: 0.1s;
 }
 
 /* Icon controls */
@@ -708,7 +693,6 @@ input:autofill {
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    transition: color var(--transition-fast), opacity var(--transition-fast), transform var(--transition-fast);
     font-size: 15px;
     color: #555;
     position: relative;
@@ -780,7 +764,6 @@ input:autofill {
     font-size: 11px;
     font-weight: bold;
     display: block;
-    transition: transform var(--transition-fast);
 }
 
 .sort-direction-btn:active .sort-indicator {
@@ -799,7 +782,6 @@ input:autofill {
     display: none;
     max-height: 0;
     overflow: hidden;
-    transition: max-height 0.2s ease, padding 0.2s ease;
 }
 
 .filter-container.active {
@@ -841,18 +823,6 @@ input:autofill {
 
 .sort-dropdown.active {
     display: block;
-    animation: fadeIn 0.15s ease;
-}
-
-@keyframes fadeIn {
-    from {
-        opacity: 0;
-        transform: translateY(-5px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
 }
 
 .sort-dropdown .sort-option {
@@ -862,7 +832,6 @@ input:autofill {
     justify-content: space-between;
     align-items: center;
     font-size: 13px;
-    transition: background var(--transition-fast);
 }
 
 .sort-dropdown .sort-option:hover {
@@ -881,16 +850,12 @@ input:autofill {
 .tree-item {
     cursor: pointer;
     user-select: none;
-    transition: all var(--transition-fast);
 }
 
 .tree-item-content {
     display: flex;
     align-items: center;
     padding: 0.6rem 1.25rem;
-    transition: background var(--transition-fast), 
-                padding-left var(--transition-fast),
-                transform var(--transition-fast);
     position: relative;
     overflow: hidden;
 }
@@ -904,7 +869,6 @@ input:autofill {
     width: 3px;
     background: var(--accent-primary);
     transform: translateX(-100%);
-    transition: transform var(--transition-fast);
 }
 
 .tree-item-content:hover {
@@ -936,7 +900,6 @@ input:autofill {
     margin-right: 0.75rem;
     font-size: 1.1rem;
     filter: saturate(0.5);
-    transition: all var(--transition-fast);
 }
 
 .tree-item:hover .tree-icon {
@@ -946,22 +909,10 @@ input:autofill {
 
 .tree-children {
     display: none;
-    animation: slideDown var(--transition-normal);
 }
 
 .tree-children.expanded {
     display: block;
-}
-
-@keyframes slideDown {
-    from {
-        opacity: 0;
-        transform: translateY(-10px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
 }
 
 /* Files Column */
@@ -996,9 +947,6 @@ input:autofill {
     padding: 0.9rem 1.25rem;
     cursor: pointer;
     border-bottom: 1px solid rgba(255, 255, 255, 0.03);
-    transition: background var(--transition-fast), 
-                color var(--transition-fast), 
-                padding-left var(--transition-fast);
     color: var(--text-secondary);
     position: relative;
     overflow: hidden;
@@ -1016,7 +964,6 @@ input:autofill {
     width: 3px;
     background: var(--accent-primary);
     transform: translateX(-100%);
-    transition: transform var(--transition-fast);
 }
 
 #file-list li:hover {
@@ -1072,7 +1019,6 @@ input:autofill {
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    transition: all var(--transition-fast);
     flex-shrink: 0;
     margin-left: 1rem;
 }
@@ -1140,7 +1086,6 @@ input:autofill {
     padding: 1rem 1.5rem;
     padding-bottom: 3rem;
     overflow-y: auto;
-    transition: padding-bottom 0.3s ease;
 }
 
 .metadata-content h3 {
@@ -1155,7 +1100,6 @@ input:autofill {
     cursor: pointer;
     padding: 0.5rem 0.75rem;
     border-radius: 6px;
-    transition: all var(--transition-fast);
     display: inline-block;
     font-weight: 500;
     background: rgba(255, 255, 255, 0.02);
@@ -1172,18 +1116,6 @@ input:autofill {
     align-items: center;
     gap: 0.75rem;
     margin-bottom: 1.5rem;
-    animation: fadeIn var(--transition-normal);
-}
-
-@keyframes fadeIn {
-    from {
-        opacity: 0;
-        transform: translateY(-5px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
 }
 
 .filename-edit input {
@@ -1194,7 +1126,6 @@ input:autofill {
     background: var(--bg-input);
     color: var(--text-primary);
     font-size: 0.95rem;
-    transition: all var(--transition-fast);
 }
 
 .filename-edit input:focus {
@@ -1209,7 +1140,6 @@ input:autofill {
     cursor: pointer;
     font-size: 0.85rem;
     font-weight: 500;
-    transition: all var(--transition-fast);
 }
 
 .filename-save {
@@ -1277,7 +1207,6 @@ input:autofill {
     max-height: 200px;
     border-radius: 8px;
     box-shadow: 0 8px 24px rgba(0,0,0,0.6);
-    transition: all var(--transition-normal);
 }
 
 .album-art:hover {
@@ -1296,7 +1225,6 @@ input:autofill {
     justify-content: center;
     color: var(--text-muted);
     font-size: 0.9rem;
-    transition: all var(--transition-fast);
 }
 
 .album-art-placeholder:hover {
@@ -1319,7 +1247,6 @@ input:autofill {
     cursor: pointer;
     font-size: 0.85rem;
     font-weight: 500;
-    transition: all var(--transition-fast);
     position: relative;
     overflow: hidden;
     width: 100%;
@@ -1343,7 +1270,6 @@ input:autofill {
     border-radius: 50%;
     background: rgba(255, 255, 255, 0.3);
     transform: translate(-50%, -50%);
-    transition: width 0.6s, height 0.6s;
     z-index: -1;
 }
 
@@ -1429,7 +1355,6 @@ input[type="file"] {
     gap: 0.5rem;
     height: fit-content;
     margin-bottom: 0;
-    animation: slideIn var(--transition-normal);
 }
 
 .apply-field-controls.visible {
@@ -1450,7 +1375,6 @@ input[type="file"] {
     cursor: pointer;
     font-size: 0.75rem;
     font-weight: 500;
-    transition: all var(--transition-fast);
     position: relative;
     overflow: hidden;
     white-space: nowrap;
@@ -1491,7 +1415,6 @@ input[type="file"] {
     border-radius: 50%;
     background: rgba(255, 255, 255, 0.3);
     transform: translate(-50%, -50%);
-    transition: width 0.6s, height 0.6s;
     z-index: -1;
 }
 
@@ -1500,17 +1423,6 @@ input[type="file"] {
     height: 200px;
 }
 
-
-@keyframes slideIn {
-    from {
-        opacity: 0;
-        transform: translateX(10px);
-    }
-    to {
-        opacity: 1;
-        transform: translateX(0);
-    }
-}
 
 label {
     font-weight: 500;
@@ -1537,7 +1449,6 @@ label {
     height: 14px;
     pointer-events: none;
     opacity: 0;
-    transition: opacity var(--transition-fast);
 }
 
 .inference-loading.active {
@@ -1550,11 +1461,6 @@ label {
     border: 2px solid rgba(74, 127, 255, 0.2);
     border-radius: 50%;
     border-top-color: var(--accent-primary);
-    animation: inference-spin 0.8s ease-in-out infinite;
-}
-
-@keyframes inference-spin {
-    to { transform: rotate(360deg); }
 }
 
 input[type="text"] {
@@ -1563,7 +1469,6 @@ input[type="text"] {
     border: 1px solid var(--border-color);
     border-radius: 8px;
     font-size: 0.95rem;
-    transition: all var(--transition-fast);
     background: var(--bg-input);
     color: var(--text-primary);
     width: 100%;
@@ -1596,7 +1501,6 @@ input[type="text"]::placeholder {
     z-index: 100;
     opacity: 0;
     transform: translateY(-10px);
-    transition: all var(--transition-fast);
     pointer-events: none;
     max-height: 200px;
     overflow-y: auto;
@@ -1611,7 +1515,6 @@ input[type="text"]::placeholder {
 .suggestion-item {
     padding: 0.75rem 1rem;
     cursor: pointer;
-    transition: all var(--transition-fast);
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
     display: flex;
     justify-content: space-between;
@@ -1656,7 +1559,6 @@ input[type="text"]::placeholder {
     left: 0;
     bottom: 0;
     background: linear-gradient(90deg, var(--accent-primary) 0%, var(--accent-hover) 100%);
-    transition: width var(--transition-normal);
     border-radius: 2px;
 }
 
@@ -1688,7 +1590,6 @@ button {
     border-radius: 8px;
     font-size: 0.95rem;
     cursor: pointer;
-    transition: transform var(--transition-fast), box-shadow var(--transition-fast), opacity var(--transition-fast);
     font-weight: 500;
     position: relative;
     overflow: hidden;
@@ -1752,7 +1653,6 @@ button:disabled {
 /* Button Status Styles */
 .btn-status {
     position: relative;
-    transition: all var(--transition-normal), width var(--transition-normal), min-width var(--transition-normal);
     min-width: fit-content;
 }
 
@@ -1761,7 +1661,6 @@ button:disabled {
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
-    transition: opacity var(--transition-fast);
     position: relative;
     z-index: 1;
 }
@@ -1778,7 +1677,6 @@ button:disabled {
     gap: 0.5rem;
     opacity: 0;
     pointer-events: none;
-    transition: opacity var(--transition-fast);
     font-size: 0.85rem;
     padding: 0 1rem;
     white-space: nowrap;
@@ -1820,12 +1718,6 @@ button:disabled {
 /* Processing state */
 .btn-status.processing {
     background: linear-gradient(135deg, #4a5d7a 0%, #5a6d8a 100%) !important;
-    animation: pulse 1.5s infinite;
-}
-
-@keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.8; }
 }
 
 /* Success state */
@@ -1849,23 +1741,11 @@ button:disabled {
 /* Status icons */
 .status-icon {
     font-size: 1rem;
-    animation: statusIconIn var(--transition-normal);
 }
 
 /* Smaller icons for apply-field buttons */
 .apply-field-btn .status-icon {
     font-size: 0.9rem;
-}
-
-@keyframes statusIconIn {
-    from {
-        transform: scale(0);
-        opacity: 0;
-    }
-    to {
-        transform: scale(1);
-        opacity: 1;
-    }
 }
 
 .status-icon.success { color: #4ade80; }
@@ -1879,7 +1759,6 @@ button:disabled {
     border: 2px solid rgba(255,255,255,.2);
     border-radius: 50%;
     border-top-color: white;
-    animation: spin 0.8s ease-in-out infinite;
 }
 
 /* Smaller spinner for apply-field buttons */
@@ -1887,10 +1766,6 @@ button:disabled {
     width: 14px;
     height: 14px;
     border-width: 1.5px;
-}
-
-@keyframes spin {
-    to { transform: rotate(360deg); }
 }
 
 /* Legacy status (hidden but preserved for compatibility) */
@@ -1916,7 +1791,6 @@ button:disabled {
 .folders.keyboard-navigating .tree-item,
 .folders.keyboard-navigating .tree-item-content,
 .files.keyboard-navigating #file-list li {
-    transition: none !important;
 }
 
 /* Help Box Modal */
@@ -1931,7 +1805,6 @@ button:disabled {
     z-index: 999;
     opacity: 0;
     pointer-events: none;
-    transition: opacity var(--transition-normal);
 }
 
 .help-overlay.active {
@@ -1955,7 +1828,6 @@ button:disabled {
     z-index: 1000;
     opacity: 0;
     pointer-events: none;
-    transition: all var(--transition-normal);
     backdrop-filter: blur(10px);
 }
 
@@ -1976,7 +1848,6 @@ button:disabled {
     color: var(--text-secondary);
     font-size: 14px;
     cursor: pointer;
-    transition: none;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -2040,7 +1911,6 @@ button:disabled {
     background: rgba(255, 255, 255, 0.02);
     border-radius: 6px;
     border: 1px solid rgba(255, 255, 255, 0.05);
-    transition: none;
 }
 
 .help-description {
@@ -2092,7 +1962,6 @@ button:disabled {
     color: var(--accent-primary);
     text-decoration: none;
     font-size: 0.7rem;
-    transition: none;
     padding: 0.2rem 0.5rem;
     border-radius: 4px;
     background: rgba(74, 127, 255, 0.1);
@@ -2167,22 +2036,6 @@ button::after {
 }
 
 button:focus:not(:active):not(.processing):not(.success):not(.error):not(.warning)::after {
-    animation: ripple 1s ease-out;
-}
-
-@keyframes ripple {
-    0% {
-        transform: scale(0, 0);
-        opacity: 1;
-    }
-    20% {
-        transform: scale(25, 25);
-        opacity: 1;
-    }
-    100% {
-        opacity: 0;
-        transform: scale(40, 40);
-    }
 }
 
 /* Disable hover effects during status display */
