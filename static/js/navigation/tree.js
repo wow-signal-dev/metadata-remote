@@ -1,6 +1,6 @@
 /**
  * Tree Navigation Management for Metadata Remote
- * Handles folder tree loading, building, sorting, and interaction
+ * Handles folder tree loading, building, sorting, filtering, and interaction
  */
 
 (function() {
@@ -26,6 +26,125 @@
         init(selectTreeItem, loadFiles) {
             selectTreeItemCallback = selectTreeItem;
             loadFilesCallback = loadFiles;
+            
+            // Set up the new folder controls
+            this.setupFolderControls();
+        },
+        
+        /**
+         * Set up filter and sort controls for folders pane
+         */
+        setupFolderControls() {
+            // Filter button toggle
+            const filterBtn = document.getElementById('folders-filter-btn');
+            const filterContainer = document.getElementById('folders-filter');
+            const filterInput = document.getElementById('folders-filter-input');
+            
+            if (filterBtn && filterContainer && filterInput) {
+                filterBtn.addEventListener('click', () => {
+                    const isActive = filterContainer.classList.contains('active');
+                    
+                    // Close any open sort dropdown
+                    document.getElementById('folders-sort-dropdown').classList.remove('active');
+                    State.activeSortDropdown = null;
+                    
+                    filterContainer.classList.toggle('active');
+                    filterBtn.classList.toggle('active');
+                    State.activeFilterPane = isActive ? null : 'folders';
+                    
+                    if (!isActive) {
+                        filterInput.focus();
+                        State.focusedPane = 'folders';
+                    }
+                });
+                
+                // Filter input handler
+                filterInput.addEventListener('input', (e) => {
+                    State.foldersFilter = e.target.value;
+                    this.rebuildTree();
+                });
+                
+                // Escape key to close filter
+                filterInput.addEventListener('keydown', (e) => {
+                    if (e.key === 'Escape') {
+                        filterContainer.classList.remove('active');
+                        filterBtn.classList.remove('active');
+                        State.activeFilterPane = null;
+                        document.getElementById('folders-pane').focus();
+                    }
+                });
+            }
+            
+            // Sort field button
+            const sortBtn = document.getElementById('folders-sort-btn');
+            const sortDropdown = document.getElementById('folders-sort-dropdown');
+            const sortDirection = document.getElementById('folders-sort-direction');
+            const sortIndicator = document.getElementById('folders-sort-indicator');
+            
+            if (sortBtn && sortDropdown) {
+                sortBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    
+                    // Close filter if open
+                    filterContainer.classList.remove('active');
+                    filterBtn.classList.remove('active');
+                    State.activeFilterPane = null;
+                    
+                    const isActive = sortDropdown.classList.contains('active');
+                    sortDropdown.classList.toggle('active');
+                    State.activeSortDropdown = isActive ? null : 'folders';
+                    State.focusedPane = 'folders';
+                });
+                
+                // Sort direction toggle
+                sortDirection.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    State.foldersSort.direction = State.foldersSort.direction === 'asc' ? 'desc' : 'asc';
+                    this.updateSortUI();
+                    this.rebuildTree();
+                });
+                
+                // Sort options
+                sortDropdown.querySelectorAll('.sort-option').forEach(option => {
+                    option.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const sortBy = option.dataset.sort;
+                        
+                        // When selecting a new field, always start with ascending
+                        State.foldersSort.method = sortBy;
+                        State.foldersSort.direction = 'asc';
+                        
+                        this.updateSortUI();
+                        this.rebuildTree();
+                        sortDropdown.classList.remove('active');
+                        State.activeSortDropdown = null;
+                    });
+                });
+            }
+            
+            // Close dropdowns on outside click
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('#folders-sort-dropdown') && !e.target.closest('#folders-sort-btn')) {
+                    sortDropdown.classList.remove('active');
+                    if (State.activeSortDropdown === 'folders') {
+                        State.activeSortDropdown = null;
+                    }
+                }
+            });
+        },
+        
+        /**
+         * Filter tree items based on filter text
+         * @param {Array} items - Items to filter
+         * @param {string} filterText - Filter text
+         * @returns {Array} Filtered items
+         */
+        filterTreeItems(items, filterText) {
+            if (!filterText) return items;
+            const lower = filterText.toLowerCase();
+            return items.filter(item => 
+                item.name.toLowerCase().includes(lower)
+            );
         },
         
         /**
@@ -36,6 +155,7 @@
                 const data = await API.loadTree();
                 State.treeData[''] = data.items;
                 this.buildTreeFromData();
+                this.updateSortUI(); // Initialize sort UI
             } catch (err) {
                 console.error('Error loading tree:', err);
                 UIUtils.showStatus('Error loading folders', 'error');
@@ -49,7 +169,9 @@
             const tree = document.getElementById('folder-tree');
             tree.innerHTML = '';
             
-            const sortedItems = this.sortItems(State.treeData[''] || []);
+            // Apply filtering first
+            const filteredItems = this.filterTreeItems(State.treeData[''] || [], State.foldersFilter);
+            const sortedItems = this.sortItems(filteredItems);
             
             sortedItems.forEach(item => {
                 if (item.type === 'folder') {
@@ -64,7 +186,6 @@
                 selectTreeItemCallback(firstTreeItem, true);
                 // Also set the focused pane to folders
                 State.focusedPane = 'folders';
-                // Note: updatePaneFocus is handled by the main app
             }
         },
 
@@ -81,6 +202,11 @@
                     if (children && State.treeData[path].length > 0) {
                         this.rebuildChildren(path, children, this.getLevel(path) + 1);
                         children.classList.add('expanded');
+                        // Update folder icon
+                        const icon = element.querySelector('.tree-icon');
+                        if (icon) {
+                            icon.innerHTML = '📂';
+                        }
                     }
                 }
             });
@@ -112,7 +238,10 @@
          */
         rebuildChildren(path, container, level) {
             container.innerHTML = '';
-            const sortedItems = this.sortItems(State.treeData[path] || []);
+            
+            // Apply filtering first
+            const filteredItems = this.filterTreeItems(State.treeData[path] || [], State.foldersFilter);
+            const sortedItems = this.sortItems(filteredItems);
             
             sortedItems.forEach(item => {
                 if (item.type === 'folder') {
@@ -180,7 +309,9 @@
             };
             
             if (State.treeData[item.path] && State.treeData[item.path].length > 0 && State.expandedFolders.has(item.path)) {
-                const sortedItems = this.sortItems(State.treeData[item.path]);
+                // Apply filtering to children
+                const filteredChildren = this.filterTreeItems(State.treeData[item.path], State.foldersFilter);
+                const sortedItems = this.sortItems(filteredChildren);
                 sortedItems.forEach(child => {
                     if (child.type === 'folder') {
                         children.appendChild(this.createTreeItem(child, level + 1));
@@ -204,7 +335,9 @@
                 const data = await API.loadTreeChildren(path);
                 State.treeData[path] = data.items;
                 
-                const sortedItems = this.sortItems(data.items);
+                // Apply filtering
+                const filteredItems = this.filterTreeItems(data.items, State.foldersFilter);
+                const sortedItems = this.sortItems(filteredItems);
                 
                 sortedItems.forEach(item => {
                     if (item.type === 'folder') {
@@ -225,27 +358,26 @@
             return items.sort((a, b) => {
                 let comparison = 0;
                 
-                // CHANGED: Use State.foldersSort instead of State.currentSort
                 if (State.foldersSort.method === 'name') {
                     comparison = a.name.toLowerCase().localeCompare(b.name.toLowerCase());
                 } else if (State.foldersSort.method === 'date') {
+                    // Use created timestamp from the folder data
                     comparison = (a.created || 0) - (b.created || 0);
                 } else if (State.foldersSort.method === 'size') {
                     // Size sorting will need backend support
+                    // For now, use 0 as default size
                     comparison = (a.size || 0) - (b.size || 0);
                 }
                 
-                // CHANGED: Use State.foldersSort.direction
                 return State.foldersSort.direction === 'asc' ? comparison : -comparison;
             });
         },
 
         /**
          * Set the sort method and rebuild tree
-         * @param {string} method - Sort method ('name' or 'date')
+         * @param {string} method - Sort method ('name', 'date', or 'size')
          */
         setSortMethod(method) {
-            // CHANGED: Use State.foldersSort
             if (State.foldersSort.method === method) {
                 State.foldersSort.direction = State.foldersSort.direction === 'asc' ? 'desc' : 'asc';
             } else {
@@ -261,24 +393,27 @@
          * Update the sort UI to reflect current state
          */
         updateSortUI() {
-            // Note: This method will be completely replaced in later subtasks
-            // For now, just update the state references
-            document.querySelectorAll('.sort-option').forEach(opt => {
-                opt.classList.remove('active');
-                opt.querySelectorAll('.sort-arrow').forEach(arrow => {
-                    arrow.classList.remove('active');
-                });
-            });
+            const sortBtn = document.getElementById('folders-sort-btn');
+            const sortIndicator = document.getElementById('folders-sort-indicator');
+            const sortDropdown = document.getElementById('folders-sort-dropdown');
             
-            // CHANGED: Use State.foldersSort
-            const activeOption = document.getElementById(`sort-${State.foldersSort.method}`);
-            if (activeOption) {
-                activeOption.classList.add('active');
-                const arrow = activeOption.querySelector(`.sort-arrow[data-dir="${State.foldersSort.direction}"]`);
-                if (arrow) {
-                    arrow.classList.add('active');
-                }
-            }
+            if (!sortBtn || !sortIndicator || !sortDropdown) return;
+            
+            // Update button title
+            const fieldNames = {
+                name: 'Name',
+                date: 'Date Modified',
+                size: 'Size'
+            };
+            sortBtn.title = `Sort by: ${fieldNames[State.foldersSort.method] || 'Name'}`;
+            
+            // Update direction indicator
+            sortIndicator.textContent = State.foldersSort.direction === 'asc' ? '▲' : '▼';
+            
+            // Update active option in dropdown
+            sortDropdown.querySelectorAll('.sort-option').forEach(option => {
+                option.classList.toggle('active', option.dataset.sort === State.foldersSort.method);
+            });
         }
     };
 })();
