@@ -768,7 +768,6 @@ input:autofill {
     left: 0;
     right: 0;
     background: #1a1a1a;
-    /*border-bottom: 2px solid var(--accent-primary); */
     padding: 10px 12px;
     z-index: 20;
     display: none;
