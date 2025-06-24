@@ -22,7 +22,14 @@ window.MetadataRemote.State = {
     // Tree and folder state
     treeData: {},
     expandedFolders: new Set(),
-    currentSort: { method: 'name', direction: 'asc' },
+    currentSort: { 
+        folders: { method: 'name', direction: 'asc' },
+        files: { method: 'name', direction: 'asc' }
+    },
+    filterState: {
+        folders: '',
+        files: ''
+    },
     
     // UI state
     focusedPane: 'folders',
