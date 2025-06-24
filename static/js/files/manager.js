@@ -28,7 +28,141 @@
             selectFileItemCallback = callbacks.selectFileItem;
             showInferenceSuggestionsCallback = callbacks.showInferenceSuggestions;
             hideInferenceSuggestionsCallback = callbacks.hideInferenceSuggestions;
-            this.setupFilterBox();
+            
+            // Set up the new file controls instead of the old filter box
+            this.setupFileControls();
+        },
+        
+        /**
+         * Set up filter and sort controls for files pane
+         */
+        setupFileControls() {
+            // Filter button toggle
+            const filterBtn = document.getElementById('files-filter-btn');
+            const filterContainer = document.getElementById('files-filter');
+            const filterInput = document.getElementById('files-filter-input');
+            
+            if (filterBtn && filterContainer && filterInput) {
+                filterBtn.addEventListener('click', () => {
+                    const isActive = filterContainer.classList.contains('active');
+                    
+                    // Close any open sort dropdown
+                    document.getElementById('files-sort-dropdown').classList.remove('active');
+                    State.activeSortDropdown = null;
+                    
+                    filterContainer.classList.toggle('active');
+                    filterBtn.classList.toggle('active');
+                    State.activeFilterPane = isActive ? null : 'files';
+                    
+                    if (!isActive) {
+                        filterInput.focus();
+                        State.focusedPane = 'files';
+                    }
+                });
+                
+                // Filter input handler
+                filterInput.addEventListener('input', (e) => {
+                    State.filesFilter = e.target.value;
+                    // Re-render the file list with the new filter
+                    this.renderFileList();
+                });
+                
+                // Escape key to close filter
+                filterInput.addEventListener('keydown', (e) => {
+                    if (e.key === 'Escape') {
+                        filterContainer.classList.remove('active');
+                        filterBtn.classList.remove('active');
+                        State.activeFilterPane = null;
+                        document.getElementById('files-pane').focus();
+                    }
+                });
+            }
+            
+            // Sort field button
+            const sortBtn = document.getElementById('files-sort-btn');
+            const sortDropdown = document.getElementById('files-sort-dropdown');
+            const sortDirection = document.getElementById('files-sort-direction');
+            const sortIndicator = document.getElementById('files-sort-indicator');
+            
+            if (sortBtn && sortDropdown) {
+                sortBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    
+                    // Close filter if open
+                    filterContainer.classList.remove('active');
+                    filterBtn.classList.remove('active');
+                    State.activeFilterPane = null;
+                    
+                    const isActive = sortDropdown.classList.contains('active');
+                    sortDropdown.classList.toggle('active');
+                    State.activeSortDropdown = isActive ? null : 'files';
+                    State.focusedPane = 'files';
+                });
+                
+                // Sort direction toggle
+                sortDirection.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    State.filesSort.direction = State.filesSort.direction === 'asc' ? 'desc' : 'asc';
+                    this.updateSortUI();
+                    this.renderFileList();
+                });
+                
+                // Sort options
+                sortDropdown.querySelectorAll('.sort-option').forEach(option => {
+                    option.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const sortBy = option.dataset.sort;
+                        
+                        // Use smart defaults for direction based on field
+                        State.filesSort.method = sortBy;
+                        // Date and size typically start descending (newest/largest first)
+                        State.filesSort.direction = (sortBy === 'date' || sortBy === 'size') ? 'desc' : 'asc';
+                        
+                        this.updateSortUI();
+                        this.renderFileList();
+                        sortDropdown.classList.remove('active');
+                        State.activeSortDropdown = null;
+                    });
+                });
+            }
+            
+            // Close dropdowns on outside click
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('#files-sort-dropdown') && !e.target.closest('#files-sort-btn')) {
+                    sortDropdown.classList.remove('active');
+                    if (State.activeSortDropdown === 'files') {
+                        State.activeSortDropdown = null;
+                    }
+                }
+            });
+        },
+        
+        /**
+         * Update the sort UI to reflect current state
+         */
+        updateSortUI() {
+            const sortBtn = document.getElementById('files-sort-btn');
+            const sortIndicator = document.getElementById('files-sort-indicator');
+            const sortDropdown = document.getElementById('files-sort-dropdown');
+            
+            if (!sortBtn || !sortIndicator || !sortDropdown) return;
+            
+            // Update button title
+            const fieldNames = {
+                name: 'Name',
+                date: 'Date',
+                type: 'Type',
+                size: 'Size'
+            };
+            sortBtn.title = `Sort by: ${fieldNames[State.filesSort.method] || 'Name'}`;
+            
+            // Update direction indicator
+            sortIndicator.textContent = State.filesSort.direction === 'asc' ? '▲' : '▼';
+            
+            // Update active option in dropdown
+            sortDropdown.querySelectorAll('.sort-option').forEach(option => {
+                option.classList.toggle('active', option.dataset.sort === State.filesSort.method);
+            });
         },
         
         /**
@@ -43,75 +177,148 @@
             
             try {
                 const data = await API.loadFiles(folderPath);
-                const list = document.getElementById('file-list');
-                list.innerHTML = '';
                 
+                // Store the raw file data
+                State.currentFiles = data.files;
+                
+                // Update count before filtering
                 document.getElementById('file-count').textContent = `(${data.files.length})`;
                 
-                if (data.files.length === 0) {
-                    const li = document.createElement('li');
-                    li.textContent = 'No audio files found';
-                    li.style.color = '#999';
-                    li.style.cursor = 'default';
-                    list.appendChild(li);
-                    return;
-                }
-
-                const filter_value = document.getElementById('filter-box').value.toLowerCase().trim();
+                // Render the file list (which will apply filtering and sorting)
+                this.renderFileList();
                 
-                data.files.forEach(file => {
-                    const li = document.createElement('li');
-                    li.dataset.filepath = file.path;
-
-                    if (filter_value.length > 0 && !file.name.toLowerCase().includes(filter_value)) {
-                        li.setAttribute("aria-hidden", "true");
-                    }
-                    
-                    const fileInfo = document.createElement('div');
-                    fileInfo.className = 'file-info';
-                    
-                    const nameDiv = document.createElement('div');
-                    const formatEmoji = UIUtils.getFormatEmoji(file.name);
-                    const musicIcon = document.createTextNode(formatEmoji + ' ');
-                    nameDiv.appendChild(musicIcon);
-                    nameDiv.appendChild(document.createTextNode(file.name));
-                    
-                    // Add format badge
-                    const badgeHtml = UIUtils.getFormatBadge(file.name);
-                    nameDiv.insertAdjacentHTML('beforeend', badgeHtml);
-                    
-                    fileInfo.appendChild(nameDiv);
-                    
-                    if (file.folder !== '.') {
-                        const folderDiv = document.createElement('div');
-                        folderDiv.className = 'file-folder';
-                        folderDiv.textContent = file.folder;
-                        fileInfo.appendChild(folderDiv);
-                    }
-                    
-                    li.appendChild(fileInfo);
-                    
-                    const playButton = document.createElement('div');
-                    playButton.className = 'play-button';
-                    playButton.innerHTML = '<span class="play-icon">▶</span><span class="pause-icon">❚❚</span>';
-                    playButton.onclick = (e) => {
-                        e.stopPropagation();
-                        AudioPlayer.togglePlayback(file.path, playButton);
-                    };
-                    li.appendChild(playButton);
-                    
-                    li.onclick = (e) => {
-                        if (!e.target.closest('.play-button')) {
-                            this.loadFile(file.path, li);
-                        }
-                    };
-                    list.appendChild(li);
-                });
+                // Update sort UI to reflect current state
+                this.updateSortUI();
+                
             } catch (err) {
                 console.error('Error loading files:', err);
                 UIUtils.showStatus('Error loading files', 'error');
                 document.getElementById('file-count').textContent = '(error)';
             }
+        },
+        
+        /**
+         * Sort files based on current sort settings
+         * @param {Array} files - Files to sort
+         * @returns {Array} Sorted files
+         */
+        sortFiles(files) {
+            return [...files].sort((a, b) => {
+                let aVal, bVal;
+                
+                switch (State.filesSort.method) {
+                    case 'name':
+                        aVal = a.name.toLowerCase();
+                        bVal = b.name.toLowerCase();
+                        break;
+                    case 'date':
+                        // Need to get file dates from backend
+                        // For now, use 0 as placeholder
+                        aVal = a.date || 0;
+                        bVal = b.date || 0;
+                        break;
+                    case 'type':
+                        const aExt = a.name.split('.').pop().toLowerCase();
+                        const bExt = b.name.split('.').pop().toLowerCase();
+                        aVal = aExt;
+                        bVal = bExt;
+                        break;
+                    case 'size':
+                        // Need to get file sizes from backend
+                        // For now, use 0 as placeholder
+                        aVal = a.size || 0;
+                        bVal = b.size || 0;
+                        break;
+                    default:
+                        aVal = a.name.toLowerCase();
+                        bVal = b.name.toLowerCase();
+                }
+                
+                if (State.filesSort.direction === 'asc') {
+                    return aVal > bVal ? 1 : -1;
+                } else {
+                    return aVal < bVal ? 1 : -1;
+                }
+            });
+        },
+        
+        /**
+         * Render the file list with current filter and sort settings
+         */
+        renderFileList() {
+            const list = document.getElementById('file-list');
+            list.innerHTML = '';
+            
+            if (!State.currentFiles || State.currentFiles.length === 0) {
+                const li = document.createElement('li');
+                li.textContent = 'No audio files found';
+                li.style.color = '#999';
+                li.style.cursor = 'default';
+                list.appendChild(li);
+                return;
+            }
+            
+            // Apply filter
+            const filterValue = State.filesFilter.toLowerCase().trim();
+            let filteredFiles = State.currentFiles;
+            
+            if (filterValue.length > 0) {
+                filteredFiles = State.currentFiles.filter(file => 
+                    file.name.toLowerCase().includes(filterValue)
+                );
+            }
+            
+            // Update file count to show filtered count
+            document.getElementById('file-count').textContent = `(${filteredFiles.length})`;
+            
+            // Apply sorting
+            const sortedFiles = this.sortFiles(filteredFiles);
+            
+            // Render each file
+            sortedFiles.forEach(file => {
+                const li = document.createElement('li');
+                li.dataset.filepath = file.path;
+                
+                const fileInfo = document.createElement('div');
+                fileInfo.className = 'file-info';
+                
+                const nameDiv = document.createElement('div');
+                const formatEmoji = UIUtils.getFormatEmoji(file.name);
+                const musicIcon = document.createTextNode(formatEmoji + ' ');
+                nameDiv.appendChild(musicIcon);
+                nameDiv.appendChild(document.createTextNode(file.name));
+                
+                // Add format badge
+                const badgeHtml = UIUtils.getFormatBadge(file.name);
+                nameDiv.insertAdjacentHTML('beforeend', badgeHtml);
+                
+                fileInfo.appendChild(nameDiv);
+                
+                if (file.folder !== '.') {
+                    const folderDiv = document.createElement('div');
+                    folderDiv.className = 'file-folder';
+                    folderDiv.textContent = file.folder;
+                    fileInfo.appendChild(folderDiv);
+                }
+                
+                li.appendChild(fileInfo);
+                
+                const playButton = document.createElement('div');
+                playButton.className = 'play-button';
+                playButton.innerHTML = '<span class="play-icon">▶</span><span class="pause-icon">❚❚</span>';
+                playButton.onclick = (e) => {
+                    e.stopPropagation();
+                    AudioPlayer.togglePlayback(file.path, playButton);
+                };
+                li.appendChild(playButton);
+                
+                li.onclick = (e) => {
+                    if (!e.target.closest('.play-button')) {
+                        this.loadFile(file.path, li);
+                    }
+                };
+                list.appendChild(li);
+            });
         },
 
         /**
@@ -325,36 +532,6 @@
             }
             
             UIUtils.setFormEnabled(true);
-        },
-        
-        /**
-         * Set up the filter box for file filtering
-         */
-        setupFilterBox() {
-            const filterBox = document.getElementById('filter-box');
-            if (filterBox) {
-                filterBox.addEventListener('input', (e) => {
-                    const value = e.target.value.toLowerCase().trim();
-                    
-                    // Store filter value in state (preparation for new implementation)
-                    State.filesFilter = value;
-                    
-                    const fileListItems = document.querySelectorAll('#file-list > li');
-                    
-                    fileListItems.forEach(li => {
-                        const fileName = li.querySelector('.file-info > div');
-                        if (fileName) {
-                            const fileNameText = fileName.innerText.toLowerCase();
-                            // If the filtered value does not match name, hide item
-                            if (value.length > 0 && !fileNameText.includes(value)) {
-                                li.setAttribute("aria-hidden", "true");
-                            } else {
-                                li.removeAttribute("aria-hidden");
-                            }
-                        }
-                    });
-                });
-            }
-        },
+        }
     };
 })();
