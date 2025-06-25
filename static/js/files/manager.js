@@ -322,7 +322,7 @@
                 if (State.filesSort.method === 'date' || State.filesSort.method === 'size') {
                     const metaDiv = document.createElement('div');
                     metaDiv.className = 'file-meta';
-                    metaDiv.style.cssText = 'font-size: 0.75rem; color: #999; margin-top: 0.2rem;';
+                    metaDiv.style.cssText = 'font-size: 0.75rem; color: #999; margin-top: 0.1rem;';
                     
                     if (State.filesSort.method === 'date' && file.date) {
                         metaDiv.textContent = this.formatDate(file.date);
