@@ -844,7 +844,7 @@ input:autofill {
 }
 
 .tree {
-    padding: 0.5rem 0;
+    padding: 0.25rem 0;
 }
 
 .tree-item {
@@ -855,7 +855,7 @@ input:autofill {
 .tree-item-content {
     display: flex;
     align-items: center;
-    padding: 0.6rem 1.25rem;
+    padding: 0.4rem 1.25rem;
     position: relative;
     overflow: hidden;
 }
@@ -873,7 +873,7 @@ input:autofill {
 
 .tree-item-content:hover {
     background: var(--bg-hover);
-    padding-left: 1.5rem;
+    padding-left: 1.4rem;
 }
 
 .tree-item.selected > .tree-item-content {
@@ -897,8 +897,8 @@ input:autofill {
 }
 
 .tree-icon {
-    margin-right: 0.75rem;
-    font-size: 1.1rem;
+    margin-right: 0.5rem;
+    font-size: 1rem;
     filter: saturate(0.5);
 }
 
