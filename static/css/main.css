@@ -2048,7 +2048,7 @@ button:disabled {
 }
 
 /* Focus styles for accessibility */
-*:focus-visible {
+*:not(.folders):not(.files):focus-visible {
     outline: 1px solid var(--accent-primary);
     outline-offset: 2px;
 }
