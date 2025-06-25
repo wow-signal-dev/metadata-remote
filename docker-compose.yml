@@ -1,5 +1,4 @@
 version: '3.8'
-
 services:
   metadata-remote:
     image: ghcr.io/wow-signal-dev/metadata-remote:latest
@@ -8,8 +7,11 @@ services:
       - "8338:8338"
     volumes:
       - /path/to/your/music:/music  # Users must change this
+      # To add multiple music folders, mount them as subdirectories:
+      # - /path/to/music1:/music/Library1
+      # - /path/to/music2:/music/Library2
+      # ... etc.
     environment:
       - PUID=1000
       - PGID=1000
     restart: unless-stopped
-    
