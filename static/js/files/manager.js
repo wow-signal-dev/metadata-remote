@@ -344,7 +344,7 @@
                 
                 const playButton = document.createElement('div');
                 playButton.className = 'play-button';
-                playButton.innerHTML = '<span class="play-icon">▶</span><span class="pause-icon">❚❚</span>';
+                playButton.innerHTML = '<span class="play-icon">▶</span><span class="pause-icon">❚❚</span><span class="play-spinner"></span>';
                 playButton.onclick = (e) => {
                     e.stopPropagation();
                     AudioPlayer.togglePlayback(file.path, playButton);
