@@ -549,6 +549,112 @@ class MetadataInferenceEngine:
             })
         
         return self._deduplicate_candidates(candidates, 'albumartist')
+
+    def _infer_composer(self, evidence_state: dict) -> List[dict]:
+        """Infer composer from evidence - especially effective for classical music"""
+        candidates = []
+        
+        # Strategy 1: Classical music filename patterns
+        filename = evidence_state['filename_no_ext']
+        
+        # Pattern: Composer - Work - Movement
+        composer_work_pattern = r'^([A-Z][a-zA-Z\s\.,]+)\s*[-_]\s*([^-_]+(?:\s*[Oo]p\.?\s*\d+[a-zA-Z]?))\s*[-_]\s*(.+)'
+        match = re.match(composer_work_pattern, filename)
+        if match:
+            composer_name = match.group(1).strip()
+            candidates.append({
+                'value': composer_name,
+                'confidence': 85,
+                'source': 'filename_pattern',
+                'evidence': ['classical_pattern']
+            })
+        
+        # Pattern: Look for opus numbers which indicate classical music
+        opus_patterns = [
+            r'Op\.?\s*\d+[a-zA-Z]?',
+            r'BWV\s*\d+',  # Bach
+            r'K\.?\s*\d+',  # Mozart/Scarlatti
+            r'D\.?\s*\d+',  # Schubert
+            r'Hob\.?\s*[IVX]+:\d+',  # Haydn
+            r'RV\s*\d+',  # Vivaldi
+            r'S\.?\s*\d+'  # Liszt
+        ]
+        
+        for pattern in opus_patterns:
+            if re.search(pattern, filename, re.IGNORECASE):
+                # Extract potential composer from beginning of filename
+                composer_match = re.match(r'^([A-Z][a-zA-Z\s\.,]+?)(?:\s*[-_]|\s+(?:Op|BWV|K|D|Hob|RV|S))', filename)
+                if composer_match:
+                    candidates.append({
+                        'value': composer_match.group(1).strip(),
+                        'confidence': 80,
+                        'source': 'opus_pattern',
+                        'evidence': ['opus_number_found']
+                    })
+                break
+        
+        # Strategy 2: Folder structure for classical music
+        folder_parts = evidence_state['folder_parts']
+        if folder_parts:
+            # Check for Classical folder structure
+            for i, part in enumerate(folder_parts):
+                if part.lower() in ['classical', 'classic', 'klassik']:
+                    # Next folder might be composer
+                    if i + 1 < len(folder_parts):
+                        candidates.append({
+                            'value': folder_parts[i + 1],
+                            'confidence': 75,
+                            'source': 'folder_structure',
+                            'evidence': ['classical_folder_structure']
+                        })
+                    break
+            
+            # Check parent folder as potential composer
+            if evidence_state['folder_name']:
+                # Common classical album patterns
+                classical_indicators = ['symphony', 'concerto', 'sonata', 'quartet', 'opus', 'suite']
+                if any(indicator in evidence_state['folder_name'].lower() for indicator in classical_indicators):
+                    # Parent folder might be composer
+                    if evidence_state['parent_folder']:
+                        candidates.append({
+                            'value': evidence_state['parent_folder'],
+                            'confidence': 70,
+                            'source': 'folder_structure',
+                            'evidence': ['classical_work_folder']
+                        })
+        
+        # Strategy 3: Extract from parentheses (often contains composer)
+        paren_matches = re.findall(r'\(([^)]+)\)', evidence_state['filename'])
+        for match in paren_matches:
+            # Check if it looks like a name (capitalized words)
+            if re.match(r'^[A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)*$', match.strip()):
+                candidates.append({
+                    'value': match.strip(),
+                    'confidence': 65,
+                    'source': 'parenthetical',
+                    'evidence': ['composer_in_parentheses']
+                })
+        
+        # Strategy 4: Known classical composers quick check
+        known_composers = [
+            'Bach', 'Mozart', 'Beethoven', 'Brahms', 'Chopin', 'Debussy',
+            'Handel', 'Haydn', 'Liszt', 'Mahler', 'Mendelssohn', 'Prokofiev',
+            'Rachmaninoff', 'Ravel', 'Schubert', 'Schumann', 'Shostakovich',
+            'Sibelius', 'Strauss', 'Stravinsky', 'Tchaikovsky', 'Vivaldi', 'Wagner'
+        ]
+        
+        text_to_search = f"{filename} {evidence_state['folder_name']} {evidence_state.get('parent_folder', '')}"
+        for composer in known_composers:
+            if composer.lower() in text_to_search.lower():
+                candidates.append({
+                    'value': composer,
+                    'confidence': 90,
+                    'source': 'known_composer',
+                    'evidence': ['recognized_classical_composer']
+                })
+                break
+        
+        return self._deduplicate_candidates(candidates, 'composer')
     
     def _infer_disc(self, evidence_state: dict) -> List[dict]:
         """Infer disc number from evidence"""
@@ -674,6 +780,19 @@ class MetadataInferenceEngine:
                     if artist and title_hint:
                         results = self._mb_search_recordings(artist, title_hint)
                         candidates.extend(self._extract_mb_candidates(results, field))
+
+            elif field == 'composer':
+                # Search for classical works
+                work_hint = evidence_state['existing_metadata'].get('title', '')
+                if not work_hint:
+                    # Try to extract from filename
+                    work_candidates = self._extract_work_from_filename(evidence_state)
+                    if work_candidates:
+                        work_hint = work_candidates[0]
+                
+                if work_hint:
+                    results = self._mb_search_work(work_hint)
+                    candidates.extend(self._extract_mb_composer_candidates(results))
             
             elif field == 'genre':
                 # Search by artist
@@ -692,6 +811,85 @@ class MetadataInferenceEngine:
         
         except Exception as e:
             logger.error(f"MusicBrainz query error: {e}")
+        
+        return candidates
+
+    def _extract_work_from_filename(self, evidence_state: dict) -> List[str]:
+        """Extract potential work titles from filename for composer search"""
+        filename = evidence_state['filename_no_ext']
+        works = []
+        
+        # Remove composer names if found
+        for segment_info in evidence_state['filename_segments']:
+            parts = segment_info['parts']
+            if len(parts) >= 2:
+                # Assume last part might be work title
+                works.append(parts[-1].strip())
+        
+        return works
+
+    def _mb_search_work(self, work_title: str) -> dict:
+        """Search MusicBrainz for classical works"""
+        cache_key = hashlib.md5(f"work:{work_title}".encode()).hexdigest()
+        
+        with self.cache_lock:
+            if cache_key in self.cache:
+                cached_data, cached_time = self.cache[cache_key]
+                if time.time() - cached_time < INFERENCE_CACHE_DURATION:
+                    return cached_data
+        
+        query = f'work:"{work_title}"'
+        url = f"https://musicbrainz.org/ws/2/work/?query={urllib.parse.quote(query)}&fmt=json&limit=5"
+        
+        try:
+            req = urllib.request.Request(url, headers={
+                'User-Agent': MUSICBRAINZ_USER_AGENT
+            })
+            
+            with urllib.request.urlopen(req, timeout=10) as response:
+                data = json.loads(response.read().decode('utf-8'))
+                
+                with self.cache_lock:
+                    self.cache[cache_key] = (data, time.time())
+                
+                return data
+        except Exception as e:
+            logger.error(f"MusicBrainz API error: {e}")
+            return {'works': []}
+
+    def _extract_mb_composer_candidates(self, mb_data: dict) -> List[dict]:
+        """Extract composer candidates from MusicBrainz work search"""
+        candidates = []
+        
+        for work in mb_data.get('works', [])[:3]:
+            # Look for composer relationships
+            relations = work.get('relations', [])
+            for relation in relations:
+                if relation.get('type') == 'composer':
+                    artist = relation.get('artist', {})
+                    if artist.get('name'):
+                        candidates.append({
+                            'value': artist['name'],
+                            'confidence': 90,
+                            'source': 'musicbrainz',
+                            'evidence': ['mb_work_composer'],
+                            'mbid': artist.get('id')
+                        })
+                        break
+            
+            # Also check attributes for composer info
+            if not candidates and work.get('disambiguation'):
+                # Sometimes composer is in disambiguation
+                disambig = work['disambiguation']
+                # Simple pattern to extract composer names
+                composer_match = re.search(r'by ([A-Z][a-zA-Z\s\.]+)', disambig)
+                if composer_match:
+                    candidates.append({
+                        'value': composer_match.group(1).strip(),
+                        'confidence': 70,
+                        'source': 'musicbrainz',
+                        'evidence': ['mb_work_disambiguation']
+                    })
         
         return candidates
     
