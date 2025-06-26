@@ -685,7 +685,7 @@ def infer_metadata_field(filename, field):
             return jsonify({'error': 'File not found'}), 404
         
         # Validate field
-        valid_fields = ['title', 'artist', 'album', 'albumartist', 'date', 'genre', 'track', 'disc']
+        valid_fields = ['title', 'artist', 'album', 'albumartist', 'date', 'genre', 'track', 'disc', 'composer']
         if field not in valid_fields:
             return jsonify({'error': 'Invalid field'}), 400
         
