@@ -65,6 +65,8 @@
                 'wav': '🌊',
                 'wma': '🪟',
                 'wv': '📦',
+                'ogg': '🎼',
+                'opus': '🎹'
             };
             return FORMAT_EMOJIS[ext] || '🎵';
         },
@@ -76,7 +78,7 @@
          */
         getFormatBadge(filename) {
             const ext = filename.split('.').pop().toUpperCase();
-            const lossless = ['FLAC', 'WAV', 'WV'];
+            const lossless = ['FLAC', 'WAV', 'WV', 'OGG', 'OPUS'];
             const limitedMetadata = ['WAV', 'WV'];
             const noAlbumArt = ['WAV', 'WV'];
             

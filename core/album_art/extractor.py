@@ -25,7 +25,12 @@ def extract_album_art(filepath):
         logger.debug(f"Format {base_format} does not support embedded album art")
         return None
     
-    # Build ffmpeg command to extract album art
+    # Special handling for OGG/Opus files
+    if base_format in ['ogg', 'opus']:
+        from core.album_art.ogg import ogg_album_art_handler
+        return ogg_album_art_handler.extract_album_art(filepath)
+    
+    # Build ffmpeg command to extract album art (for other formats)
     art_cmd = ['ffmpeg', '-i', filepath, '-an', '-vcodec', 'copy', '-f', 'image2pipe', '-']
     
     try:

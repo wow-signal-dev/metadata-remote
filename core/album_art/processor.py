@@ -15,6 +15,52 @@ from core.album_art.extractor import extract_album_art
 def detect_corrupted_album_art(filepath):
     """Detect if album art in the file is corrupted"""
     try:
+        # Get file format
+        _, _, base_format = get_file_format(filepath)
+        
+        # Special handling for OGG/Opus files
+        if base_format in ['ogg', 'opus']:
+            from core.album_art.ogg import ogg_album_art_handler
+            
+            # Try to extract album art - if it fails, it's corrupted
+            try:
+                art_data = ogg_album_art_handler.extract_album_art(filepath)
+                
+                # Check if extraction was successful
+                if art_data:
+                    # Successfully extracted - not corrupted
+                    return False
+                
+                # No art data extracted, but check if art exists
+                has_art = ogg_album_art_handler.has_album_art(filepath)
+                if not has_art:
+                    # No art at all - not corrupted
+                    return False
+                
+                # Art exists but couldn't be extracted - check if it's truly corrupted
+                # by trying a more aggressive extraction method
+                probe_data = run_ffprobe(filepath)
+                for stream in probe_data.get('streams', []):
+                    if stream.get('codec_type') == 'video':
+                        # Try basic ffmpeg extraction to test if video stream is readable
+                        try:
+                            test_cmd = ['ffmpeg', '-i', filepath, '-an', '-f', 'null', '-']
+                            result = subprocess.run(test_cmd, capture_output=True, timeout=5)
+                            if result.returncode == 0:
+                                # Video stream is readable - not corrupted
+                                return False
+                        except:
+                            pass
+                
+                # If we get here, art exists but extraction failed - likely corrupted
+                return True
+                
+            except Exception as e:
+                logger.warning(f"Error checking OGG corruption for {filepath}: {e}")
+                # If there's art but extraction fails, it might be corrupted
+                return ogg_album_art_handler.has_album_art(filepath)
+        
+        # Rest of existing code for other formats...
         # First, try to run ffprobe normally
         probe_data = run_ffprobe(filepath)
         
@@ -79,6 +125,39 @@ def detect_corrupted_album_art(filepath):
 def fix_corrupted_album_art(filepath):
     """Extract and re-embed album art to fix corruption"""
     try:
+        # Get file format
+        _, _, base_format = get_file_format(filepath)
+        
+        # Special handling for OGG/Opus files
+        if base_format in ['ogg', 'opus']:
+            from core.album_art.ogg import ogg_album_art_handler
+            
+            # Try to extract existing art
+            try:
+                existing_art = ogg_album_art_handler.extract_album_art(filepath)
+                if existing_art:
+                    # Remove and re-embed the art using proper OGG handling
+                    if ogg_album_art_handler.embed_album_art(filepath, existing_art, remove_art=True):
+                        if ogg_album_art_handler.embed_album_art(filepath, existing_art):
+                            logger.info(f"Successfully fixed corrupted album art in OGG file {filepath}")
+                            return True
+                else:
+                    # No extractable art, just remove any corrupted art
+                    if ogg_album_art_handler.embed_album_art(filepath, None, remove_art=True):
+                        logger.info(f"Removed corrupted album art from OGG file {filepath}")
+                        return True
+            except Exception as e:
+                logger.error(f"Error fixing OGG album art: {e}")
+                # Try to remove any corrupted art as fallback
+                try:
+                    if ogg_album_art_handler.embed_album_art(filepath, None, remove_art=True):
+                        logger.info(f"Removed corrupted album art from OGG file {filepath}")
+                        return True
+                except:
+                    pass
+            return False
+        
+        # Original code for other formats follows...
         # Step 1: Try multiple methods to extract the image data
         image_data = None
         image_format = None

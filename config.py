@@ -16,7 +16,7 @@ HOST = '0.0.0.0'
 
 # Supported audio formats
 AUDIO_EXTENSIONS = (
-    '.mp3', '.flac', '.wav', '.m4a', '.wma', '.wv'
+    '.mp3', '.flac', '.wav', '.m4a', '.wma', '.wv', '.ogg', '.opus'
 )
 
 # MIME type mapping for streaming
@@ -26,7 +26,9 @@ MIME_TYPES = {
     '.wav': 'audio/wav',
     '.m4a': 'audio/mp4',
     '.wma': 'audio/x-ms-wma',
-    '.wv': 'audio/x-wavpack'
+    '.wv': 'audio/x-wavpack',
+    '.ogg': 'audio/ogg',
+    '.opus': 'audio/opus'
 }
 
 # Format-specific metadata handling
@@ -42,7 +44,9 @@ FORMAT_METADATA_CONFIG = {
     # Formats that don't support embedded album art
     'no_embedded_art': ['wav', 'wv'],
     # Formats with no standard composer field
-    'no_standard_composer': ['wav']  # Uses ICMS as workaround
+    'no_standard_composer': ['wav'],  # Uses ICMS as workaround
+    # Formats that store metadata at stream level
+    'stream_level_metadata': ['opus']
 }
 
 # History configuration

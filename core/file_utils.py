@@ -37,6 +37,8 @@ def get_file_format(filepath):
         output_format = 'asf'  # WMA uses ASF container
     elif ext == '.wv':
         output_format = 'wv'
+    elif ext in ['.ogg', '.opus']:
+        output_format = 'ogg'
     else:
         output_format = base_format
     

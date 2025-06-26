@@ -29,10 +29,36 @@ def read_metadata(filepath):
     
     # Get metadata using ffprobe
     probe_data = run_ffprobe(filepath)
-    tags = probe_data.get('format', {}).get('tags', {})
     
     # Get format info for proper normalization
     _, _, base_format = get_file_format(filepath)
+    
+    # More comprehensive metadata extraction for OGG/Opus
+    tags = {}
+    if base_format in ['ogg', 'opus']:
+        # For OGG/Opus files, we need to check both stream and format levels
+        # as per the research document
+        
+        # First try stream tags (typical for Opus)
+        for stream in probe_data.get('streams', []):
+            if stream.get('codec_type') == 'audio':
+                stream_tags = stream.get('tags', {})
+                if stream_tags:
+                    tags = stream_tags
+                    break
+        
+        # If no stream tags or incomplete, merge with format tags
+        format_tags = probe_data.get('format', {}).get('tags', {})
+        if not tags:
+            tags = format_tags
+        else:
+            # Merge format tags for any missing fields
+            for key, value in format_tags.items():
+                if key not in tags:
+                    tags[key] = value
+    else:
+        # For other formats, use format tags
+        tags = probe_data.get('format', {}).get('tags', {})
     
     # Normalize tags
     metadata = normalize_metadata_tags(tags, base_format)

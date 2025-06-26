@@ -10,7 +10,9 @@ from config import logger
 
 def run_ffprobe(filepath):
     """Run ffprobe and return parsed JSON data"""
-    cmd = ['ffprobe', '-v', 'quiet', '-print_format', 'json', '-show_format', filepath]
+    # CRITICAL: Must get BOTH format and streams data
+    cmd = ['ffprobe', '-v', 'quiet', '-print_format', 'json', 
+           '-show_format', '-show_streams', filepath]
     result = subprocess.run(cmd, capture_output=True, text=True)
     
     if result.returncode != 0:

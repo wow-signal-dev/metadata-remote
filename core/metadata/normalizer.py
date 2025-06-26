@@ -24,6 +24,21 @@ def normalize_metadata_tags(tags, format_type=''):
             'composer': tags.get('composer', tags.get('©wrt', ''))
         }
     
+    # Handle OGG/Opus specific normalization
+    elif format_type in ['ogg', 'opus']:
+        # OGG uses specific field names
+        return {
+            'title': tags.get('TITLE', tags.get('title', '')),
+            'artist': tags.get('ARTIST', tags.get('artist', '')),
+            'album': tags.get('ALBUM', tags.get('album', '')),
+            'albumartist': tags.get('ALBUMARTIST', tags.get('albumartist', tags.get('album_artist', ''))),
+            'date': tags.get('DATE', tags.get('date', tags.get('YEAR', tags.get('year', '')))),
+            'genre': tags.get('GENRE', tags.get('genre', '')),
+            'track': tags.get('TRACKNUMBER', tags.get('tracknumber', tags.get('TRACK', tags.get('track', '')))),
+            'disc': tags.get('DISCNUMBER', tags.get('discnumber', tags.get('DISC', tags.get('disc', '')))),
+            'composer': tags.get('COMPOSER', tags.get('composer', ''))
+        }
+    
     # Standard normalization for other formats
     return {
         'title': tags.get('title', tags.get('TITLE', tags.get('Title', ''))),
