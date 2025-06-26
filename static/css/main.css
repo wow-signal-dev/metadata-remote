@@ -639,7 +639,7 @@ input:autofill {
 .folders {
     flex: 0 0 25%;
     min-width: 200px;
-    background: var(--bg-tertiary);
+    background: var(--bg-card);
     overflow: hidden;
     outline: none;
     height: 100%;
@@ -919,7 +919,7 @@ input:autofill {
 .files {
     flex: 0 0 35%;
     min-width: 250px;
-    background: var(--bg-card);
+    background: var(--bg-tertiary);
     overflow: hidden;
     outline: none;
     height: 100%;
