@@ -373,7 +373,7 @@
             AudioPlayer.stopPlayback();
             
             // Hide all inference suggestions
-            const fields = ['title', 'artist', 'album', 'albumartist', 'date', 'genre', 'track', 'disc'];
+            const fields = ['title', 'artist', 'album', 'albumartist', 'date', 'genre', 'composer', 'track', 'disc'];
             fields.forEach(field => {
                 if (window.MetadataRemote.Metadata.Inference) {
                     window.MetadataRemote.Metadata.Inference.hideInferenceSuggestions(field);
@@ -428,6 +428,7 @@
                     albumartist: data.albumartist || '',
                     date: data.date || '',
                     genre: data.genre || '',
+                    composer: data.composer || '',
                     track: data.track || '',
                     disc: data.disc || ''
                 };
