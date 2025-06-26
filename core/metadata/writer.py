@@ -12,6 +12,30 @@ from config import FORMAT_METADATA_CONFIG, logger
 from core.file_utils import get_file_format, fix_file_ownership
 from core.metadata.normalizer import get_metadata_field_mapping
 
+def normalize_composer_text(composer_text):
+    """
+    Normalize composer text for cross-platform compatibility
+    Handles Unicode normalization and full-width character replacement
+    """
+    if not composer_text:
+        return composer_text
+    
+    # Normalize to NFC form
+    normalized = composer_text.normalize('NFC')
+    
+    # Replace full-width Unicode characters
+    replacements = {
+        '：': ':', '？': '?', '｜': '|', 
+        '＊': '*', '＂': '"', '／': '/',
+        '＼': '\\', '＜': '<', '＞': '>',
+        '．': '.', '，': ',', '；': ';'
+    }
+    
+    for bad, good in replacements.items():
+        normalized = normalized.replace(bad, good)
+    
+    return normalized.strip()
+
 def apply_metadata_to_file(filepath, new_tags, art_data=None, remove_art=False):
     """
     Apply metadata changes to a single file
@@ -169,7 +193,11 @@ def apply_metadata_to_file(filepath, new_tags, art_data=None, remove_art=False):
                 # Special handling for WMA composer field
                 elif base_format == 'wma' and field == 'composer':
                     proper_tag_name = 'WM/Composer'
-                
+
+                # Special handling for composer field to ensure Unicode compatibility
+                if field == 'composer' and value:
+                    value = normalize_composer_text(value)
+                             
                 if value:
                     cmd.extend(['-metadata', f'{proper_tag_name}={value}'])
                 else:
