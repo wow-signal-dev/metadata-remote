@@ -20,7 +20,8 @@ def normalize_metadata_tags(tags, format_type=''):
             'genre': tags.get('genre', tags.get('GENRE', tags.get('©gen', ''))),
             'track': tags.get('track', tags.get('TRACK', tags.get('trkn', ''))),
             'disc': tags.get('disc', tags.get('DISC', tags.get('disk', 
-                    tags.get('discnumber', tags.get('DISCNUMBER', '')))))
+                    tags.get('discnumber', tags.get('DISCNUMBER', ''))))),
+            'composer': tags.get('composer', tags.get('©wrt', ''))
         }
     
     # Standard normalization for other formats
@@ -38,7 +39,9 @@ def normalize_metadata_tags(tags, format_type=''):
                  tags.get('tracknumber', tags.get('TRACKNUMBER', ''))))),
         'disc': tags.get('disc', tags.get('DISC', tags.get('Disc',
                 tags.get('discnumber', tags.get('DISCNUMBER', 
-                tags.get('disk', tags.get('DISK', '')))))))
+                tags.get('disk', tags.get('DISK', ''))))))),
+        'composer': tags.get('composer', tags.get('COMPOSER', tags.get('Composer',
+            tags.get('WM/Composer', tags.get('TCOM', '')))))
     }
 
 def get_metadata_field_mapping(use_uppercase, format_type=''):
@@ -54,7 +57,8 @@ def get_metadata_field_mapping(use_uppercase, format_type=''):
             'year': 'date',
             'genre': 'genre',
             'track': 'track',
-            'disc': 'disc'
+            'disc': 'disc',
+            'composer': 'composer'
         }
     
     base_mapping = {
@@ -66,7 +70,8 @@ def get_metadata_field_mapping(use_uppercase, format_type=''):
         'year': 'date',
         'genre': 'genre',
         'track': 'track',
-        'disc': 'disc'
+        'disc': 'disc',
+        'composer': 'composer'
     }
     
     if use_uppercase:
