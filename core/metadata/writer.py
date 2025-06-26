@@ -7,6 +7,7 @@ import tempfile
 import subprocess
 import base64
 import logging
+import unicodedata
 
 from config import FORMAT_METADATA_CONFIG, logger
 from core.file_utils import get_file_format, fix_file_ownership
@@ -19,9 +20,9 @@ def normalize_composer_text(composer_text):
     """
     if not composer_text:
         return composer_text
-    
-    # Normalize to NFC form
-    normalized = composer_text.normalize('NFC')
+
+    # Normalize to NFC form using unicodedata
+    normalized = unicodedata.normalize('NFC', composer_text)
     
     # Replace full-width Unicode characters
     replacements = {
@@ -165,8 +166,9 @@ def apply_metadata_to_file(filepath, new_tags, art_data=None, remove_art=False):
             # Warn about limited support
             if base_format in FORMAT_METADATA_CONFIG.get('limited', []):
                 logger.info(f"Note: {base_format} format has limited metadata support. Some fields may not be saved.")
-                if 'composer' in new_tags and base_format == 'wav':
-                    logger.warning(f"WAV format has no standard composer field. Using ICMS field as workaround.")
+                # Special warning for composer in WAV
+                if 'composer' in new_tags and base_format in FORMAT_METADATA_CONFIG.get('no_standard_composer', []):
+                    logger.warning(f"{base_format.upper()} format has no standard composer field. Using ICMS (Commissioned) field as workaround.")
         
         # Standard handling for other formats (MP3, FLAC, M4A, WMA, WV)
         else:
