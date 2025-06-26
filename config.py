@@ -60,7 +60,8 @@ FIELD_THRESHOLDS = {
     'date': 60,
     'genre': 55,
     'albumartist': 65,
-    'disc': 75
+    'disc': 75,
+    'composer': 70
 }
 
 # Logging configuration
