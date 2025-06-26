@@ -40,7 +40,9 @@ FORMAT_METADATA_CONFIG = {
     # Formats with limited metadata support
     'limited': ['wav'],
     # Formats that don't support embedded album art
-    'no_embedded_art': ['wav', 'wv']
+    'no_embedded_art': ['wav', 'wv'],
+    # Formats with no standard composer field
+    'no_standard_composer': ['wav']  # Uses ICMS as workaround
 }
 
 # History configuration
