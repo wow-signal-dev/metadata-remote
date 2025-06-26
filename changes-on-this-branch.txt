@@ -4,3 +4,4 @@
 (4) Additional sorting options added: Name, Date Modified, File Size.
 (5) Added support for 'Composer' metadata field.
 (6) GUI rendered more compact by reducing padding.
+(7) Added full support for OGG and OPUS file formats.
