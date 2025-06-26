@@ -77,3 +77,35 @@ def get_metadata_field_mapping(use_uppercase, format_type=''):
     if use_uppercase:
         return {k: v.upper() for k, v in base_mapping.items()}
     return base_mapping
+    
+def parse_multi_value_field(value, format_type=''):
+    """
+    Parse multi-value fields based on format-specific separators
+    Returns a list of values
+    """
+    if not value:
+        return []
+    
+    # ID3v2.4 uses null bytes
+    if '\x00' in value:
+        return [v.strip() for v in value.split('\x00') if v.strip()]
+    
+    # Most formats use semicolon
+    if ';' in value:
+        return [v.strip() for v in value.split(';') if v.strip()]
+    
+    # Single value
+    return [value.strip()] if value.strip() else []
+
+def join_multi_value_field(values, format_type=''):
+    """
+    Join multiple values based on format preferences
+    """
+    if not values:
+        return ''
+    
+    if isinstance(values, str):
+        return values
+    
+    # Use semicolon as the standard separator
+    return '; '.join(str(v).strip() for v in values if v)
