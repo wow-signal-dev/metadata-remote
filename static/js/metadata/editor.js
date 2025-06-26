@@ -32,7 +32,7 @@
          * Setup metadata field change listeners
          */
         setupMetadataFieldListeners() {
-            const fields = ['title', 'artist', 'album', 'albumartist', 'date', 'genre', 'track', 'disc'];
+            const fields = ['title', 'artist', 'album', 'albumartist', 'date', 'genre', 'composer', 'track', 'disc'];
             
             fields.forEach(field => {
                 const input = document.getElementById(field);
@@ -69,6 +69,7 @@
                 albumartist: document.getElementById('albumartist').value,
                 date: document.getElementById('date').value,
                 genre: document.getElementById('genre').value,
+                composer: document.getElementById('composer').value,
                 track: document.getElementById('track').value,
                 disc: document.getElementById('disc').value
             };
@@ -146,6 +147,7 @@
                     albumartist: data.albumartist || '',
                     date: data.date || '',
                     genre: data.genre || '',
+                    composer: data.composer || '',
                     track: data.track || '',
                     disc: data.disc || ''
                 };
