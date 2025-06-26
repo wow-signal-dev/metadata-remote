@@ -119,6 +119,10 @@ services:
       - "8338:8338"
     volumes:
       - /your/music/directory:/music
+      # To add multiple music folders, mount them as well like this:
+      # - /path/to/music1:/music/Library1
+      # - /path/to/music2:/music/Library2
+      # ... etc.
     environment:
       - PUID=1000
       - PGID=1000
