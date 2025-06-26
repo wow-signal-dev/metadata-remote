@@ -90,7 +90,8 @@ def apply_metadata_to_file(filepath, new_tags, art_data=None, remove_art=False):
                 'year': 'DATE',  # Map year to DATE for OGG
                 'genre': 'GENRE',
                 'track': 'TRACKNUMBER',
-                'disc': 'DISCNUMBER'
+                'disc': 'DISCNUMBER',
+                'composer': 'COMPOSER'
             }
             
             for field, value in new_tags.items():
@@ -119,7 +120,9 @@ def apply_metadata_to_file(filepath, new_tags, art_data=None, remove_art=False):
                 'genre': 'IGNR',
                 'comment': 'ICMT',
                 'copyright': 'ICOP',
-                'track': 'ITRK'
+                'track': 'ITRK',
+                # NOTE: WAV has no standard composer field - mdrm uses ICMS (Commissioned) as workaround
+                'composer': 'ICMS'
             }
             
             for field, value in new_tags.items():
@@ -138,6 +141,8 @@ def apply_metadata_to_file(filepath, new_tags, art_data=None, remove_art=False):
             # Warn about limited support
             if base_format in FORMAT_METADATA_CONFIG.get('limited', []):
                 logger.info(f"Note: {base_format} format has limited metadata support. Some fields may not be saved.")
+                if 'composer' in new_tags and base_format == 'wav':
+                    logger.warning(f"WAV format has no standard composer field. Using ICMS field as workaround.")
         
         # Standard handling for other formats (MP3, FLAC, M4A, WMA, WV)
         else:
@@ -156,9 +161,14 @@ def apply_metadata_to_file(filepath, new_tags, art_data=None, remove_art=False):
                         'track': 'TRCK',
                         'disc': 'TPOS',
                         'year': 'TDRC',
-                        'date': 'TDRC'
+                        'date': 'TDRC',
+                        'composer': 'TCOM'
                     }
                     proper_tag_name = mp3_special_mapping.get(field, proper_tag_name)
+
+                # Special handling for WMA composer field
+                elif base_format == 'wma' and field == 'composer':
+                    proper_tag_name = 'WM/Composer'
                 
                 if value:
                     cmd.extend(['-metadata', f'{proper_tag_name}={value}'])
