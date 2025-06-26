@@ -76,8 +76,6 @@
             
             if (State.pendingAlbumArt) {
                 data.art = State.pendingAlbumArt;
-            } else if (State.shouldRemoveArt) {
-                data.removeArt = true;
             }
             
             UIUtils.setFormEnabled(false);
@@ -103,11 +101,8 @@
                         State.currentAlbumArt = State.pendingAlbumArt;
                         document.querySelector('.save-image-btn').style.display = 'none';
                         document.querySelector('.apply-folder-btn').style.display = 'none';
-                    } else if (State.shouldRemoveArt) {
-                        State.currentAlbumArt = null;
                     }
                     State.pendingAlbumArt = null;
-                    State.shouldRemoveArt = false;
                     
                     loadHistoryCallback();
                 } else {
@@ -161,7 +156,6 @@
                 });
                 
                 State.pendingAlbumArt = null;
-                State.shouldRemoveArt = false;
                 
                 const artDisplay = document.getElementById('art-display');
                 const deleteBtn = document.querySelector('.delete-art-btn');

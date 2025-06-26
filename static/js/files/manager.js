@@ -409,7 +409,6 @@
             
             State.currentAlbumArt = null;
             State.pendingAlbumArt = null;
-            State.shouldRemoveArt = false;
             
             UIUtils.setFormEnabled(false);
             

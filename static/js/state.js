@@ -16,7 +16,6 @@ window.MetadataRemote.State = {
     originalFilename: '',
     currentAlbumArt: null,
     pendingAlbumArt: null,
-    shouldRemoveArt: false,
     originalMetadata: {},
     currentFiles: [],
     
@@ -92,7 +91,6 @@ window.MetadataRemote.State = {
         this.originalFilename = '';
         this.currentAlbumArt = null;
         this.pendingAlbumArt = null;
-        this.shouldRemoveArt = false;
         this.originalMetadata = {};
         this.currentlyPlayingFile = null;
         

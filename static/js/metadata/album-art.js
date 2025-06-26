@@ -41,7 +41,6 @@
             const reader = new FileReader();
             reader.onload = (e) => {
                 State.pendingAlbumArt = e.target.result;
-                State.shouldRemoveArt = false;
                 
                 const artDisplay = document.getElementById('art-display');
                 artDisplay.innerHTML = `<img src="${State.pendingAlbumArt}" class="album-art">`;
@@ -57,20 +56,39 @@
         },
 
         /**
-         * Mark album art for deletion
+         * Delete album art from file immediately
          */
-        deleteAlbumArt() {
+        async deleteAlbumArt() {
+            if (!State.currentFile) return;
+            
             const button = document.querySelector('.delete-art-btn');
-            State.shouldRemoveArt = true;
-            State.pendingAlbumArt = null;
+            button.disabled = true;
+            ButtonStatus.showButtonStatus(button, 'Deleting...', 'processing');
             
-            const artDisplay = document.getElementById('art-display');
-            artDisplay.innerHTML = '<div class="album-art-placeholder">No album art</div>';
-            document.querySelector('.delete-art-btn').style.display = 'none';
-            document.querySelector('.save-image-btn').style.display = 'none';
-            document.querySelector('.apply-folder-btn').style.display = 'none';
+            try {
+                const result = await API.setMetadata(State.currentFile, { removeArt: true });
+                
+                if (result.status === 'success') {
+                    State.pendingAlbumArt = null;
+                    State.currentAlbumArt = null;
+                    
+                    const artDisplay = document.getElementById('art-display');
+                    artDisplay.innerHTML = '<div class="album-art-placeholder">No album art</div>';
+                    document.querySelector('.delete-art-btn').style.display = 'none';
+                    document.querySelector('.save-image-btn').style.display = 'none';
+                    document.querySelector('.apply-folder-btn').style.display = 'none';
+                    
+                    ButtonStatus.showButtonStatus(button, 'Deleted!', 'success', 2000);
+                    loadHistoryCallback();
+                } else {
+                    ButtonStatus.showButtonStatus(button, 'Error', 'error');
+                }
+            } catch (err) {
+                console.error('Error deleting album art:', err);
+                ButtonStatus.showButtonStatus(button, 'Error', 'error');
+            }
             
-            ButtonStatus.showButtonStatus(button, 'Marked for deletion', 'warning', 2000);
+            button.disabled = false;
         },
 
         /**
