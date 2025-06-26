@@ -447,7 +447,7 @@
                     
                     // Disable unsupported fields
                     if (data.supportedFields) {
-                        const allFields = ['title', 'artist', 'album', 'albumartist', 'date', 'genre', 'track', 'disc'];
+                        const allFields = ['title', 'artist', 'album', 'albumartist', 'date', 'genre', 'composer', 'track', 'disc'];
                         allFields.forEach(field => {
                             const input = document.getElementById(field);
                             const controls = document.querySelector(`.apply-field-controls[data-field="${field}"]`);
@@ -467,6 +467,14 @@
                                 }
                             }
                         });
+                    }
+                }
+
+                if (format === 'wav') {
+                    const composerInput = document.getElementById('composer');
+                    if (composerInput && !composerInput.disabled) {
+                        composerInput.style.borderColor = '#ffa94d'; // Warning color
+                        composerInput.title = 'WAV format has no standard composer field. Will use ICMS (Commissioned) field as workaround.';
                     }
                 }
                 
