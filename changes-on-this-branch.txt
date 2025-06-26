@@ -1,2 +1,6 @@
 (1) Entire codebase refactored into modular architecture.
 (2) PGUP/PGDN feature added for better keyboard navigation.
+(3) File filtering and sorting added for both folder and file panes.
+(4) Additional sorting options added: Name, Date Modified, File Size.
+(5) Added support for 'Composer' metadata field.
+(6) GUI rendered more compact by reducing padding.
