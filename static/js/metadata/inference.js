@@ -18,7 +18,7 @@
          * @param {Object} callbacks - Object containing callback functions
          */
         setupInferenceHandlers(callbacks) {
-            const fields = ['title', 'artist', 'album', 'albumartist', 'date', 'genre', 'track', 'disc'];
+            const fields = ['title', 'artist', 'album', 'albumartist', 'date', 'genre', 'composer', 'track', 'disc'];
             
             fields.forEach(field => {
                 const input = document.getElementById(field);
