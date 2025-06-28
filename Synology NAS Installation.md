@@ -8,13 +8,13 @@ Synology NAS devices may create hidden system folders and metadata structures th
 
 ```yaml
 volumes:
-  - /volume1/docker/mdrm/music:/music/music:rw
+  - /path/to/your/music:/music/music:rw
 ```
 
 Instead of the standard configuration:
 ```yaml
 volumes:
-  - /volume1/docker/mdrm:/music:rw
+  - /path/to/your/music:/music
 ```
 
 ### Why This Works
