@@ -133,16 +133,33 @@ const AudioMetadataEditor = {
         
         // Show help box
         const showHelp = () => {
+            // Track when help was opened to prevent immediate closure
+            State.helpBoxOpenTime = Date.now();
+            State.helpBoxOpen = true;
+            
+            // Use CSS classes for proper display (the correct approach)
             helpOverlay.classList.add('active');
             helpBox.classList.add('active');
-            State.helpBoxOpen = true;
         };
+        
+        // Make showHelp globally accessible for keyboard navigation
+        window.MetadataRemote.showHelp = showHelp;
         
         // Hide help box
         const hideHelp = () => {
+            // Use CSS classes for proper hiding (the correct approach)
             helpOverlay.classList.remove('active');
             helpBox.classList.remove('active');
             State.helpBoxOpen = false;
+            
+            // If help was opened via keyboard navigation, restore focus to help button
+            if (State.headerFocus && State.headerFocus.iconType === 'help') {
+                const helpButton = document.getElementById('help-button');
+                if (helpButton) {
+                    helpButton.focus();
+                    helpButton.classList.add('keyboard-focus');
+                }
+            }
         };
         
         // Help button click
@@ -165,9 +182,19 @@ const AudioMetadataEditor = {
             e.stopPropagation();
         });
         
-        // Close on any key press
+        // Close on any key press (except the ones that open help)
         document.addEventListener('keydown', (e) => {
             if (State.helpBoxOpen) {
+                // Don't close immediately on Enter key (which might have opened help)
+                // Add a small delay to avoid closing help that was just opened
+                if (e.key === 'Enter') {
+                    // Check if this Enter key opened the help by seeing if it was just opened
+                    const timeSinceOpen = Date.now() - (State.helpBoxOpenTime || 0);
+                    if (timeSinceOpen < 100) {
+                        return; // Don't close help that was just opened
+                    }
+                }
+                
                 e.preventDefault();
                 hideHelp();
             }
@@ -201,6 +228,14 @@ const AudioMetadataEditor = {
             el.classList.remove('keyboard-focus');
         });
         
+        // When called from keyboard navigation, ensure the folders pane has DOM focus
+        if (isKeyboard) {
+            const foldersPane = document.getElementById('folders-pane');
+            if (foldersPane) {
+                foldersPane.focus();
+            }
+        }
+        
         // Load files for the selected folder
         if (State.loadFileDebounceTimer) {
             clearTimeout(State.loadFileDebounceTimer);
@@ -230,6 +265,12 @@ const AudioMetadataEditor = {
         
         // Load file if keyboard navigation
         if (isKeyboard) {
+            // Ensure the files pane has DOM focus
+            const filesPane = document.getElementById('files-pane');
+            if (filesPane) {
+                filesPane.focus();
+            }
+            
             if (State.loadFileDebounceTimer) {
                 clearTimeout(State.loadFileDebounceTimer);
             }

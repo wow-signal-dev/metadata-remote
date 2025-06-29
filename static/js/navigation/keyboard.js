@@ -54,10 +54,214 @@
                 }
             });
             
+            document.querySelector('.metadata').addEventListener('click', (e) => {
+                // Don't change focus if clicking on input/button elements
+                if (!e.target.closest('input, button, textarea')) {
+                    State.focusedPane = 'metadata';
+                    this.updatePaneFocus();
+                }
+            });
+            
             this.updatePaneFocus();
+            
+            // Handle blur events for filename editing
+            document.addEventListener('blur', (e) => {
+                if (e.target.id === 'current-filename' && e.target.contentEditable === 'true') {
+                    // Save filename when losing focus
+                    this.saveFilenameInPlace(e.target);
+                }
+            }, true);
+            
+            // Handle click events on metadata input fields to immediately activate editing
+            document.addEventListener('click', (e) => {
+                if (e.target.tagName === 'INPUT' && e.target.type === 'text' && 
+                    e.target.closest('.metadata') && e.target.dataset.editing === 'false') {
+                    
+                    // Clear focus from any other metadata input fields first
+                    document.querySelectorAll('.metadata input[type="text"]').forEach(input => {
+                        if (input !== e.target) {
+                            input.blur();
+                            input.dataset.editing = 'false';
+                            input.readOnly = true;
+                        }
+                    });
+                    
+                    // Immediately activate editing mode on click
+                    e.target.dataset.editing = 'true';
+                    e.target.readOnly = false;
+                    
+                    // Position cursor at the click location (default behavior)
+                    // Show inference suggestions if field is empty and we have a current file
+                    if (e.target.value.trim() === '' && State.currentFile && 
+                        window.MetadataRemote.Metadata.Inference) {
+                        setTimeout(() => {
+                            window.MetadataRemote.Metadata.Inference.showInferenceSuggestions(e.target.id);
+                        }, 0);
+                    }
+                }
+            });
             
             // Global keyboard handler with custom repeat
             document.addEventListener('keydown', (e) => {
+                // Handle header icon navigation
+                if (this.isHeaderIconFocused()) {
+                    if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'Enter') {
+                        e.preventDefault();
+                        this.handleHeaderNavigation(e.key);
+                        return;
+                    }
+                }
+                
+                // Handle metadata pane navigation
+                if (State.focusedPane === 'metadata') {
+                    // Handle TAB key to switch panes - this takes priority
+                    if (e.key === 'Tab') {
+                        e.preventDefault();
+                        this.switchPanes();
+                        return;
+                    }
+                    
+                    // Handle Enter key on buttons
+                    if (e.key === 'Enter' && e.target.tagName === 'BUTTON') {
+                        e.preventDefault();
+                        e.target.click();
+                        return;
+                    }
+                    
+                    // Handle navigation on buttons and non-editable elements
+                    if ((e.target.tagName === 'BUTTON' || e.target.id === 'current-filename') &&
+                        (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+                        e.preventDefault();
+                        this.navigateMetadata(e.key);
+                        return;
+                    }
+                    
+                    // Handle input fields
+                    if (e.target.tagName === 'INPUT' && e.target.type === 'text') {
+                        // Check if field is in edit mode
+                        const isEditing = e.target.dataset.editing === 'true';
+                        
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            if (isEditing) {
+                                // Exit edit mode - keep focus without blur/refocus cycle
+                                e.target.dataset.editing = 'false';
+                                e.target.readOnly = true;
+                                // Keep the element focused for navigation without creating a focus cycle
+                            } else {
+                                // Enter edit mode
+                                e.target.dataset.editing = 'true';
+                                e.target.readOnly = false;
+                                // Position cursor at end of text instead of selecting all
+                                setTimeout(() => {
+                                    e.target.setSelectionRange(e.target.value.length, e.target.value.length);
+                                }, 0);
+                                
+                                // Show inference suggestions if field is empty and we have a current file
+                                if (e.target.value.trim() === '' && State.currentFile && 
+                                    window.MetadataRemote.Metadata.Inference) {
+                                    window.MetadataRemote.Metadata.Inference.showInferenceSuggestions(e.target.id);
+                                }
+                            }
+                            return;
+                        } else if (e.key === 'Escape' && isEditing) {
+                            e.preventDefault();
+                            // Exit edit mode - keep focus without blur/refocus cycle
+                            e.target.dataset.editing = 'false';
+                            e.target.readOnly = true;
+                            // Keep the element focused for navigation without creating a focus cycle
+                            return;
+                        } else if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && isEditing) {
+                            e.preventDefault();
+                            // Exit edit mode and navigate
+                            e.target.dataset.editing = 'false';
+                            e.target.readOnly = true;
+                            // Navigate in the specified direction
+                            this.navigateMetadata(e.key);
+                            return;
+                        } else if ((e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') && !isEditing) {
+                            // Navigate only when not in edit mode
+                            e.preventDefault();
+                            this.navigateMetadata(e.key);
+                            return;
+                        }
+                        // When in edit mode, allow normal arrow key behavior for cursor movement
+                    }
+                    
+                    // Handle special case for current filename
+                    if (e.target.id === 'current-filename') {
+                        if (e.key === 'Enter') {
+                            e.preventDefault();
+                            if (e.target.contentEditable === 'true') {
+                                // Exit edit mode and save
+                                this.saveFilenameInPlace(e.target);
+                            } else {
+                                // Enter edit mode
+                                this.navigateMetadata('Enter');
+                            }
+                            return;
+                        } else if (e.key === 'Escape' && e.target.contentEditable === 'true') {
+                            e.preventDefault();
+                            // Exit edit mode without saving
+                            e.target.textContent = State.originalFilename;
+                            e.target.contentEditable = false;
+                            e.target.dataset.editing = 'false';
+                            e.target.focus();
+                            return;
+                        } else if (e.target.contentEditable === 'true' && 
+                                   (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+                            // Allow normal text editing in contentEditable mode
+                            return;
+                        }
+                    }
+                }
+                
+                // Handle filter input arrow key behavior
+                if (State.filterInputActive && e.target.classList.contains('filter-input')) {
+                    if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+                        e.preventDefault();
+                        // Store the pane before clearing state
+                        const currentPane = State.filterInputActive;
+                        // Close the filter
+                        const filterBtn = document.getElementById(`${currentPane}-filter-btn`);
+                        if (filterBtn) {
+                            filterBtn.click(); // Close filter
+                        }
+                        State.filterInputActive = null;
+                        
+                        // Navigate based on the arrow key
+                        if (e.key === 'ArrowDown') {
+                            // Go to topmost item in the pane
+                            this.returnToPaneFromHeader(currentPane);
+                        } else if (e.key === 'ArrowUp') {
+                            // Go to help icon
+                            this.navigateToHeaderIcon('metadata', 'help');
+                        } else if (e.key === 'ArrowLeft') {
+                            // Go to filter icon (stay where we are conceptually)
+                            this.navigateToHeaderIcon(currentPane, 'filter');
+                        } else if (e.key === 'ArrowRight') {
+                            // Go to sort icon
+                            this.navigateToHeaderIcon(currentPane, 'sort');
+                        }
+                        return;
+                    } else if (e.key === 'Escape' || e.key === 'Enter') {
+                        e.preventDefault();
+                        // Store the pane before clearing state
+                        const currentPane = State.filterInputActive;
+                        // Close the filter
+                        const filterBtn = document.getElementById(`${currentPane}-filter-btn`);
+                        if (filterBtn) {
+                            filterBtn.click(); // Close filter
+                        }
+                        State.filterInputActive = null;
+                        
+                        // Move focus to the topmost item in the pane
+                        this.returnToPaneFromHeader(currentPane);
+                        return;
+                    }
+                }
+
+                // Normal input field behavior - skip keyboard navigation
                 if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
                     return;
                 }
@@ -207,55 +411,104 @@
         },
         
         /**
-         * Switch between folder and file panes
+         * Switch between folder, file, and metadata panes
          */
         switchPanes() {
-            // Determine where we're switching TO
-            const switchingToFiles = State.focusedPane === 'folders';
+            // Clear header focus when switching panes
+            this.clearHeaderFocus();
             
-            // If switching to files, check if there are valid files
-            if (switchingToFiles) {
+            // Remove all keyboard focus indicators
+            document.querySelectorAll('.keyboard-focus').forEach(el => {
+                el.classList.remove('keyboard-focus');
+            });
+            
+            if (State.focusedPane === 'folders') {
+                // Switch from folders to files
                 const fileItems = Array.from(document.querySelectorAll('#file-list li:not([aria-hidden="true"])'));
                 const validFileItems = fileItems.filter(item => item.dataset.filepath);
                 
                 if (validFileItems.length === 0) {
-                    return; // Don't switch if no valid files
+                    // No valid files, skip to metadata if there's a current file
+                    if (State.currentFile) {
+                        State.focusedPane = 'metadata';
+                        this.focusMetadataPane();
+                    }
+                    return;
                 }
                 
-                // Remove keyboard focus from folders
-                document.querySelectorAll('.folders .keyboard-focus').forEach(el => {
-                    el.classList.remove('keyboard-focus');
-                });
-                
-                // Switch to files pane
                 State.focusedPane = 'files';
                 this.updatePaneFocus();
                 
-                // Add focus to files pane
+                // Focus the files pane container
+                const filesPane = document.getElementById('files-pane');
+                if (filesPane) {
+                    filesPane.focus();
+                }
+                
                 if (!State.selectedListItem || !validFileItems.includes(State.selectedListItem)) {
-                    // No file is selected or the selected file is not in the current file list
                     selectFileItemCallback(validFileItems[0], true);
                     validFileItems[0].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
                 } else {
-                    // A file is already selected and it's in the current list, just add keyboard focus to it
                     State.selectedListItem.classList.add('keyboard-focus');
                 }
-            } else {
-                // Switching from files to folders
+            } else if (State.focusedPane === 'files') {
+                // Switch from files to metadata
+                if (State.currentFile) {
+                    State.focusedPane = 'metadata';
+                    this.focusMetadataPane();
+                } else {
+                    // No file loaded, go back to folders
+                    State.focusedPane = 'folders';
+                    this.updatePaneFocus();
+                    
+                    // Focus the folders pane container
+                    const foldersPane = document.getElementById('folders-pane');
+                    if (foldersPane) {
+                        foldersPane.focus();
+                    }
+                    
+                    if (State.selectedTreeItem) {
+                        State.selectedTreeItem.classList.add('keyboard-focus');
+                    }
+                }
+            } else if (State.focusedPane === 'metadata') {
+                // Switch from metadata to folders
+                // First, explicitly blur the currently focused metadata element
+                if (document.activeElement && document.activeElement.closest('.metadata')) {
+                    document.activeElement.blur();
+                }
                 
-                // Remove keyboard focus from files
-                document.querySelectorAll('.files .keyboard-focus').forEach(el => {
-                    el.classList.remove('keyboard-focus');
-                });
-                
-                // Switch to folders pane
                 State.focusedPane = 'folders';
                 this.updatePaneFocus();
                 
-                // Add focus to folders pane
+                // Focus the folders pane container (which has tabindex="0")
+                const foldersPane = document.getElementById('folders-pane');
+                if (foldersPane) {
+                    foldersPane.focus();
+                }
+                
                 if (State.selectedTreeItem) {
                     State.selectedTreeItem.classList.add('keyboard-focus');
                 }
+            }
+        },
+        
+        /**
+         * Focus the metadata pane and set focus to Title field
+         */
+        focusMetadataPane() {
+            this.updatePaneFocus();
+            
+            // Focus the Title field
+            const titleField = document.getElementById('title');
+            if (titleField) {
+                titleField.dataset.editing = 'false';
+                titleField.readOnly = true;
+                titleField.focus();
+                // Don't select text - user must press Enter to edit
+                
+                // Ensure the title field is visible
+                this.ensureElementVisible(titleField);
             }
         },
         
@@ -467,6 +720,12 @@
                 currentIndex = visibleFolders.findIndex(item => item === State.selectedTreeItem);
             }
             
+            // Check if we're at the topmost item and trying to go up
+            if (direction === 'up' && currentIndex === 0) {
+                this.navigateToHeaderIcon('folders', 'filter');
+                return;
+            }
+            
             let newIndex;
             if (currentIndex === -1) {
                 newIndex = direction === 'up' ? visibleFolders.length - 1 : 0;
@@ -497,6 +756,12 @@
             let currentIndex = -1;
             if (State.selectedListItem) {
                 currentIndex = fileItems.findIndex(item => item === State.selectedListItem);
+            }
+            
+            // Check if we're at the topmost item and trying to go up
+            if (direction === 'up' && currentIndex === 0) {
+                this.navigateToHeaderIcon('files', 'filter');
+                return;
             }
             
             let newIndex;
@@ -592,6 +857,506 @@
                 if (filepath) {
                     loadFileCallback(filepath, State.selectedListItem);
                 }
+            }
+        },
+        
+        /**
+         * Navigate within the metadata pane using arrow keys
+         * @param {string} key - The arrow key pressed
+         */
+        navigateMetadata(key) {
+            const activeElement = document.activeElement;
+            const metadataSection = document.getElementById('metadata-section');
+            if (!metadataSection) return;
+            
+            // Define the navigation order
+            const navigableElements = [
+                'current-filename',
+                'filename-input',
+                'filename-save',
+                'filename-reset',
+                'filename-cancel',
+                '.upload-btn',
+                '.delete-art-btn',
+                'title',
+                'artist', 
+                'album',
+                'albumartist',
+                'composer',
+                'genre',
+                'track',
+                'disc',
+                'date',
+                '.save-btn',
+                '.clear-btn'
+            ];
+            
+            // Build list of visible focusable elements
+            const focusableElements = [];
+            
+            navigableElements.forEach(selector => {
+                let elements;
+                if (selector.startsWith('.')) {
+                    elements = metadataSection.querySelectorAll(selector);
+                } else if (selector.startsWith('#')) {
+                    const el = metadataSection.querySelector(selector);
+                    elements = el ? [el] : [];
+                } else {
+                    const el = document.getElementById(selector);
+                    elements = el ? [el] : [];
+                }
+                
+                elements.forEach(el => {
+                    if (el && el.offsetParent !== null && !el.disabled) {
+                        focusableElements.push(el);
+                    }
+                });
+            });
+            
+            // Add dynamically visible buttons (apply to file/folder buttons)
+            const visibleApplyButtons = metadataSection.querySelectorAll('.apply-field-controls.visible button');
+            visibleApplyButtons.forEach(btn => {
+                if (!focusableElements.includes(btn)) {
+                    // Insert after the corresponding field
+                    const field = btn.closest('.form-group-with-button')?.querySelector('input');
+                    if (field) {
+                        const fieldIndex = focusableElements.indexOf(field);
+                        if (fieldIndex !== -1) {
+                            focusableElements.splice(fieldIndex + 1, 0, btn);
+                        }
+                    }
+                }
+            });
+            
+            // Handle filename navigation
+            if (activeElement.id === 'current-filename' && key === 'Enter') {
+                // Make filename editable in place
+                const filenameElement = activeElement;
+                const currentText = filenameElement.textContent;
+                
+                // Store original value
+                window.MetadataRemote.State.originalFilename = currentText;
+                
+                // Make it editable
+                filenameElement.contentEditable = true;
+                filenameElement.dataset.editing = 'true';
+                
+                // Position cursor at end of text instead of selecting all
+                setTimeout(() => {
+                    const range = document.createRange();
+                    const sel = window.getSelection();
+                    range.selectNodeContents(filenameElement);
+                    range.collapse(false); // false = collapse to end
+                    sel.removeAllRanges();
+                    sel.addRange(range);
+                }, 0);
+                
+                return;
+            }
+            
+            const currentIndex = focusableElements.indexOf(activeElement);
+            let nextIndex = -1;
+            
+            if (key === 'ArrowUp') {
+                // Check if we're on the filename (topmost element) and go to help icon
+                if (activeElement.id === 'current-filename') {
+                    this.navigateToHeaderIcon('metadata', 'help');
+                    return;
+                }
+                nextIndex = currentIndex > 0 ? currentIndex - 1 : focusableElements.length - 1;
+            } else if (key === 'ArrowDown') {
+                nextIndex = currentIndex < focusableElements.length - 1 ? currentIndex + 1 : 0;
+            } else if (key === 'ArrowLeft' || key === 'ArrowRight') {
+                // Handle horizontal navigation for grouped fields
+                const parentGroup = activeElement.closest('.form-group-three-column');
+                if (parentGroup) {
+                    const inputs = Array.from(parentGroup.querySelectorAll('input'));
+                    const inputIndex = inputs.indexOf(activeElement);
+                    
+                    if (key === 'ArrowLeft' && inputIndex > 0) {
+                        inputs[inputIndex - 1].focus();
+                        // Position cursor at end instead of selecting all
+                        setTimeout(() => {
+                            const input = inputs[inputIndex - 1];
+                            input.setSelectionRange(input.value.length, input.value.length);
+                        }, 0);
+                    } else if (key === 'ArrowRight' && inputIndex < inputs.length - 1) {
+                        inputs[inputIndex + 1].focus();
+                        // Position cursor at end instead of selecting all
+                        setTimeout(() => {
+                            const input = inputs[inputIndex + 1];
+                            input.setSelectionRange(input.value.length, input.value.length);
+                        }, 0);
+                    }
+                }
+                
+                // Handle horizontal navigation for buttons in same row
+                const buttonParent = activeElement.closest('.filename-edit, .album-art-controls, .apply-field-controls, .buttons');
+                if (buttonParent) {
+                    const buttons = Array.from(buttonParent.querySelectorAll('button:not([disabled])'))
+                        .filter(btn => btn.offsetParent !== null);
+                    const buttonIndex = buttons.indexOf(activeElement);
+                    
+                    if (key === 'ArrowLeft' && buttonIndex > 0) {
+                        buttons[buttonIndex - 1].focus();
+                    } else if (key === 'ArrowRight' && buttonIndex < buttons.length - 1) {
+                        buttons[buttonIndex + 1].focus();
+                    }
+                }
+                return;
+            }
+            
+            if (nextIndex !== -1 && focusableElements[nextIndex]) {
+                focusableElements[nextIndex].focus();
+                if (focusableElements[nextIndex].tagName === 'INPUT') {
+                    // Set to non-edit mode when navigating to input
+                    focusableElements[nextIndex].dataset.editing = 'false';
+                    focusableElements[nextIndex].readOnly = true;
+                }
+                
+                // Auto-scroll to ensure the focused element is visible
+                this.ensureElementVisible(focusableElements[nextIndex]);
+            }
+        },
+        
+        /**
+         * Save filename when edited in place
+         * @param {HTMLElement} filenameElement - The filename display element
+         */
+        async saveFilenameInPlace(filenameElement) {
+            const newName = filenameElement.textContent.trim();
+            const originalName = State.originalFilename;
+            
+            // Exit edit mode
+            filenameElement.contentEditable = false;
+            filenameElement.dataset.editing = 'false';
+            
+            // If no change, just return
+            if (newName === originalName || !newName) {
+                filenameElement.textContent = originalName;
+                return;
+            }
+            
+            try {
+                const API = window.MetadataRemote.API;
+                const result = await API.renameFile(State.currentFile, newName);
+                
+                if (result.status === 'success') {
+                    State.currentFile = result.newPath;
+                    State.originalFilename = newName;
+                    filenameElement.textContent = newName;
+                    
+                    // Reload files and history
+                    if (window.AudioMetadataEditor && window.AudioMetadataEditor.loadFiles) {
+                        window.AudioMetadataEditor.loadFiles(State.currentPath);
+                    }
+                    if (window.MetadataRemote.History && window.MetadataRemote.History.Manager) {
+                        window.MetadataRemote.History.Manager.loadHistory();
+                    }
+                } else {
+                    // Revert on error
+                    filenameElement.textContent = originalName;
+                    console.error('Error renaming file:', result.error);
+                }
+            } catch (err) {
+                // Revert on error
+                filenameElement.textContent = originalName;
+                console.error('Error renaming file:', err);
+            }
+        },
+
+        /**
+         * Check if a header icon currently has focus
+         * @returns {boolean} True if a header icon is focused
+         */
+        isHeaderIconFocused() {
+            // Check if we have state indicating header focus
+            if (State.headerFocus) {
+                return true;
+            }
+            
+            // Fallback to checking the active element
+            const focusedElement = document.activeElement;
+            return focusedElement && (
+                focusedElement.classList.contains('control-icon') ||
+                focusedElement.classList.contains('help-button') ||
+                focusedElement.id === 'help-button'
+            );
+        },
+
+        /**
+         * Navigate to a specific header icon
+         * @param {string} pane - 'folders', 'files', or 'metadata'
+         * @param {string} iconType - 'filter', 'sort', 'sort-direction', or 'help'
+         */
+        navigateToHeaderIcon(pane, iconType) {
+            // Clear any existing keyboard focus from list items
+            document.querySelectorAll('.keyboard-focus').forEach(el => {
+                el.classList.remove('keyboard-focus');
+            });
+
+            let targetElement;
+            
+            if (iconType === 'help') {
+                // Store previous focus state before navigating to help
+                if (State.headerFocus) {
+                    State.previousFocusBeforeHelp = { ...State.headerFocus };
+                }
+                targetElement = document.getElementById('help-button');
+            } else if (pane === 'folders') {
+                if (iconType === 'filter') {
+                    targetElement = document.getElementById('folders-filter-btn');
+                } else if (iconType === 'sort') {
+                    targetElement = document.getElementById('folders-sort-btn');
+                } else if (iconType === 'sort-direction') {
+                    targetElement = document.getElementById('folders-sort-direction');
+                }
+            } else if (pane === 'files') {
+                if (iconType === 'filter') {
+                    targetElement = document.getElementById('files-filter-btn');
+                } else if (iconType === 'sort') {
+                    targetElement = document.getElementById('files-sort-btn');
+                } else if (iconType === 'sort-direction') {
+                    targetElement = document.getElementById('files-sort-direction');
+                }
+            }
+
+            if (targetElement) {
+                // Add keyboard focus indicator
+                targetElement.classList.add('keyboard-focus');
+                // Focus the element so it can receive keyboard events
+                targetElement.focus();
+                // Store current header focus state
+                State.headerFocus = { pane, iconType };
+            }
+        },
+
+        /**
+         * Handle keyboard navigation within header icons
+         * @param {string} key - The key that was pressed
+         */
+        handleHeaderNavigation(key) {
+            // If State.headerFocus is not set, try to determine it from the active element
+            if (!State.headerFocus) {
+                const activeElement = document.activeElement;
+                if (!activeElement) return;
+                
+                // Check if it's the help button
+                if (activeElement.id === 'help-button') {
+                    State.headerFocus = { pane: 'metadata', iconType: 'help' };
+                } 
+                // Check folders pane icons
+                else if (activeElement.id === 'folders-filter-btn') {
+                    State.headerFocus = { pane: 'folders', iconType: 'filter' };
+                } else if (activeElement.id === 'folders-sort-btn') {
+                    State.headerFocus = { pane: 'folders', iconType: 'sort' };
+                } else if (activeElement.id === 'folders-sort-direction') {
+                    State.headerFocus = { pane: 'folders', iconType: 'sort-direction' };
+                }
+                // Check files pane icons
+                else if (activeElement.id === 'files-filter-btn') {
+                    State.headerFocus = { pane: 'files', iconType: 'filter' };
+                } else if (activeElement.id === 'files-sort-btn') {
+                    State.headerFocus = { pane: 'files', iconType: 'sort' };
+                } else if (activeElement.id === 'files-sort-direction') {
+                    State.headerFocus = { pane: 'files', iconType: 'sort-direction' };
+                }
+                // If we still don't have a match, return
+                else {
+                    return;
+                }
+            }
+
+            const { pane, iconType } = State.headerFocus;
+
+            if (key === 'Enter') {
+                if (iconType === 'filter') {
+                    // Activate filter and close filter on arrow keys
+                    this.activateFilter(pane);
+                } else if (iconType === 'help') {
+                    // Activate help box directly
+                    if (window.MetadataRemote && window.MetadataRemote.showHelp) {
+                        window.MetadataRemote.showHelp();
+                    } else {
+                        // Fallback to button click
+                        const helpButton = document.getElementById('help-button');
+                        if (helpButton) {
+                            // Create and dispatch a click event
+                            const clickEvent = new MouseEvent('click', {
+                                bubbles: true,
+                                cancelable: true,
+                                view: window
+                            });
+                            helpButton.dispatchEvent(clickEvent);
+                        }
+                    }
+                } else {
+                    // For sort buttons, just click them
+                    document.activeElement.click();
+                }
+                return;
+            }
+
+
+            // Handle directional navigation
+            if (key === 'ArrowUp') {
+                if (iconType !== 'help') {
+                    this.navigateToHeaderIcon('metadata', 'help');
+                }
+            } else if (key === 'ArrowDown') {
+                // If we're on the help icon and have a previous focus state, return to it
+                if (iconType === 'help' && State.previousFocusBeforeHelp) {
+                    const { pane: prevPane, iconType: prevIconType } = State.previousFocusBeforeHelp;
+                    this.navigateToHeaderIcon(prevPane, prevIconType);
+                    State.previousFocusBeforeHelp = null; // Clear the stored state
+                } else {
+                    // Go back to the appropriate pane's top item
+                    this.returnToPaneFromHeader(pane);
+                }
+            } else if (key === 'ArrowLeft') {
+                if (pane === 'folders') {
+                    if (iconType === 'sort') {
+                        this.navigateToHeaderIcon(pane, 'filter');
+                    } else if (iconType === 'sort-direction') {
+                        this.navigateToHeaderIcon(pane, 'sort');
+                    }
+                } else if (pane === 'files') {
+                    if (iconType === 'sort') {
+                        this.navigateToHeaderIcon(pane, 'filter');
+                    } else if (iconType === 'sort-direction') {
+                        this.navigateToHeaderIcon(pane, 'sort');
+                    }
+                }
+            } else if (key === 'ArrowRight') {
+                if (pane === 'folders') {
+                    if (iconType === 'filter') {
+                        this.navigateToHeaderIcon(pane, 'sort');
+                    } else if (iconType === 'sort') {
+                        this.navigateToHeaderIcon(pane, 'sort-direction');
+                    }
+                } else if (pane === 'files') {
+                    if (iconType === 'filter') {
+                        this.navigateToHeaderIcon(pane, 'sort');
+                    } else if (iconType === 'sort') {
+                        this.navigateToHeaderIcon(pane, 'sort-direction');
+                    }
+                }
+            }
+        },
+
+        /**
+         * Activate filter and set up arrow key handling
+         * @param {string} pane - 'folders' or 'files'
+         */
+        activateFilter(pane) {
+            const filterBtn = document.getElementById(`${pane}-filter-btn`);
+            if (filterBtn) {
+                // Clear header focus
+                this.clearHeaderFocus();
+                // Set state BEFORE clicking to avoid race condition
+                State.filterInputActive = pane;
+                // Click the filter button to open it
+                filterBtn.click();
+                // Set up the filter input focus with delay to ensure DOM is ready
+                setTimeout(() => {
+                    const filterInput = document.getElementById(`${pane}-filter-input`);
+                    if (filterInput) {
+                        // Focus the input
+                        filterInput.focus();
+                    }
+                }, 50);
+            }
+        },
+
+        /**
+         * Return focus to the appropriate pane's topmost item
+         * @param {string} pane - 'folders', 'files', or 'metadata'
+         */
+        returnToPaneFromHeader(pane) {
+            this.clearHeaderFocus();
+            
+            if (pane === 'folders') {
+                State.focusedPane = 'folders';
+                const visibleFolders = this.getVisibleFolders();
+                if (visibleFolders.length > 0) {
+                    selectTreeItemCallback(visibleFolders[0], true);
+                }
+            } else if (pane === 'files') {
+                State.focusedPane = 'files';
+                const fileItems = Array.from(document.querySelectorAll('#file-list li:not([aria-hidden="true"])'))
+                    .filter(item => item.dataset.filepath);
+                if (fileItems.length > 0) {
+                    selectFileItemCallback(fileItems[0], true);
+                }
+            } else if (pane === 'metadata') {
+                State.focusedPane = 'metadata';
+                const filenameElement = document.getElementById('current-filename');
+                if (filenameElement) {
+                    filenameElement.focus();
+                    // Ensure the filename element is visible
+                    this.ensureElementVisible(filenameElement);
+                }
+            }
+        },
+
+        /**
+         * Clear header focus indicators and state
+         */
+        clearHeaderFocus() {
+            // Remove keyboard-focus class from all header elements and blur the active one
+            document.querySelectorAll('.control-icon, .help-button').forEach(el => {
+                el.classList.remove('keyboard-focus');
+                // If this element currently has DOM focus, blur it
+                if (document.activeElement === el) {
+                    el.blur();
+                }
+            });
+            // Clear state
+            State.headerFocus = null;
+        },
+        
+        /**
+         * Ensure an element is visible within its scrollable container
+         * @param {HTMLElement} element - The element to make visible
+         */
+        ensureElementVisible(element) {
+            // Find the scrollable container (metadata-content)
+            const scrollContainer = element.closest('.metadata-content');
+            if (!scrollContainer) return;
+            
+            // Get element and container positions
+            const elementRect = element.getBoundingClientRect();
+            const containerRect = scrollContainer.getBoundingClientRect();
+            
+            // Calculate dynamic bottom padding based on history panel
+            const historyHeader = document.querySelector('.history-header');
+            let paddingBottom = 80; // Default padding
+            
+            if (historyHeader) {
+                const historyRect = historyHeader.getBoundingClientRect();
+                // If history header is visible within the viewport, adjust padding
+                if (historyRect.top < window.innerHeight) {
+                    // Add extra padding to ensure element is above the history bar
+                    paddingBottom = Math.max(80, window.innerHeight - historyRect.top + 20);
+                }
+            }
+            
+            // Calculate visible boundaries with padding
+            const paddingTop = 20; // Padding from top edge
+            const visibleTop = containerRect.top + paddingTop;
+            const visibleBottom = containerRect.bottom - paddingBottom;
+            
+            // Check if element is above visible area
+            if (elementRect.top < visibleTop) {
+                // Scroll up to show element with padding
+                const scrollAmount = elementRect.top - visibleTop;
+                scrollContainer.scrollTop += scrollAmount;
+            }
+            // Check if element is below visible area
+            else if (elementRect.bottom > visibleBottom) {
+                // Scroll down to show element with padding
+                const scrollAmount = elementRect.bottom - visibleBottom;
+                scrollContainer.scrollTop += scrollAmount;
             }
         }
     };

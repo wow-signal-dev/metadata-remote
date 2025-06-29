@@ -1,45 +1,19 @@
 """
 Metadata writing operations for Metadata Remote
-Handles applying metadata changes to audio files using FFmpeg
+Handles applying metadata changes to audio files using Mutagen
 """
 import os
-import tempfile
 import subprocess
-import base64
 import logging
-import unicodedata
 
 from config import FORMAT_METADATA_CONFIG, logger
 from core.file_utils import get_file_format, fix_file_ownership
-from core.metadata.normalizer import get_metadata_field_mapping
+from core.metadata.mutagen_handler import mutagen_handler
 
-def normalize_composer_text(composer_text):
-    """
-    Normalize composer text for cross-platform compatibility
-    Handles Unicode normalization and full-width character replacement
-    """
-    if not composer_text:
-        return composer_text
-
-    # Normalize to NFC form using unicodedata
-    normalized = unicodedata.normalize('NFC', composer_text)
-    
-    # Replace full-width Unicode characters
-    replacements = {
-        '：': ':', '？': '?', '｜': '|', 
-        '＊': '*', '＂': '"', '／': '/',
-        '＼': '\\', '＜': '<', '＞': '>',
-        '．': '.', '，': ',', '；': ';'
-    }
-    
-    for bad, good in replacements.items():
-        normalized = normalized.replace(bad, good)
-    
-    return normalized.strip()
 
 def apply_metadata_to_file(filepath, new_tags, art_data=None, remove_art=False):
     """
-    Apply metadata changes to a single file
+    Apply metadata changes to a single file using Mutagen
     
     Args:
         filepath: Path to the audio file
@@ -54,8 +28,7 @@ def apply_metadata_to_file(filepath, new_tags, art_data=None, remove_art=False):
     from core.album_art.processor import detect_corrupted_album_art, fix_corrupted_album_art
     
     # Get file format
-    output_format, use_uppercase, base_format = get_file_format(filepath)
-    ext = os.path.splitext(filepath)[1]
+    _, _, base_format = get_file_format(filepath)
     
     # Check for and fix corrupted album art before proceeding
     if not remove_art and not art_data:
@@ -67,6 +40,66 @@ def apply_metadata_to_file(filepath, new_tags, art_data=None, remove_art=False):
     if art_data and base_format in FORMAT_METADATA_CONFIG.get('no_embedded_art', []):
         logger.warning(f"Format {base_format} does not support embedded album art")
         art_data = None
+    
+    try:
+        # First, handle album art operations if needed
+        if remove_art:
+            logger.debug(f"Removing album art from {os.path.basename(filepath)}")
+            mutagen_handler.remove_album_art(filepath)
+        elif art_data:
+            logger.debug(f"Adding album art to {os.path.basename(filepath)}")
+            mutagen_handler.write_album_art(filepath, art_data)
+        else:
+            # For OGG/Opus files, we need to preserve existing album art
+            # when only updating text metadata
+            if base_format in ['ogg', 'opus']:
+                existing_art = mutagen_handler.get_album_art(filepath)
+                if existing_art:
+                    logger.debug(f"Preserving existing album art for {os.path.basename(filepath)}")
+                    # We'll re-write it after updating metadata
+                    art_data = existing_art
+        
+        # Prepare metadata for writing (exclude art-related fields)
+        metadata_to_write = {}
+        for field, value in new_tags.items():
+            if field not in ['art', 'removeArt']:
+                metadata_to_write[field] = value
+        
+        # Write metadata
+        if metadata_to_write:
+            logger.debug(f"Applying metadata changes to {os.path.basename(filepath)}")
+            logger.debug(f"Changed fields: {', '.join(metadata_to_write.keys())}")
+            mutagen_handler.write_metadata(filepath, metadata_to_write)
+        
+        # For OGG/Opus, re-write preserved album art if needed
+        if base_format in ['ogg', 'opus'] and art_data and not remove_art and 'art' not in new_tags:
+            mutagen_handler.write_album_art(filepath, art_data)
+        
+        # Fix file ownership
+        fix_file_ownership(filepath)
+        
+        logger.info(f"Successfully updated {os.path.basename(filepath)}")
+    
+    except Exception as e:
+        # If Mutagen fails, fall back to FFmpeg for unsupported formats
+        logger.warning(f"Mutagen failed for {filepath}: {e}")
+        logger.info("Falling back to FFmpeg...")
+        _apply_metadata_with_ffmpeg(filepath, new_tags, art_data, remove_art)
+
+
+def _apply_metadata_with_ffmpeg(filepath, new_tags, art_data=None, remove_art=False):
+    """
+    Fallback method using FFmpeg for formats not supported by Mutagen
+    
+    This is the original implementation kept as a fallback
+    """
+    import tempfile
+    import base64
+    from core.metadata.normalizer import get_metadata_field_mapping
+    
+    # Get file format
+    output_format, use_uppercase, base_format = get_file_format(filepath)
+    ext = os.path.splitext(filepath)[1]
     
     # Special handling for OGG/Opus files - ALL metadata operations must use this path
     if base_format in ['ogg', 'opus']:
@@ -160,7 +193,7 @@ def apply_metadata_to_file(filepath, new_tags, art_data=None, remove_art=False):
             if result.returncode == 0:
                 os.replace(temp_file, filepath)
                 fix_file_ownership(filepath)
-                logger.info(f"Successfully updated {os.path.basename(filepath)}")
+                logger.info(f"Successfully updated {os.path.basename(filepath)} with FFmpeg")
             else:
                 raise Exception(f"FFmpeg failed: {result.stderr}")
                 
@@ -247,10 +280,43 @@ def apply_metadata_to_file(filepath, new_tags, art_data=None, remove_art=False):
             if base_format in FORMAT_METADATA_CONFIG.get('limited', []):
                 logger.info(f"Note: {base_format} format has limited metadata support. Some fields may not be saved.")
                 # Special warning for composer in WAV
-                if 'composer' in new_tags and base_format in FORMAT_METADATA_CONFIG.get('no_standard_composer', []):
-                    logger.warning(f"{base_format.upper()} format has no standard composer field. Using ICMS (Commissioned) field as workaround.")
+                # Note: This warning is no longer needed for WAV since Mutagen uses ID3
+                pass
         
-        # Standard handling for other formats (MP3, FLAC, M4A, WMA, WV)
+        # Special handling for WavPack format
+        elif base_format == 'wv':
+            # WavPack uses APEv2 tags with specific case-sensitive names
+            wavpack_tag_mapping = {
+                'title': 'Title',
+                'artist': 'Artist',
+                'album': 'Album',
+                'albumartist': 'AlbumArtist',
+                'date': 'Date',
+                'year': 'Year',
+                'genre': 'Genre',
+                'track': 'Track',
+                'disc': 'Disc',
+                'composer': 'Composer'
+            }
+            
+            for field, value in new_tags.items():
+                if field in ['art', 'removeArt']:
+                    continue
+                
+                # Get the WavPack-specific tag name
+                wv_field = wavpack_tag_mapping.get(field, field.title())
+                
+                # Normalize composer text
+                if field == 'composer' and value:
+                    value = mutagen_handler.normalize_composer_text(value)
+                
+                if value:
+                    cmd.extend(['-metadata', f'{wv_field}={value}'])
+                else:
+                    # Clear the field
+                    cmd.extend(['-metadata', f'{wv_field}='])
+        
+        # Standard handling for other formats (MP3, FLAC, M4A, WMA)
         else:
             for field, value in new_tags.items():
                 if field in ['art', 'removeArt']:
@@ -278,7 +344,7 @@ def apply_metadata_to_file(filepath, new_tags, art_data=None, remove_art=False):
 
                 # Special handling for composer field to ensure Unicode compatibility
                 if field == 'composer' and value:
-                    value = normalize_composer_text(value)
+                    value = mutagen_handler.normalize_composer_text(value)
                              
                 if value:
                     cmd.extend(['-metadata', f'{proper_tag_name}={value}'])
@@ -290,7 +356,7 @@ def apply_metadata_to_file(filepath, new_tags, art_data=None, remove_art=False):
         cmd.append(temp_file)
         
         # Log command for debugging (but not the full command to avoid clutter)
-        logger.debug(f"Applying metadata changes to {os.path.basename(filepath)}")
+        logger.debug(f"Applying metadata changes to {os.path.basename(filepath)} with FFmpeg fallback")
         logger.debug(f"Changed fields: {', '.join(k for k in new_tags.keys() if k not in ['art', 'removeArt'])}")
         if art_data:
             logger.debug("Adding album art")
@@ -315,7 +381,7 @@ def apply_metadata_to_file(filepath, new_tags, art_data=None, remove_art=False):
         if art_data and 'temp_art_file' in locals():
             os.remove(temp_art_file)
         
-        logger.info(f"Successfully updated {os.path.basename(filepath)}")
+        logger.info(f"Successfully updated {os.path.basename(filepath)} with FFmpeg")
             
     except Exception as e:
         # Clean up on error
@@ -324,4 +390,3 @@ def apply_metadata_to_file(filepath, new_tags, art_data=None, remove_art=False):
         if art_data and 'temp_art_file' in locals() and os.path.exists(temp_art_file):
             os.remove(temp_art_file)
         raise
-

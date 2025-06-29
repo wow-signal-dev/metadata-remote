@@ -1,18 +1,19 @@
 """
 Metadata reading operations for Metadata Remote
-Handles extracting and formatting metadata from audio files
+Handles extracting and formatting metadata from audio files using Mutagen
 """
 import os
 import logging
 
 from config import FORMAT_METADATA_CONFIG, logger
 from core.file_utils import get_file_format
-from core.metadata.normalizer import normalize_metadata_tags
+from core.metadata.mutagen_handler import mutagen_handler
 from core.metadata.ffmpeg import run_ffprobe
+
 
 def read_metadata(filepath):
     """
-    Read metadata from an audio file and return formatted data
+    Read metadata from an audio file and return formatted data using Mutagen
     
     Args:
         filepath: Full path to the audio file
@@ -26,6 +27,39 @@ def read_metadata(filepath):
     """
     if not os.path.exists(filepath):
         raise FileNotFoundError(f"File not found: {filepath}")
+    
+    # Get format info for proper normalization
+    _, _, base_format = get_file_format(filepath)
+    
+    try:
+        # Try to read metadata using Mutagen first
+        metadata = mutagen_handler.read_metadata(filepath)
+        
+        # Add format info for client
+        metadata['format'] = base_format
+        
+        # Add format limitations info
+        metadata['formatLimitations'] = {
+            'supportsAlbumArt': base_format not in FORMAT_METADATA_CONFIG.get('no_embedded_art', []),
+            'hasLimitedMetadata': base_format in FORMAT_METADATA_CONFIG.get('limited', [])
+        }
+        
+        return metadata
+        
+    except Exception as e:
+        # If Mutagen fails, fall back to FFmpeg
+        logger.warning(f"Mutagen failed to read {filepath}: {e}")
+        logger.info("Falling back to FFmpeg...")
+        return _read_metadata_with_ffmpeg(filepath)
+
+
+def _read_metadata_with_ffmpeg(filepath):
+    """
+    Fallback method using FFmpeg for formats not supported by Mutagen
+    
+    This is the original implementation kept as a fallback
+    """
+    from core.metadata.normalizer import normalize_metadata_tags
     
     # Get metadata using ffprobe
     probe_data = run_ffprobe(filepath)
@@ -63,10 +97,6 @@ def read_metadata(filepath):
     # Normalize tags
     metadata = normalize_metadata_tags(tags, base_format)
     
-    # Get album art (we need to import extract_album_art for this)
-    # For now, we'll make this optional and handle it in the route
-    # This avoids circular imports since extract_album_art is still in app.py
-    
     # Add format info for client
     metadata['format'] = base_format
     
@@ -77,6 +107,7 @@ def read_metadata(filepath):
     }
     
     return metadata
+
 
 def get_format_limitations(base_format):
     """

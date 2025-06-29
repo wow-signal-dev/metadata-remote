@@ -66,16 +66,6 @@
                     // Re-render the file list with the new filter
                     this.renderFileList();
                 });
-                
-                // Escape key to close filter
-                filterInput.addEventListener('keydown', (e) => {
-                    if (e.key === 'Escape') {
-                        filterContainer.classList.remove('active');
-                        filterBtn.classList.remove('active');
-                        State.activeFilterPane = null;
-                        document.getElementById('files-pane').focus();
-                    }
-                });
             }
             
             // Sort field button
@@ -433,7 +423,11 @@
                 };
                 
                 Object.entries(State.originalMetadata).forEach(([field, value]) => {
-                    document.getElementById(field).value = value;
+                    const input = document.getElementById(field);
+                    input.value = value;
+                    // Initialize as read-only until user presses Enter to edit
+                    input.dataset.editing = 'false';
+                    input.readOnly = true;
                 });
                 
                 // Handle format limitations

@@ -332,11 +332,8 @@ def set_metadata(filename):
         
         data = request.json
         
-        # Get current metadata before changes
-        probe_data = run_ffprobe(filepath)
-        tags = probe_data.get('format', {}).get('tags', {})
-        _, _, base_format = get_file_format(filepath)
-        current_metadata = normalize_metadata_tags(tags, base_format)
+        # Get current metadata before changes using the correct method for OGG/OPUS
+        current_metadata = read_metadata(filepath)
         
         # Separate metadata from special operations
         metadata_tags = {k: v for k, v in data.items() if k not in ['art', 'removeArt']}
@@ -422,10 +419,7 @@ def apply_field_to_folder():
         file_path = os.path.join(abs_folder_path, filename)
         if os.path.isfile(file_path) and filename.lower().endswith(AUDIO_EXTENSIONS):
             try:
-                probe_data = run_ffprobe(file_path)
-                tags = probe_data.get('format', {}).get('tags', {})
-                _, _, base_format = get_file_format(file_path)
-                current_metadata = normalize_metadata_tags(tags, base_format)
+                current_metadata = read_metadata(file_path)
                 old_value = current_metadata.get(field, '')
                 file_changes.append((file_path, old_value, value))
             except:
@@ -690,10 +684,7 @@ def infer_metadata_field(filename, field):
             return jsonify({'error': 'Invalid field'}), 400
         
         # Get existing metadata
-        probe_data = run_ffprobe(filepath)
-        tags = probe_data.get('format', {}).get('tags', {})
-        _, _, base_format = get_file_format(filepath)
-        existing_metadata = normalize_metadata_tags(tags, base_format)
+        existing_metadata = read_metadata(filepath)
         
         # Get folder context (sibling files)
         folder_path = os.path.dirname(filepath)
