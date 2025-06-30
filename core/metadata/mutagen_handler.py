@@ -1,7 +1,12 @@
+
 """
 Centralized Mutagen operations for Metadata Remote
 Handles all metadata reading and writing using Mutagen library
+
+This module uses Mutagen (https://github.com/quodlibet/mutagen)
+Licensed under LGPL-2.1+ for audio metadata operations.
 """
+
 import os
 import base64
 import logging
