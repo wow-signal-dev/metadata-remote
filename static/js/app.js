@@ -228,11 +228,13 @@ const AudioMetadataEditor = {
             el.classList.remove('keyboard-focus');
         });
         
-        // When called from keyboard navigation, ensure the folders pane has DOM focus
+        // When called from keyboard navigation, ensure the item has DOM focus
         if (isKeyboard) {
-            const foldersPane = document.getElementById('folders-pane');
-            if (foldersPane) {
-                foldersPane.focus();
+            // Focus the tree item content div for proper keyboard navigation
+            const treeItemContent = item.querySelector('.tree-item-content');
+            if (treeItemContent) {
+                treeItemContent.setAttribute('tabindex', '0');
+                treeItemContent.focus();
             }
         }
         
@@ -265,11 +267,9 @@ const AudioMetadataEditor = {
         
         // Load file if keyboard navigation
         if (isKeyboard) {
-            // Ensure the files pane has DOM focus
-            const filesPane = document.getElementById('files-pane');
-            if (filesPane) {
-                filesPane.focus();
-            }
+            // Focus the list item for proper keyboard navigation
+            item.setAttribute('tabindex', '0');
+            item.focus();
             
             if (State.loadFileDebounceTimer) {
                 clearTimeout(State.loadFileDebounceTimer);
@@ -399,6 +399,9 @@ function clearHistory() {
 // =============================
 // Application Initialization
 // =============================
+// Make AudioMetadataEditor globally accessible for keyboard navigation
+window.AudioMetadataEditor = AudioMetadataEditor;
+
 document.addEventListener('DOMContentLoaded', () => {
     AudioMetadataEditor.init();
 });

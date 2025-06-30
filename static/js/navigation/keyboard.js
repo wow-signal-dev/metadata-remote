@@ -11,6 +11,15 @@
     // Create shortcuts
     const State = window.MetadataRemote.State;
     const TreeNav = window.MetadataRemote.Navigation.Tree;
+    const KeyRepeatHandler = window.MetadataRemote.Navigation.KeyRepeatHandler;
+    const ScrollManager = window.MetadataRemote.Navigation.ScrollManager;
+    const FocusManager = window.MetadataRemote.Navigation.FocusManager;
+    const EventUtils = window.MetadataRemote.Navigation.EventUtils;
+    const StateMachine = window.MetadataRemote.Navigation.StateMachine;
+    const Router = window.KeyboardRouter;
+    
+    // Create a global key repeat handler instance
+    let keyRepeatHandler = null;
     
     // Store callbacks that will be set during initialization
     let selectTreeItemCallback = null;
@@ -33,6 +42,41 @@
             loadFileCallback = callbacks.loadFile;
             loadFilesCallback = callbacks.loadFiles;
             
+            // Initialize the key repeat handler
+            keyRepeatHandler = new KeyRepeatHandler();
+            
+            // Make keyRepeatHandler globally available for utilities
+            window.MetadataRemote.Navigation.keyRepeatHandler = keyRepeatHandler;
+            
+            // Initialize state machine
+            StateMachine.init();
+            
+            // Add debug logging for state changes
+            StateMachine.on('statechange', (oldState, newState, context) => {
+                console.log(`[StateMachine] Navigation state: ${oldState} → ${newState}`, context);
+            });
+            
+            // Initialize PaneNavigation
+            window.MetadataRemote.Navigation.PaneNavigation.init({
+                selectTreeItem: selectTreeItemCallback,
+                selectFileItem: selectFileItemCallback,
+                loadFile: loadFileCallback
+            });
+            window.MetadataRemote.Navigation.PaneNavigation.registerRoutes();
+            
+            // Initialize ListNavigation
+            if (window.MetadataRemote.Navigation.ListNavigation) {
+                window.MetadataRemote.Navigation.ListNavigation.init({
+                    selectTreeItem: selectTreeItemCallback,
+                    selectFileItem: selectFileItemCallback,
+                    loadFile: loadFileCallback,
+                    loadFiles: loadFilesCallback
+                });
+            } else {
+                console.error('[Keyboard] ListNavigation module not found');
+            }
+            
+            
             this.setupKeyboardNavigation();
         },
         
@@ -40,29 +84,9 @@
          * Set up all keyboard event handlers
          */
         setupKeyboardNavigation() {
-            // Pane click handlers
-            document.querySelector('.folders').addEventListener('click', (e) => {
-                State.focusedPane = 'folders';
-                this.updatePaneFocus();
-            });
             
-            document.querySelector('.files').addEventListener('click', (e) => {
-                State.focusedPane = 'files';
-                this.updatePaneFocus();
-                if (State.loadFileDebounceTimer) {
-                    clearTimeout(State.loadFileDebounceTimer);
-                }
-            });
-            
-            document.querySelector('.metadata').addEventListener('click', (e) => {
-                // Don't change focus if clicking on input/button elements
-                if (!e.target.closest('input, button, textarea')) {
-                    State.focusedPane = 'metadata';
-                    this.updatePaneFocus();
-                }
-            });
-            
-            this.updatePaneFocus();
+            // Register keyboard routes
+            this.registerKeyboardRoutes();
             
             // Handle blur events for filename editing
             document.addEventListener('blur', (e) => {
@@ -86,6 +110,15 @@
                         }
                     });
                     
+                    // Transition to form edit state
+                    StateMachine.transition(StateMachine.States.FORM_EDIT, {
+                        fieldId: e.target.id,
+                        fieldType: 'metadata'
+                    });
+                    
+                    // Set focusedPane to metadata when clicking metadata fields
+                    State.focusedPane = 'metadata';
+                    
                     // Immediately activate editing mode on click
                     e.target.dataset.editing = 'true';
                     e.target.readOnly = false;
@@ -103,6 +136,25 @@
             
             // Global keyboard handler with custom repeat
             document.addEventListener('keydown', (e) => {
+                // Check for active sort dropdown
+                const activeSortDropdown = document.querySelector('.sort-dropdown.active');
+
+                
+                // Try routing first
+                if (Router && Router.route(e)) {
+                    return; // Route handled the event
+                }
+                
+                
+                // Check if sort dropdown is active and handle its navigation first
+                if (activeSortDropdown && State.sortDropdownActive) {
+                    if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'Tab' || e.key === 'Enter' || e.key === 'Escape') {
+                        e.preventDefault();
+                        this.handleSortDropdownNavigation(e.key, activeSortDropdown);
+                        return;
+                    }
+                }
+                
                 // Handle header icon navigation
                 if (this.isHeaderIconFocused()) {
                     if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'Enter') {
@@ -114,10 +166,14 @@
                 
                 // Handle metadata pane navigation
                 if (State.focusedPane === 'metadata') {
-                    // Handle TAB key to switch panes - this takes priority
-                    if (e.key === 'Tab') {
+                    // Tab key now handled by Router (removed from here)
+                    
+                    // Handle Enter key on filename - MUST come before arrow key navigation
+                    if (e.key === 'Enter' && e.target.id === 'current-filename') {
                         e.preventDefault();
-                        this.switchPanes();
+                        if (window.AudioMetadataEditor && window.AudioMetadataEditor.handleFilenameEditClick) {
+                            window.AudioMetadataEditor.handleFilenameEditClick();
+                        }
                         return;
                     }
                     
@@ -140,15 +196,23 @@
                     if (e.target.tagName === 'INPUT' && e.target.type === 'text') {
                         // Check if field is in edit mode
                         const isEditing = e.target.dataset.editing === 'true';
-                        
                         if (e.key === 'Enter') {
                             e.preventDefault();
                             if (isEditing) {
+                                // Transition back to normal state
+                                StateMachine.transition(StateMachine.States.NORMAL);
+                                
                                 // Exit edit mode - keep focus without blur/refocus cycle
                                 e.target.dataset.editing = 'false';
                                 e.target.readOnly = true;
                                 // Keep the element focused for navigation without creating a focus cycle
                             } else {
+                                // Transition to form edit state
+                                StateMachine.transition(StateMachine.States.FORM_EDIT, {
+                                    fieldId: e.target.id,
+                                    fieldType: 'metadata'
+                                });
+                                
                                 // Enter edit mode
                                 e.target.dataset.editing = 'true';
                                 e.target.readOnly = false;
@@ -166,6 +230,9 @@
                             return;
                         } else if (e.key === 'Escape' && isEditing) {
                             e.preventDefault();
+                            // Transition back to normal state
+                            StateMachine.transition(StateMachine.States.NORMAL);
+                            
                             // Exit edit mode - keep focus without blur/refocus cycle
                             e.target.dataset.editing = 'false';
                             e.target.readOnly = true;
@@ -173,6 +240,9 @@
                             return;
                         } else if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && isEditing) {
                             e.preventDefault();
+                            // Transition back to normal state
+                            StateMachine.transition(StateMachine.States.NORMAL);
+                            
                             // Exit edit mode and navigate
                             e.target.dataset.editing = 'false';
                             e.target.readOnly = true;
@@ -184,11 +254,13 @@
                             e.preventDefault();
                             this.navigateMetadata(e.key);
                             return;
+                        } else if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && isEditing) {
+                            return;
                         }
                         // When in edit mode, allow normal arrow key behavior for cursor movement
                     }
                     
-                    // Handle special case for current filename
+                    // Handle special case for current filename (contentEditable span)
                     if (e.target.id === 'current-filename') {
                         if (e.key === 'Enter') {
                             e.preventDefault();
@@ -202,6 +274,9 @@
                             return;
                         } else if (e.key === 'Escape' && e.target.contentEditable === 'true') {
                             e.preventDefault();
+                            // Transition back to normal state
+                            StateMachine.transition(StateMachine.States.NORMAL);
+                            
                             // Exit edit mode without saving
                             e.target.textContent = State.originalFilename;
                             e.target.contentEditable = false;
@@ -222,6 +297,9 @@
                         e.preventDefault();
                         // Store the pane before clearing state
                         const currentPane = State.filterInputActive;
+                        // Transition back to normal state
+                        StateMachine.transition(StateMachine.States.NORMAL);
+                        
                         // Close the filter
                         const filterBtn = document.getElementById(`${currentPane}-filter-btn`);
                         if (filterBtn) {
@@ -248,6 +326,9 @@
                         e.preventDefault();
                         // Store the pane before clearing state
                         const currentPane = State.filterInputActive;
+                        // Transition back to normal state
+                        StateMachine.transition(StateMachine.States.NORMAL);
+                        
                         // Close the filter
                         const filterBtn = document.getElementById(`${currentPane}-filter-btn`);
                         if (filterBtn) {
@@ -266,19 +347,8 @@
                     return;
                 }
 
-                // Filter shortcut: / (forward slash)
-                if (e.key === '/' && !e.ctrlKey && !e.shiftKey) {
-                    e.preventDefault();
-                    const filterBtn = document.getElementById(`${State.focusedPane}-filter-btn`);
-                    if (filterBtn) filterBtn.click();
-                }
-                
-                // Filter shortcut: Ctrl+F
-                if (e.ctrlKey && e.key === 'f') {
-                    e.preventDefault();
-                    const filterBtn = document.getElementById(`${State.focusedPane}-filter-btn`);
-                    if (filterBtn) filterBtn.click();
-                }
+                // Filter shortcuts now handled by Router
+                // Removed: / and Ctrl+F shortcuts (see registerKeyboardRoutes)
                 
                 // Sort reverse: Ctrl+Shift+S
                 if (e.ctrlKey && e.shiftKey && e.key === 'S') {
@@ -287,70 +357,10 @@
                     if (dirBtn) dirBtn.click();
                 }
                 
-                if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-                    e.preventDefault();
-            
-                    document.querySelector('.folders').classList.add('keyboard-navigating');
-                    document.querySelector('.files').classList.add('keyboard-navigating');
-            
-                    // If this is a repeat event from the browser, ignore it
-                    if (e.repeat) {
-                        return;
-                    }
-                    
-                    // Clear any existing repeat timer and delay timer
-                    if (State.keyRepeatDelayTimer) {
-                        clearTimeout(State.keyRepeatDelayTimer);
-                        State.keyRepeatDelayTimer = null;
-                    }
-                    if (State.keyRepeatTimer) {
-                        clearInterval(State.keyRepeatTimer);
-                        State.keyRepeatTimer = null;
-                    }
-                    
-                    // Store which key is being held
-                    State.keyHeldDown = e.key;
-                    State.isKeyRepeating = false;
-                    
-                    // Perform the initial navigation
-                    this.navigateWithArrows(e.key === 'ArrowUp' ? 'up' : 'down');
-                    
-                    // Set up custom repeat with initial delay
-                    State.keyRepeatDelayTimer = setTimeout(() => {
-                        // Only start repeating if the same key is still held down
-                        if (State.keyHeldDown === e.key) {
-                            State.isKeyRepeating = true;
-                            State.keyRepeatTimer = setInterval(() => {
-                                if (State.keyHeldDown === e.key) {
-                                    this.navigateWithArrows(e.key === 'ArrowUp' ? 'up' : 'down');
-                                }
-                            }, State.keyRepeatInterval);
-                        }
-                    }, State.keyRepeatDelay);
-                    
-                } else if (e.key === 'PageUp' || e.key === 'PageDown') {
-                    e.preventDefault();
-                    
-                    // Add keyboard navigating class for consistent behavior
-                    document.querySelector('.folders').classList.add('keyboard-navigating');
-                    document.querySelector('.files').classList.add('keyboard-navigating');
-                    
-                    // Navigate by page
-                    this.navigateByPage(e.key === 'PageUp' ? 'up' : 'down');
-                    
-                    // Remove keyboard navigating class after a short delay
-                    setTimeout(() => {
-                        document.querySelector('.folders').classList.remove('keyboard-navigating');
-                        document.querySelector('.files').classList.remove('keyboard-navigating');
-                    }, 100);
-                    
-                } else if (e.key === 'Enter') {
-                    e.preventDefault();
-                    this.activateCurrentItem();
-                } else if (e.key === 'Tab') {
-                    e.preventDefault();
-                    this.switchPanes();
-                }
+                // Arrow keys, PageUp/PageDown, and Enter are now handled by ListNavigation module via Router
+                // No direct handling needed here - ListNavigation routes will take precedence
+                // Tab key now handled by Router (see registerKeyboardRoutes)
+                
             });
             
             // Keyup handler to stop custom repeat
@@ -361,22 +371,13 @@
                 
                 // If this key was being held down, stop the repeat
                 if (State.keyHeldDown === e.key) {
+                    keyRepeatHandler.stop();
                     State.keyHeldDown = null;
                     State.isKeyRepeating = false;
                     
                     // Remove keyboard navigating class
                     document.querySelector('.folders').classList.remove('keyboard-navigating');
                     document.querySelector('.files').classList.remove('keyboard-navigating');
-                    
-                    // Clear BOTH the delay timer and repeat timer
-                    if (State.keyRepeatDelayTimer) {
-                        clearTimeout(State.keyRepeatDelayTimer);
-                        State.keyRepeatDelayTimer = null;
-                    }
-                    if (State.keyRepeatTimer) {
-                        clearInterval(State.keyRepeatTimer);
-                        State.keyRepeatTimer = null;
-                    }
                 }
                 // Handle PageUp/PageDown keyup to ensure clean state
                 if (e.key === 'PageUp' || e.key === 'PageDown') {
@@ -388,477 +389,66 @@
                             
             // Clear key state on window blur to prevent stuck keys
             window.addEventListener('blur', () => {
+                keyRepeatHandler.stop();
                 State.keyHeldDown = null;
                 State.isKeyRepeating = false;
-                
-                // Clear BOTH timers on blur
-                if (State.keyRepeatDelayTimer) {
-                    clearTimeout(State.keyRepeatDelayTimer);
-                    State.keyRepeatDelayTimer = null;
-                }
-                if (State.keyRepeatTimer) {
-                    clearInterval(State.keyRepeatTimer);
-                    State.keyRepeatTimer = null;
-                }
-            });
-        },
-
-        /**
-         * Update visual focus indicators for panes
-         */
-        updatePaneFocus() {
-            // Visual focus indicator handled by CSS :focus-within
-        },
-        
-        /**
-         * Switch between folder, file, and metadata panes
-         */
-        switchPanes() {
-            // Clear header focus when switching panes
-            this.clearHeaderFocus();
-            
-            // Remove all keyboard focus indicators
-            document.querySelectorAll('.keyboard-focus').forEach(el => {
-                el.classList.remove('keyboard-focus');
             });
             
-            if (State.focusedPane === 'folders') {
-                // Switch from folders to files
-                const fileItems = Array.from(document.querySelectorAll('#file-list li:not([aria-hidden="true"])'));
-                const validFileItems = fileItems.filter(item => item.dataset.filepath);
+            // Set filename-input to editing mode when focused
+            document.addEventListener('focus', (e) => {
+                if (e.target.id === 'filename-input') {
+                    e.target.dataset.editing = 'true';
+                    e.target.readOnly = false;
+                }
                 
-                if (validFileItems.length === 0) {
-                    // No valid files, skip to metadata if there's a current file
-                    if (State.currentFile) {
+                // Ensure focusedPane is set correctly when focusing on metadata fields
+                if (e.target.tagName === 'INPUT' && e.target.type === 'text' && 
+                    e.target.closest('.metadata')) {
+                    // Set focusedPane to metadata if it's not already
+                    if (State.focusedPane !== 'metadata') {
                         State.focusedPane = 'metadata';
-                        this.focusMetadataPane();
-                    }
-                    return;
-                }
-                
-                State.focusedPane = 'files';
-                this.updatePaneFocus();
-                
-                // Focus the files pane container
-                const filesPane = document.getElementById('files-pane');
-                if (filesPane) {
-                    filesPane.focus();
-                }
-                
-                if (!State.selectedListItem || !validFileItems.includes(State.selectedListItem)) {
-                    selectFileItemCallback(validFileItems[0], true);
-                    validFileItems[0].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-                } else {
-                    State.selectedListItem.classList.add('keyboard-focus');
-                }
-            } else if (State.focusedPane === 'files') {
-                // Switch from files to metadata
-                if (State.currentFile) {
-                    State.focusedPane = 'metadata';
-                    this.focusMetadataPane();
-                } else {
-                    // No file loaded, go back to folders
-                    State.focusedPane = 'folders';
-                    this.updatePaneFocus();
-                    
-                    // Focus the folders pane container
-                    const foldersPane = document.getElementById('folders-pane');
-                    if (foldersPane) {
-                        foldersPane.focus();
-                    }
-                    
-                    if (State.selectedTreeItem) {
-                        State.selectedTreeItem.classList.add('keyboard-focus');
                     }
                 }
-            } else if (State.focusedPane === 'metadata') {
-                // Switch from metadata to folders
-                // First, explicitly blur the currently focused metadata element
-                if (document.activeElement && document.activeElement.closest('.metadata')) {
-                    document.activeElement.blur();
-                }
-                
-                State.focusedPane = 'folders';
-                this.updatePaneFocus();
-                
-                // Focus the folders pane container (which has tabindex="0")
-                const foldersPane = document.getElementById('folders-pane');
-                if (foldersPane) {
-                    foldersPane.focus();
-                }
-                
-                if (State.selectedTreeItem) {
-                    State.selectedTreeItem.classList.add('keyboard-focus');
-                }
-            }
-        },
-        
-        /**
-         * Focus the metadata pane and set focus to Title field
-         */
-        focusMetadataPane() {
-            this.updatePaneFocus();
-            
-            // Focus the Title field
-            const titleField = document.getElementById('title');
-            if (titleField) {
-                titleField.dataset.editing = 'false';
-                titleField.readOnly = true;
-                titleField.focus();
-                // Don't select text - user must press Enter to edit
-                
-                // Ensure the title field is visible
-                this.ensureElementVisible(titleField);
-            }
-        },
-        
-        /**
-         * Scroll item to center of container with smooth scrolling
-         * @param {HTMLElement} item - Item to scroll to
-         * @param {HTMLElement} container - Container element
-         */
-        scrollItemToCenter(item, container) {
-            const containerRect = container.getBoundingClientRect();
-            const itemRect = item.getBoundingClientRect();
-            
-            // Calculate the center position of the container
-            const containerCenter = containerRect.top + (containerRect.height / 2);
-            
-            // Calculate where the item currently is
-            const itemCenter = itemRect.top + (itemRect.height / 2);
-            
-            // Calculate how much we need to scroll
-            const scrollOffset = itemCenter - containerCenter;
-            
-            // Get current scroll position
-            const currentScroll = container.scrollTop;
-            
-            // Calculate new scroll position
-            const newScroll = currentScroll + scrollOffset;
-            
-            // Check boundaries
-            const maxScroll = container.scrollHeight - container.clientHeight;
-            
-            // Use instant scrolling during key repeat for smooth performance
-            // Only use smooth scrolling for single key presses
-            if (State.isKeyRepeating) {
-                container.scrollTop = Math.max(0, Math.min(newScroll, maxScroll));
-            } else {
-                container.scrollTo({
-                    top: Math.max(0, Math.min(newScroll, maxScroll)),
-                    behavior: 'smooth'
-                });
-            }
+            }, true);
         },
 
-        /**
-         * Immediate centering without animation
-         * @param {HTMLElement} item - Item to scroll to
-         * @param {HTMLElement} container - Container element
-         */
-        immediateScrollToCenter(item, container) {
-            const containerRect = container.getBoundingClientRect();
-            const itemRect = item.getBoundingClientRect();
-            
-            const containerTop = containerRect.top;
-            const containerBottom = containerRect.bottom;
-            const itemTop = itemRect.top;
-            const itemBottom = itemRect.bottom;
-            
-            // Define a margin (e.g., 30% of container height)
-            const margin = containerRect.height * 0.3;
-            
-            let scrollAdjustment = 0;
-            
-            // If item is above the visible area (with margin)
-            if (itemTop < containerTop + margin) {
-                scrollAdjustment = itemTop - containerTop - margin;
-            }
-            // If item is below the visible area (with margin)
-            else if (itemBottom > containerBottom - margin) {
-                scrollAdjustment = itemBottom - containerBottom + margin;
-            }
-            
-            if (scrollAdjustment !== 0) {
-                const currentScroll = container.scrollTop;
-                const newScroll = currentScroll + scrollAdjustment;
-                const maxScroll = container.scrollHeight - container.clientHeight;
-                container.scrollTop = Math.max(0, Math.min(newScroll, maxScroll));
-            }
-        },
-
-        /**
-         * Navigate with arrow keys
-         * @param {string} direction - 'up' or 'down'
-         */
-        navigateWithArrows(direction) {
-            if (State.focusedPane === 'folders') {
-                this.navigateFolders(direction);
-            } else if (State.focusedPane === 'files') {
-                this.navigateFiles(direction);
-            }
-        },
-
-        /**
-         * Navigate by page with PageUp/PageDown keys
-         * @param {string} direction - 'up' or 'down'
-         */
-        navigateByPage(direction) {
-            if (State.focusedPane === 'folders') {
-                this.navigateFoldersByPage(direction);
-            } else if (State.focusedPane === 'files') {
-                this.navigateFilesByPage(direction);
-            }
-        },
         
         /**
-         * Calculate visible items per page for a container
-         * @param {HTMLElement} container - Container element
-         * @param {string} itemSelector - Selector for items
-         * @returns {number} Number of visible items per page
+         * Register keyboard routes with the router
          */
-        calculateItemsPerPage(container, itemSelector) {
-            const containerHeight = container.clientHeight;
-            const items = container.querySelectorAll(itemSelector);
+        registerKeyboardRoutes() {
+            // Help shortcut - ? key (handled in app.js, so we skip it here)
+            // The ? key is already handled by app.js showHelp function
             
-            if (items.length === 0) return 10; // Default fallback
-            
-            // Get average item height from first few items
-            let totalHeight = 0;
-            let count = Math.min(5, items.length);
-            
-            for (let i = 0; i < count; i++) {
-                totalHeight += items[i].offsetHeight;
-            }
-            
-            const avgItemHeight = totalHeight / count;
-            
-            // Account for headers and padding
-            const effectiveHeight = containerHeight - 60; // Approximate header height
-            
-            // Calculate items per page (leave one item for context)
-            return Math.max(1, Math.floor(effectiveHeight / avgItemHeight) - 1);
-        },
-        
-        /**
-         * Navigate folders by page
-         * @param {string} direction - 'up' or 'down'
-         */
-        navigateFoldersByPage(direction) {
-            const visibleFolders = this.getVisibleFolders();
-            if (visibleFolders.length === 0) return;
-            
-            const container = document.querySelector('.folders-scroll-area');
-            const itemsPerPage = this.calculateItemsPerPage(container, '.tree-item:not(.collapsed)');
-            
-            let currentIndex = -1;
-            if (State.selectedTreeItem) {
-                currentIndex = visibleFolders.findIndex(item => item === State.selectedTreeItem);
-            }
-            
-            let newIndex;
-            if (currentIndex === -1) {
-                newIndex = direction === 'up' ? visibleFolders.length - 1 : 0;
-            } else if (direction === 'up') {
-                newIndex = Math.max(0, currentIndex - itemsPerPage);
-            } else {
-                newIndex = Math.min(visibleFolders.length - 1, currentIndex + itemsPerPage);
-            }
-            
-            if (visibleFolders[newIndex] && newIndex !== currentIndex) {
-                selectTreeItemCallback(visibleFolders[newIndex], true);
-                
-                // Scroll to the new item
-                this.immediateScrollToCenter(visibleFolders[newIndex], container);
-            }
-        },
-        
-        /**
-         * Navigate files by page
-         * @param {string} direction - 'up' or 'down'
-         */
-        navigateFilesByPage(direction) {
-            const fileItems = Array.from(document.querySelectorAll('#file-list li:not([aria-hidden="true"])'))
-                .filter(item => item.dataset.filepath);
-            if (fileItems.length === 0) return;
-            
-            const container = document.querySelector('.files-scroll-area');
-            const itemsPerPage = this.calculateItemsPerPage(container, '#file-list li:not([aria-hidden="true"])');
-            
-            let currentIndex = -1;
-            if (State.selectedListItem) {
-                currentIndex = fileItems.findIndex(item => item === State.selectedListItem);
-            }
-            
-            let newIndex;
-            if (currentIndex === -1) {
-                newIndex = direction === 'up' ? fileItems.length - 1 : 0;
-            } else if (direction === 'up') {
-                newIndex = Math.max(0, currentIndex - itemsPerPage);
-            } else {
-                newIndex = Math.min(fileItems.length - 1, currentIndex + itemsPerPage);
-            }
-            
-            if (fileItems[newIndex] && newIndex !== currentIndex) {
-                selectFileItemCallback(fileItems[newIndex], true);
-                
-                // Scroll to the new item
-                this.immediateScrollToCenter(fileItems[newIndex], container);
-            }
-        },
-        
-        /**
-         * Navigate folders with arrow keys
-         * @param {string} direction - 'up' or 'down'
-         */
-        navigateFolders(direction) {
-            const visibleFolders = this.getVisibleFolders();
-            if (visibleFolders.length === 0) return;
-            
-            let currentIndex = -1;
-            if (State.selectedTreeItem) {
-                currentIndex = visibleFolders.findIndex(item => item === State.selectedTreeItem);
-            }
-            
-            // Check if we're at the topmost item and trying to go up
-            if (direction === 'up' && currentIndex === 0) {
-                this.navigateToHeaderIcon('folders', 'filter');
-                return;
-            }
-            
-            let newIndex;
-            if (currentIndex === -1) {
-                newIndex = direction === 'up' ? visibleFolders.length - 1 : 0;
-            } else if (direction === 'up') {
-                newIndex = currentIndex > 0 ? currentIndex - 1 : 0;
-            } else {
-                newIndex = currentIndex < visibleFolders.length - 1 ? currentIndex + 1 : visibleFolders.length - 1;
-            }
-            
-            if (visibleFolders[newIndex]) {
-                selectTreeItemCallback(visibleFolders[newIndex], true);
-                
-                // Always use immediate scrolling during arrow navigation for smooth performance
-                const container = document.querySelector('.folders-scroll-area');
-                this.immediateScrollToCenter(visibleFolders[newIndex], container);
-            }
-        },
-
-        /**
-         * Navigate files with arrow keys
-         * @param {string} direction - 'up' or 'down'
-         */
-        navigateFiles(direction) {
-            const fileItems = Array.from(document.querySelectorAll('#file-list li:not([aria-hidden="true"])'))
-                .filter(item => item.dataset.filepath);
-            if (fileItems.length === 0) return;
-            
-            let currentIndex = -1;
-            if (State.selectedListItem) {
-                currentIndex = fileItems.findIndex(item => item === State.selectedListItem);
-            }
-            
-            // Check if we're at the topmost item and trying to go up
-            if (direction === 'up' && currentIndex === 0) {
-                this.navigateToHeaderIcon('files', 'filter');
-                return;
-            }
-            
-            let newIndex;
-            if (currentIndex === -1) {
-                newIndex = direction === 'up' ? fileItems.length - 1 : 0;
-            } else if (direction === 'up') {
-                newIndex = currentIndex > 0 ? currentIndex - 1 : 0;
-            } else {
-                newIndex = currentIndex < fileItems.length - 1 ? currentIndex + 1 : fileItems.length - 1;
-            }
-            
-            if (fileItems[newIndex]) {
-                selectFileItemCallback(fileItems[newIndex], true);
-                
-                // Always use immediate scrolling during arrow navigation for smooth performance
-                const container = document.querySelector('.files-scroll-area');
-                this.immediateScrollToCenter(fileItems[newIndex], container);
-            }
-        },
-
-        /**
-         * Get all visible folders in the tree
-         * @returns {Array<HTMLElement>} Array of visible folder elements
-         */
-        getVisibleFolders() {
-            const folders = [];
-            
-            const collectVisible = (container) => {
-                const items = container.children;
-                for (let item of items) {
-                    if (item.classList.contains('tree-item')) {
-                        folders.push(item);
-                        const children = item.querySelector('.tree-children');
-                        if (children && children.classList.contains('expanded')) {
-                            collectVisible(children);
-                        }
+            // Filter shortcuts - / and Ctrl+F
+            Router.register(
+                { key: '/', state: '*' },
+                (event, context) => {
+                    // Don't activate if in input/textarea
+                    if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA') {
+                        return;
                     }
+                    const filterBtn = document.getElementById(`${State.focusedPane}-filter-btn`);
+                    if (filterBtn) filterBtn.click();
                 }
-            };
+            );
             
-            collectVisible(document.getElementById('folder-tree'));
-            return folders;
+            Router.register(
+                { key: 'f', state: '*', modifiers: { ctrl: true } },
+                (event, context) => {
+                    const filterBtn = document.getElementById(`${State.focusedPane}-filter-btn`);
+                    if (filterBtn) filterBtn.click();
+                }
+            );
+            
+            // Tab key routing
+            const tabState = window.NavigationStates?.NORMAL || 'normal';
+            // Tab routing now handled by PaneNavigation module
         },
+        
+        
+        
 
-        /**
-         * Activate the currently selected item (Enter key)
-         */
-        activateCurrentItem() {
-            if (State.focusedPane === 'folders' && State.selectedTreeItem) {
-                const children = State.selectedTreeItem.querySelector('.tree-children');
-                const folderPath = State.selectedTreeItem.dataset.path;
-                
-                // Check if we haven't loaded this folder's data yet
-                const dataNotLoaded = !State.treeData.hasOwnProperty(folderPath);
-                
-                // Check if this folder has subfolders in the data
-                const hasSubfolders = dataNotLoaded || 
-                                     (State.treeData[folderPath] && 
-                                      State.treeData[folderPath].some(item => item.type === 'folder'));
-                
-                // Check if already expanded and has visible subfolder elements
-                const hasVisibleSubfolders = children && children.classList.contains('expanded') && 
-                                            children.querySelectorAll('.tree-item').length > 0;
-                
-                if (hasSubfolders || hasVisibleSubfolders) {
-                    // Has subfolders - just toggle expand/collapse without loading files
-                    const icon = State.selectedTreeItem.querySelector('.tree-icon');
-                    const isExpanded = children.classList.contains('expanded');
-                    
-                    if (!isExpanded) {
-                        // Expand
-                        if (children.children.length === 0) {
-                            // Load children if not already loaded
-                            TreeNav.loadTreeChildren(folderPath, children, TreeNav.getLevel(folderPath) + 1);
-                        }
-                        children.classList.add('expanded');
-                        State.expandedFolders.add(folderPath);
-                        if (icon) icon.innerHTML = '📂';
-                    } else {
-                        // Collapse
-                        children.classList.remove('expanded');
-                        State.expandedFolders.delete(folderPath);
-                        if (icon) icon.innerHTML = '📁';
-                    }
-                    // DO NOT load files, DO NOT move focus - just return
-                    return;
-                } else {
-                    // No subfolders - do nothing
-                    return;
-                }
-            } else if (State.focusedPane === 'files' && State.selectedListItem) {
-                const filepath = State.selectedListItem.dataset.filepath;
-                if (filepath) {
-                    loadFileCallback(filepath, State.selectedListItem);
-                }
-            }
-        },
         
         /**
          * Navigate within the metadata pane using arrow keys
@@ -869,6 +459,7 @@
             const metadataSection = document.getElementById('metadata-section');
             if (!metadataSection) return;
             
+            
             // Define the navigation order
             const navigableElements = [
                 'current-filename',
@@ -877,6 +468,8 @@
                 'filename-reset',
                 'filename-cancel',
                 '.upload-btn',
+                '.save-image-btn',
+                '.apply-folder-btn',
                 '.delete-art-btn',
                 'title',
                 'artist', 
@@ -913,49 +506,70 @@
                 });
             });
             
-            // Add dynamically visible buttons (apply to file/folder buttons)
-            const visibleApplyButtons = metadataSection.querySelectorAll('.apply-field-controls.visible button');
-            visibleApplyButtons.forEach(btn => {
-                if (!focusableElements.includes(btn)) {
-                    // Insert after the corresponding field
-                    const field = btn.closest('.form-group-with-button')?.querySelector('input');
-                    if (field) {
-                        const fieldIndex = focusableElements.indexOf(field);
-                        if (fieldIndex !== -1) {
-                            focusableElements.splice(fieldIndex + 1, 0, btn);
-                        }
+            
+            // Add dynamically visible File/Folder buttons for Track #, Disc #, and Year fields
+            // These buttons appear when the user modifies these fields, allowing them to apply
+            // changes to either the current file or all files in the folder
+            const groupedApplyItems = metadataSection.querySelectorAll('.grouped-apply-item');
+            
+            const visibleGroupedItems = Array.from(groupedApplyItems).filter(item => {
+                return item.style.display !== 'none';
+            });
+            
+            // Build a map of field -> buttons for proper insertion order
+            const fieldButtonMap = new Map();
+            
+            visibleGroupedItems.forEach(item => {
+                const fieldName = item.dataset.field;
+                const applyControls = item.querySelector('.apply-field-controls');
+                if (applyControls) {
+                    const fileBtn = applyControls.querySelector('.apply-file-btn');
+                    const folderBtn = applyControls.querySelector('.apply-folder-btn-new');
+                    
+                    if (fileBtn || folderBtn) {
+                        fieldButtonMap.set(fieldName, { fileBtn, folderBtn });
                     }
+                    
                 }
             });
             
-            // Handle filename navigation
-            if (activeElement.id === 'current-filename' && key === 'Enter') {
-                // Make filename editable in place
-                const filenameElement = activeElement;
-                const currentText = filenameElement.textContent;
+            // Insert buttons in the correct positions after Track, Disc, and Date fields
+            // This ensures proper keyboard navigation order
+            const groupedFields = ['track', 'disc', 'date'];
+            
+            // Process in reverse order to maintain correct indices when inserting
+            for (let i = groupedFields.length - 1; i >= 0; i--) {
+                const fieldId = groupedFields[i];
+                const fieldIndex = focusableElements.findIndex(el => el.id === fieldId);
                 
-                // Store original value
-                window.MetadataRemote.State.originalFilename = currentText;
-                
-                // Make it editable
-                filenameElement.contentEditable = true;
-                filenameElement.dataset.editing = 'true';
-                
-                // Position cursor at end of text instead of selecting all
-                setTimeout(() => {
-                    const range = document.createRange();
-                    const sel = window.getSelection();
-                    range.selectNodeContents(filenameElement);
-                    range.collapse(false); // false = collapse to end
-                    sel.removeAllRanges();
-                    sel.addRange(range);
-                }, 0);
-                
-                return;
+                if (fieldIndex !== -1 && fieldButtonMap.has(fieldId)) {
+                    const { fileBtn, folderBtn } = fieldButtonMap.get(fieldId);
+                    const buttonsToInsert = [];
+                    
+                    if (fileBtn && !fileBtn.disabled) {
+                        buttonsToInsert.push(fileBtn);
+                    }
+                    if (folderBtn && !folderBtn.disabled) {
+                        buttonsToInsert.push(folderBtn);
+                    }
+                    
+                    
+                    // Insert buttons after the field
+                    buttonsToInsert.forEach((btn, idx) => {
+                        focusableElements.splice(fieldIndex + 1 + idx, 0, btn);
+                    });
+                }
             }
+            
+            // Final check of what buttons were added
+            const finalButtonCount = focusableElements.filter(el => 
+                el.classList?.contains('apply-file-btn') || 
+                el.classList?.contains('apply-folder-btn-new')
+            ).length;
             
             const currentIndex = focusableElements.indexOf(activeElement);
             let nextIndex = -1;
+            
             
             if (key === 'ArrowUp') {
                 // Check if we're on the filename (topmost element) and go to help icon
@@ -963,10 +577,298 @@
                     this.navigateToHeaderIcon('metadata', 'help');
                     return;
                 }
-                nextIndex = currentIndex > 0 ? currentIndex - 1 : focusableElements.length - 1;
+                
+                // Check if we're on a grouped apply button (Track/Disc/Year)
+                // These buttons require special handling for vertical navigation to maintain
+                // File->File and Folder->Folder alignment when moving up/down
+                if (activeElement.closest('.grouped-apply-item')) {
+                    
+                    // Find all visible grouped buttons
+                    const allGroupedButtons = focusableElements.filter(el => 
+                        el.closest('.grouped-apply-item') && 
+                        (el.classList?.contains('apply-file-btn') || el.classList?.contains('apply-folder-btn-new'))
+                    );
+                    
+                    const currentButtonIndex = allGroupedButtons.indexOf(activeElement);
+                    
+                    if (currentButtonIndex === 0 || currentButtonIndex === 1) {
+                        // We're on one of the topmost buttons (File or Folder), go to Track #
+                        const trackField = document.getElementById('track');
+                        if (trackField) {
+                            trackField.focus();
+                            trackField.dataset.editing = 'false';
+                            trackField.readOnly = true;
+                            FocusManager.ensureElementVisible(trackField);
+                            return;
+                        }
+                    } else if (currentButtonIndex > 1) {
+                        // Move to the button directly above (maintaining File->File, Folder->Folder alignment)
+                        const isFileButton = activeElement.classList.contains('apply-file-btn');
+                        // Look for button above with same type
+                        for (let i = currentButtonIndex - 1; i >= 0; i--) {
+                            const targetButton = allGroupedButtons[i];
+                            const targetIsFile = targetButton.classList.contains('apply-file-btn');
+                            if (isFileButton === targetIsFile) {
+                                nextIndex = focusableElements.indexOf(targetButton);
+                                break;
+                            }
+                        }
+                    }
+                }
+                // Check if we're on other text field's apply button - treat as same unit
+                else if (activeElement.closest('.apply-field-controls')) {
+                    const field = activeElement.closest('.form-group-with-button')?.querySelector('input');
+                    if (field) {
+                        const fieldIndex = focusableElements.indexOf(field);
+                        if (fieldIndex > 0) {
+                            nextIndex = fieldIndex - 1;
+                        } else {
+                            nextIndex = focusableElements.length - 1;
+                        }
+                    }
+                } else if (activeElement.classList.contains('save-btn')) {
+                    // Special handling for Save button - UP navigates to bottommost File button if any exist,
+                    // otherwise goes to Track # field
+                    // Find all File/Folder buttons that come before the Save button
+                    const buttonsBeforeSave = focusableElements.filter((el, idx) => {
+                        return idx < currentIndex && 
+                               (el.classList?.contains('apply-file-btn') || 
+                                el.classList?.contains('apply-folder-btn-new'));
+                    });
+                    
+                    if (buttonsBeforeSave.length > 0) {
+                        // Find the last File button (bottommost)
+                        const lastFileButton = buttonsBeforeSave.reverse().find(btn => btn.classList.contains('apply-file-btn')) || buttonsBeforeSave[0];
+                        const buttonIndex = focusableElements.indexOf(lastFileButton);
+                        nextIndex = buttonIndex;
+                    } else {
+                        // No buttons visible, go to Track # field
+                        const trackField = document.getElementById('track');
+                        if (trackField) {
+                            trackField.focus();
+                            trackField.dataset.editing = 'false';
+                            trackField.readOnly = true;
+                            FocusManager.ensureElementVisible(trackField);
+                            return;
+                        }
+                    }
+                } else if (activeElement.id === 'track' || activeElement.id === 'disc' || activeElement.id === 'date') {
+                    // Special handling for Track #, Disc #, and Year fields - UP goes to GENRE
+                    const genreField = document.getElementById('genre');
+                    if (genreField) {
+                        genreField.focus();
+                        genreField.dataset.editing = 'false';
+                        genreField.readOnly = true;
+                        FocusManager.ensureElementVisible(genreField);
+                        return;
+                    }
+                } else if (activeElement.classList.contains('clear-btn')) {
+                    // Special handling for Reset button - UP navigates to bottommost File button if any exist,
+                    // otherwise uses default behavior (goes to Save button)
+                    // Find all File/Folder buttons that come before the Reset button
+                    const buttonsBeforeReset = focusableElements.filter((el, idx) => {
+                        return idx < currentIndex && 
+                               el.closest('.grouped-apply-item') &&
+                               (el.classList?.contains('apply-file-btn') || 
+                                el.classList?.contains('apply-folder-btn-new'));
+                    });
+                    
+                    if (buttonsBeforeReset.length > 0) {
+                        // Find the last File button (bottommost)
+                        const lastFileButton = buttonsBeforeReset.reverse().find(btn => btn.classList.contains('apply-file-btn'));
+                        if (lastFileButton) {
+                            const buttonIndex = focusableElements.indexOf(lastFileButton);
+                            nextIndex = buttonIndex;
+                        } else {
+                            // No File buttons, just use default behavior
+                            nextIndex = currentIndex > 0 ? currentIndex - 1 : focusableElements.length - 1;
+                        }
+                    } else {
+                        // No buttons visible, use default behavior (go to Save button)
+                        nextIndex = currentIndex > 0 ? currentIndex - 1 : focusableElements.length - 1;
+                    }
+                } else {
+                    // Default behavior only if no special handling was applied
+                    nextIndex = currentIndex > 0 ? currentIndex - 1 : focusableElements.length - 1;
+                }
             } else if (key === 'ArrowDown') {
-                nextIndex = currentIndex < focusableElements.length - 1 ? currentIndex + 1 : 0;
+                // Check if we're on a text field that has visible apply buttons - skip over them
+                if (activeElement.tagName === 'INPUT' && activeElement.type === 'text') {
+                    const formGroup = activeElement.closest('.form-group-with-button');
+                    if (formGroup) {
+                        const applyControls = formGroup.querySelector('.apply-field-controls.visible');
+                        if (applyControls) {
+                            // Count how many buttons follow this field
+                            let buttonsAfterField = 0;
+                            for (let i = currentIndex + 1; i < focusableElements.length; i++) {
+                                if (focusableElements[i].closest('.apply-field-controls') && 
+                                    focusableElements[i].closest('.form-group-with-button')?.querySelector('input') === activeElement) {
+                                    buttonsAfterField++;
+                                } else {
+                                    break;
+                                }
+                            }
+                            if (buttonsAfterField > 0) {
+                                nextIndex = currentIndex + buttonsAfterField + 1;
+                                if (nextIndex >= focusableElements.length) {
+                                    nextIndex = 0;
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // Check if we're on a grouped apply button (Track/Disc/Year)
+                // DOWN navigation maintains vertical alignment (File->File, Folder->Folder)
+                // From bottommost button, goes directly to Save button
+                if (!nextIndex || nextIndex === -1) {
+                    if (activeElement.closest('.grouped-apply-item')) {
+                        
+                        // Find all visible grouped buttons
+                        const allGroupedButtons = focusableElements.filter(el => 
+                            el.closest('.grouped-apply-item') && 
+                            (el.classList?.contains('apply-file-btn') || el.classList?.contains('apply-folder-btn-new'))
+                        );
+                        
+                        const currentButtonIndex = allGroupedButtons.indexOf(activeElement);
+                        const isLastButton = currentButtonIndex === allGroupedButtons.length - 1;
+                        
+                        if (isLastButton) {
+                            // We're on the bottommost button, go to Save button
+                            const saveButton = document.querySelector('.save-btn');
+                            if (saveButton) {
+                                saveButton.focus();
+                                FocusManager.ensureElementVisible(saveButton);
+                                return;
+                            }
+                        } else {
+                            // Move to the button directly below (maintaining File->File, Folder->Folder alignment)
+                            const isFileButton = activeElement.classList.contains('apply-file-btn');
+                            
+                            // Look for button below with same type
+                            let foundAlignedButton = false;
+                            for (let i = currentButtonIndex + 1; i < allGroupedButtons.length; i++) {
+                                const targetButton = allGroupedButtons[i];
+                                const targetIsFile = targetButton.classList.contains('apply-file-btn');
+                                if (isFileButton === targetIsFile) {
+                                    nextIndex = focusableElements.indexOf(targetButton);
+                                    foundAlignedButton = true;
+                                    break;
+                                }
+                            }
+                            
+                            if (!foundAlignedButton && isFileButton) {
+                                // We're on a File button with no File button below - go to Save
+                                const saveButton = document.querySelector('.save-btn');
+                                if (saveButton) {
+                                    saveButton.focus();
+                                    FocusManager.ensureElementVisible(saveButton);
+                                    return;
+                                }
+                            }
+                        }
+                    }
+                    // Check if we're on other text field's apply button - treat as same unit
+                    else if (activeElement.closest('.apply-field-controls')) {
+                        const field = activeElement.closest('.form-group-with-button')?.querySelector('input');
+                        if (field) {
+                            // Find the field's index and skip to after all its buttons
+                            const fieldIndex = focusableElements.indexOf(field);
+                            // Count how many buttons follow this field
+                            let buttonsAfterField = 0;
+                            for (let i = fieldIndex + 1; i < focusableElements.length; i++) {
+                                if (focusableElements[i].closest('.apply-field-controls') && 
+                                    focusableElements[i].closest('.form-group-with-button')?.querySelector('input') === field) {
+                                    buttonsAfterField++;
+                                } else {
+                                    break;
+                                }
+                            }
+                            nextIndex = fieldIndex + buttonsAfterField + 1;
+                            if (nextIndex >= focusableElements.length) {
+                                nextIndex = 0;
+                            }
+                        }
+                    }
+                }
+                
+                // Special handling for Track #, Disc #, and Year fields
+                // DOWN from these fields always goes to the topmost File button if any exist
+                if ((!nextIndex || nextIndex === -1) && (activeElement.id === 'track' || activeElement.id === 'disc' || activeElement.id === 'date')) {
+                    // Find ALL grouped File/Folder buttons (not just those after current position)
+                    const allGroupedButtons = focusableElements.filter(el => {
+                        return el.closest('.grouped-apply-item') && 
+                               (el.classList?.contains('apply-file-btn') || 
+                                el.classList?.contains('apply-folder-btn-new'));
+                    });
+                    
+                    if (allGroupedButtons.length > 0) {
+                        // Navigate to the first (topmost) File button
+                        const firstFileButton = allGroupedButtons.find(btn => btn.classList.contains('apply-file-btn'));
+                        if (firstFileButton) {
+                            const buttonIndex = focusableElements.indexOf(firstFileButton);
+                            nextIndex = buttonIndex;
+                        } else {
+                            // No File buttons, use first button available
+                            nextIndex = focusableElements.indexOf(allGroupedButtons[0]);
+                        }
+                    } else {
+                        // No buttons visible, go directly to Save button
+                        const saveButton = document.querySelector('.save-btn');
+                        if (saveButton) {
+                            saveButton.focus();
+                            FocusManager.ensureElementVisible(saveButton);
+                            return;
+                        }
+                    }
+                }
+                
+                // Default behavior only if no special handling was applied
+                if (!nextIndex || nextIndex === -1) {
+                    nextIndex = currentIndex < focusableElements.length - 1 ? currentIndex + 1 : 0;
+                }
             } else if (key === 'ArrowLeft' || key === 'ArrowRight') {
+                // Check if we're on a grouped apply button (Track/Disc/Year)
+                // LEFT/RIGHT navigation between File and Folder buttons in the same row
+                if (activeElement.closest('.grouped-apply-item')) {
+                    const currentItem = activeElement.closest('.grouped-apply-item');
+                    const fileBtn = currentItem.querySelector('.apply-file-btn');
+                    const folderBtn = currentItem.querySelector('.apply-folder-btn-new');
+                    
+                    if (key === 'ArrowLeft' && activeElement === folderBtn && fileBtn) {
+                        // From Folder button, go to File button
+                        fileBtn.focus();
+                        FocusManager.ensureElementVisible(fileBtn);
+                        return;
+                    } else if (key === 'ArrowRight' && activeElement === fileBtn && folderBtn) {
+                        // From File button, go to Folder button
+                        folderBtn.focus();
+                        FocusManager.ensureElementVisible(folderBtn);
+                        return;
+                    } else if (key === 'ArrowLeft' && activeElement === fileBtn) {
+                        // From File button, do nothing (no element to the left spatially)
+                        return;
+                    }
+                    // If we're on Folder button and Right is pressed, do nothing (no element to the right)
+                    return;
+                }
+                
+                // Check if we're on a text field with visible apply buttons (for non-grouped fields)
+                if (activeElement.tagName === 'INPUT' && activeElement.type === 'text') {
+                    const formGroup = activeElement.closest('.form-group-with-button');
+                    if (formGroup) {
+                        const applyControls = formGroup.querySelector('.apply-field-controls.visible');
+                        if (applyControls && key === 'ArrowRight') {
+                            const fileBtn = applyControls.querySelector('.apply-file-btn');
+                            if (fileBtn && !fileBtn.disabled) {
+                                fileBtn.focus();
+                                FocusManager.ensureElementVisible(fileBtn);
+                                return;
+                            }
+                        }
+                    }
+                }
+                
                 // Handle horizontal navigation for grouped fields
                 const parentGroup = activeElement.closest('.form-group-three-column');
                 if (parentGroup) {
@@ -988,6 +890,7 @@
                             input.setSelectionRange(input.value.length, input.value.length);
                         }, 0);
                     }
+                    return; // Exit early to prevent other navigation
                 }
                 
                 // Handle horizontal navigation for buttons in same row
@@ -996,6 +899,21 @@
                     const buttons = Array.from(buttonParent.querySelectorAll('button:not([disabled])'))
                         .filter(btn => btn.offsetParent !== null);
                     const buttonIndex = buttons.indexOf(activeElement);
+                    
+                    // Special handling for apply-field-controls buttons
+                    if (buttonParent.classList.contains('apply-field-controls')) {
+                        // For File button (index 0), Left arrow goes back to text field
+                        if (key === 'ArrowLeft' && buttonIndex === 0) {
+                            const field = buttonParent.closest('.form-group-with-button')?.querySelector('input');
+                            if (field) {
+                                field.focus();
+                                field.dataset.editing = 'false';
+                                field.readOnly = true;
+                                FocusManager.ensureElementVisible(field);
+                                return;
+                            }
+                        }
+                    }
                     
                     if (key === 'ArrowLeft' && buttonIndex > 0) {
                         buttons[buttonIndex - 1].focus();
@@ -1015,7 +933,8 @@
                 }
                 
                 // Auto-scroll to ensure the focused element is visible
-                this.ensureElementVisible(focusableElements[nextIndex]);
+                FocusManager.ensureElementVisible(focusableElements[nextIndex]);
+            } else {
             }
         },
         
@@ -1026,6 +945,9 @@
         async saveFilenameInPlace(filenameElement) {
             const newName = filenameElement.textContent.trim();
             const originalName = State.originalFilename;
+            
+            // Transition back to normal state
+            StateMachine.transition(StateMachine.States.NORMAL);
             
             // Exit edit mode
             filenameElement.contentEditable = false;
@@ -1070,18 +992,7 @@
          * @returns {boolean} True if a header icon is focused
          */
         isHeaderIconFocused() {
-            // Check if we have state indicating header focus
-            if (State.headerFocus) {
-                return true;
-            }
-            
-            // Fallback to checking the active element
-            const focusedElement = document.activeElement;
-            return focusedElement && (
-                focusedElement.classList.contains('control-icon') ||
-                focusedElement.classList.contains('help-button') ||
-                focusedElement.id === 'help-button'
-            );
+            return StateMachine.isInState(StateMachine.States.HEADER_FOCUS);
         },
 
         /**
@@ -1091,9 +1002,7 @@
          */
         navigateToHeaderIcon(pane, iconType) {
             // Clear any existing keyboard focus from list items
-            document.querySelectorAll('.keyboard-focus').forEach(el => {
-                el.classList.remove('keyboard-focus');
-            });
+            FocusManager.clearAllKeyboardFocus();
 
             let targetElement;
             
@@ -1122,11 +1031,18 @@
             }
 
             if (targetElement) {
+                // Transition to header focus state
+                StateMachine.transition(StateMachine.States.HEADER_FOCUS, { 
+                    pane, 
+                    iconType, 
+                    element: targetElement.id 
+                });
+                
                 // Add keyboard focus indicator
-                targetElement.classList.add('keyboard-focus');
+                FocusManager.addKeyboardFocus(targetElement);
                 // Focus the element so it can receive keyboard events
                 targetElement.focus();
-                // Store current header focus state
+                // Store current header focus state (for backward compatibility)
                 State.headerFocus = { pane, iconType };
             }
         },
@@ -1190,8 +1106,52 @@
                             helpButton.dispatchEvent(clickEvent);
                         }
                     }
+                } else if (iconType === 'sort') {
+                    // For sort button, handle dropdown navigation
+                    const sortBtn = document.getElementById(`${pane}-sort-btn`);
+                    const sortDropdown = document.getElementById(`${pane}-sort-dropdown`);
+                    if (sortBtn && sortDropdown) {
+                        // Click the sort button to toggle dropdown
+                        sortBtn.click();
+                        
+                        // If dropdown is now active, set up keyboard navigation
+                        setTimeout(() => {
+                            if (sortDropdown.classList.contains('active')) {
+                                // Mark dropdown as active for keyboard navigation
+                                State.sortDropdownActive = pane;
+                                
+                                // Focus the first sort option
+                                const sortOptions = sortDropdown.querySelectorAll('.sort-option');
+                                if (sortOptions.length > 0) {
+                                    // Find the currently active option or default to first
+                                    let activeOption = sortDropdown.querySelector('.sort-option.active') || sortOptions[0];
+                                    
+                                    // Add keyboard focus indicator
+                                    FocusManager.addKeyboardFocus(activeOption);
+                                    activeOption.setAttribute('tabindex', '0');
+                                    activeOption.focus();
+                                    
+                                    // Set tabindex on all options for keyboard navigation
+                                    sortOptions.forEach(opt => {
+                                        opt.setAttribute('tabindex', '0');
+                                    });
+                                }
+                            }
+                        }, 50);
+                    }
+                } else if (iconType === 'sort-direction') {
+                    // For sort-direction button, click and update focus after re-sort
+                    document.activeElement.click();
+                    
+                    // Move focus to the topmost item after sorting completes
+                    // Use requestAnimationFrame to wait for DOM updates
+                    requestAnimationFrame(() => {
+                        requestAnimationFrame(() => {
+                            this.returnToPaneFromHeader(pane);
+                        });
+                    });
                 } else {
-                    // For sort buttons, just click them
+                    // For other buttons, just click them
                     document.activeElement.click();
                 }
                 return;
@@ -1251,9 +1211,15 @@
         activateFilter(pane) {
             const filterBtn = document.getElementById(`${pane}-filter-btn`);
             if (filterBtn) {
+                // Transition to filter active state
+                StateMachine.transition(StateMachine.States.FILTER_ACTIVE, { 
+                    pane,
+                    inputId: `${pane}-filter-input`
+                });
+                
                 // Clear header focus
                 this.clearHeaderFocus();
-                // Set state BEFORE clicking to avoid race condition
+                // Set state BEFORE clicking to avoid race condition (for backward compatibility)
                 State.filterInputActive = pane;
                 // Click the filter button to open it
                 filterBtn.click();
@@ -1277,16 +1243,18 @@
             
             if (pane === 'folders') {
                 State.focusedPane = 'folders';
-                const visibleFolders = this.getVisibleFolders();
+                const visibleFolders = document.querySelectorAll('#folder-tree .tree-item');
                 if (visibleFolders.length > 0) {
-                    selectTreeItemCallback(visibleFolders[0], true);
+                    const firstFolder = visibleFolders[0];
+                    selectTreeItemCallback(firstFolder, true);
                 }
             } else if (pane === 'files') {
                 State.focusedPane = 'files';
                 const fileItems = Array.from(document.querySelectorAll('#file-list li:not([aria-hidden="true"])'))
                     .filter(item => item.dataset.filepath);
                 if (fileItems.length > 0) {
-                    selectFileItemCallback(fileItems[0], true);
+                    const firstFile = fileItems[0];
+                    selectFileItemCallback(firstFile, true);
                 }
             } else if (pane === 'metadata') {
                 State.focusedPane = 'metadata';
@@ -1294,7 +1262,7 @@
                 if (filenameElement) {
                     filenameElement.focus();
                     // Ensure the filename element is visible
-                    this.ensureElementVisible(filenameElement);
+                    FocusManager.ensureElementVisible(filenameElement);
                 }
             }
         },
@@ -1303,9 +1271,14 @@
          * Clear header focus indicators and state
          */
         clearHeaderFocus() {
+            // Transition back to normal state if we're in header focus
+            if (StateMachine.isInState(StateMachine.States.HEADER_FOCUS)) {
+                StateMachine.transition(StateMachine.States.NORMAL);
+            }
+            
             // Remove keyboard-focus class from all header elements and blur the active one
             document.querySelectorAll('.control-icon, .help-button').forEach(el => {
-                el.classList.remove('keyboard-focus');
+                FocusManager.removeKeyboardFocus(el);
                 // If this element currently has DOM focus, blur it
                 if (document.activeElement === el) {
                     el.blur();
@@ -1316,48 +1289,99 @@
         },
         
         /**
-         * Ensure an element is visible within its scrollable container
-         * @param {HTMLElement} element - The element to make visible
+         * Handle keyboard navigation within sort dropdown menu
+         * @param {string} key - The key that was pressed
+         * @param {HTMLElement} dropdown - The active dropdown element
          */
-        ensureElementVisible(element) {
-            // Find the scrollable container (metadata-content)
-            const scrollContainer = element.closest('.metadata-content');
-            if (!scrollContainer) return;
+        handleSortDropdownNavigation(key, dropdown) {
+            const sortOptions = Array.from(dropdown.querySelectorAll('.sort-option'));
+            const currentFocus = document.activeElement;
+            const currentIndex = sortOptions.indexOf(currentFocus);
+            const pane = State.sortDropdownActive;
             
-            // Get element and container positions
-            const elementRect = element.getBoundingClientRect();
-            const containerRect = scrollContainer.getBoundingClientRect();
-            
-            // Calculate dynamic bottom padding based on history panel
-            const historyHeader = document.querySelector('.history-header');
-            let paddingBottom = 80; // Default padding
-            
-            if (historyHeader) {
-                const historyRect = historyHeader.getBoundingClientRect();
-                // If history header is visible within the viewport, adjust padding
-                if (historyRect.top < window.innerHeight) {
-                    // Add extra padding to ensure element is above the history bar
-                    paddingBottom = Math.max(80, window.innerHeight - historyRect.top + 20);
+            if (key === 'ArrowDown') {
+                // Move to next option
+                let nextIndex = currentIndex + 1;
+                if (nextIndex >= sortOptions.length) {
+                    nextIndex = 0; // Wrap to first option
                 }
+                FocusManager.removeKeyboardFocus(currentFocus);
+                FocusManager.addKeyboardFocus(sortOptions[nextIndex]);
+                sortOptions[nextIndex].focus();
+            } else if (key === 'ArrowUp') {
+                if (currentIndex === 0) {
+                    // Close dropdown and return focus to sort icon
+                    this.closeSortDropdown(dropdown, pane);
+                    const sortBtn = document.getElementById(`${pane}-sort-btn`);
+                    if (sortBtn) {
+                        FocusManager.addKeyboardFocus(sortBtn);
+                        sortBtn.focus();
+                    }
+                } else {
+                    // Move to previous option
+                    const prevIndex = currentIndex - 1;
+                    FocusManager.removeKeyboardFocus(currentFocus);
+                    FocusManager.addKeyboardFocus(sortOptions[prevIndex]);
+                    sortOptions[prevIndex].focus();
+                }
+            } else if (key === 'Enter') {
+                // Select the current option
+                if (currentFocus && currentFocus.classList.contains('sort-option')) {
+                    currentFocus.click();
+                    // The click handler will close the dropdown
+                    State.sortDropdownActive = null;
+                    
+                    // Move focus to the topmost item in the pane after sorting completes
+                    // Use requestAnimationFrame to wait for DOM updates
+                    requestAnimationFrame(() => {
+                        requestAnimationFrame(() => {
+                            this.returnToPaneFromHeader(pane);
+                        });
+                    });
+                }
+            } else if (key === 'Escape') {
+                // Close dropdown and return focus to sort icon
+                this.closeSortDropdown(dropdown, pane);
+                const sortBtn = document.getElementById(`${pane}-sort-btn`);
+                if (sortBtn) {
+                    FocusManager.addKeyboardFocus(sortBtn);
+                    sortBtn.focus();
+                }
+            } else if (key === 'Tab') {
+                // Close dropdown and move to next pane
+                this.closeSortDropdown(dropdown, pane);
+                State.sortDropdownActive = null;
+                
+                // Let the Tab navigation handle moving to next pane
+                // Need to re-dispatch the Tab event
+                setTimeout(() => {
+                    const tabEvent = new KeyboardEvent('keydown', {
+                        key: 'Tab',
+                        keyCode: 9,
+                        which: 9,
+                        bubbles: true,
+                        cancelable: true
+                    });
+                    document.dispatchEvent(tabEvent);
+                }, 50);
             }
+        },
+        
+        /**
+         * Close sort dropdown and clean up state
+         * @param {HTMLElement} dropdown - The dropdown to close
+         * @param {string} pane - The pane name
+         */
+        closeSortDropdown(dropdown, pane) {
+            dropdown.classList.remove('active');
+            State.sortDropdownActive = null;
             
-            // Calculate visible boundaries with padding
-            const paddingTop = 20; // Padding from top edge
-            const visibleTop = containerRect.top + paddingTop;
-            const visibleBottom = containerRect.bottom - paddingBottom;
-            
-            // Check if element is above visible area
-            if (elementRect.top < visibleTop) {
-                // Scroll up to show element with padding
-                const scrollAmount = elementRect.top - visibleTop;
-                scrollContainer.scrollTop += scrollAmount;
-            }
-            // Check if element is below visible area
-            else if (elementRect.bottom > visibleBottom) {
-                // Scroll down to show element with padding
-                const scrollAmount = elementRect.bottom - visibleBottom;
-                scrollContainer.scrollTop += scrollAmount;
-            }
-        }
+            // Remove keyboard focus from all options
+            dropdown.querySelectorAll('.sort-option').forEach(opt => {
+                FocusManager.removeKeyboardFocus(opt);
+                opt.removeAttribute('tabindex');
+            });
+        },
+        
     };
 })();

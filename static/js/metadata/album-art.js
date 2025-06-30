@@ -80,6 +80,10 @@
                     
                     ButtonStatus.showButtonStatus(button, 'Deleted!', 'success', 2000);
                     loadHistoryCallback();
+                    
+                    // Return focus to upload button
+                    const uploadBtn = document.querySelector('.upload-btn');
+                    if (uploadBtn) uploadBtn.focus();
                 } else {
                     ButtonStatus.showButtonStatus(button, 'Error', 'error');
                 }
@@ -112,7 +116,11 @@
                     setTimeout(() => {
                         document.querySelector('.save-image-btn').style.display = 'none';
                         document.querySelector('.apply-folder-btn').style.display = 'none';
-                    }, 2000);
+                        
+                        // Return focus to upload button after buttons are hidden
+                        const uploadBtn = document.querySelector('.upload-btn');
+                        if (uploadBtn) uploadBtn.focus();
+                    }, 1000);
                     
                     loadHistoryCallback();
                 } else {
@@ -161,7 +169,11 @@
                         setTimeout(() => {
                             document.querySelector('.save-image-btn').style.display = 'none';
                             document.querySelector('.apply-folder-btn').style.display = 'none';
-                        }, 3000);
+                            
+                            // Return focus to upload button after buttons are hidden
+                            const uploadBtn = document.querySelector('.upload-btn');
+                            if (uploadBtn) uploadBtn.focus();
+                        }, 1000);
                     }
                     
                     loadHistoryCallback();

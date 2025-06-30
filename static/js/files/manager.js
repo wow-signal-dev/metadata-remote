@@ -257,6 +257,13 @@
         },
         
         /**
+         * Sort and render files (called from UI controls)
+         */
+        sortAndRenderFiles() {
+            this.renderFileList();
+        },
+        
+        /**
          * Render the file list with current filter and sort settings
          */
         renderFileList() {
@@ -564,6 +571,9 @@
                     showButtonStatus(button, 'Renamed!', 'success');
                     loadFilesCallback(State.currentPath);
                     loadHistoryCallback();
+                    
+                    // Restore focus to filename display after successful save
+                    document.getElementById('current-filename').focus();
                 } else {
                     showButtonStatus(button, result.error || 'Error', 'error');
                 }

@@ -821,7 +821,8 @@ input:autofill {
     min-width: 140px;
     display: none;
     z-index: 30;
-    overflow: hidden;
+    overflow: visible;
+    padding: 4px 0;
 }
 
 .sort-dropdown.active {
@@ -830,11 +831,13 @@ input:autofill {
 
 .sort-dropdown .sort-option {
     padding: 10px 14px;
+    margin: 0 4px;
     cursor: pointer;
     display: flex;
     justify-content: space-between;
     align-items: center;
     font-size: 13px;
+    border-radius: 4px;
 }
 
 .sort-dropdown .sort-option:hover {
@@ -842,8 +845,24 @@ input:autofill {
 }
 
 .sort-dropdown .sort-option.active {
-    background: rgba(74, 127, 255, 0.15);
     color: var(--accent-primary);
+    font-weight: 500;
+}
+
+.sort-dropdown .sort-option.active:not(.keyboard-focus) {
+    background: transparent;
+}
+
+.sort-dropdown .sort-option.keyboard-focus {
+    outline: 1px solid var(--accent-primary);
+    outline-offset: -2px;
+    background: rgba(74, 127, 255, 0.1);
+    position: relative;
+    z-index: 1;
+}
+
+.sort-dropdown .sort-option:focus {
+    outline: none;
 }
 
 .tree {
