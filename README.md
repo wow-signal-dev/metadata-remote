@@ -187,7 +187,9 @@ docker run -d \
 
 ### Backend
 - **Framework**: Python Flask
-- **Audio Processing**: FFmpeg for reading/writing metadata
+- **Audio Processing**: For reading/writing metadata:
+  - **Primary**: [Mutagen](https://mutagen.readthedocs.io/) library for direct metadata manipulation
+  - **Fallback**: FFmpeg/FFprobe for formats not supported by Mutagen
 - **Inference Engine**: Custom pattern recognition algorithm + MusicBrainz API
 - **History System**: In-memory with temporary file storage for album art
 
