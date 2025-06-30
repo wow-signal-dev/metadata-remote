@@ -273,6 +273,7 @@ AGPL-3.0 License - see [LICENSE](LICENSE) file for details.
 
 ## Acknowledgments
 
+- [Mutagen](https://github.com/quodlibet/mutagen) - Python multimedia tagging library (LGPL-2.1+)
 - MusicBrainz for their amazing open music database
 - FFmpeg team for reliable audio processing
 - All our users and contributors
