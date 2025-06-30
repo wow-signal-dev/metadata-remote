@@ -65,6 +65,11 @@ window.MetadataRemote.State = {
     keyRepeatInterval: 40,
     isKeyRepeating: false,
     
+    // Header navigation state
+    headerFocus: null,           // { pane: 'folders'|'files'|'metadata', iconType: 'filter'|'sort'|'sort-direction'|'help' }
+    filterInputActive: null,     // 'folders'|'files'|null - tracks which filter input is active
+    previousFocusBeforeHelp: null, // Stores focus state before navigating to help icon
+    
     // Inference state
     inferenceActive: {},
     inferenceAbortControllers: {},

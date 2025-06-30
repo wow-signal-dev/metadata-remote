@@ -31,21 +31,107 @@
         /**
          * Setup metadata field change listeners
          */
+        /**
+         * Hide apply controls for a specific field
+         * @param {string} field - Field name
+         */
+        hideFieldControls(field) {
+            const groupedFields = ['track', 'disc', 'date'];
+            
+            if (groupedFields.includes(field)) {
+                // Hide the specific grouped field item
+                const fieldItem = document.querySelector(`.grouped-apply-item[data-field="${field}"]`);
+                if (fieldItem) {
+                    fieldItem.classList.remove('visible');
+                    fieldItem.style.display = 'none';
+                }
+                
+                // Check if any other grouped fields are still changed
+                const anyGroupedFieldChanged = groupedFields.some(f => {
+                    const inp = document.getElementById(f);
+                    return inp.value !== (State.originalMetadata[f] || '');
+                });
+                
+                // Hide entire grouped controls if no fields are changed
+                if (!anyGroupedFieldChanged) {
+                    const groupedControls = document.getElementById('grouped-apply-controls');
+                    if (groupedControls) {
+                        groupedControls.classList.remove('visible');
+                    }
+                }
+            } else {
+                // Hide individual field controls
+                const controls = document.querySelector(`.apply-field-controls[data-field="${field}"]`);
+                if (controls) {
+                    controls.classList.remove('visible');
+                }
+            }
+        },
+
+        /**
+         * Hide all apply field controls (both individual and grouped)
+         */
+        hideAllApplyControls() {
+            // Hide individual field controls
+            document.querySelectorAll('.apply-field-controls').forEach(controls => {
+                controls.classList.remove('visible');
+            });
+            
+            // Hide grouped controls
+            const groupedControls = document.getElementById('grouped-apply-controls');
+            if (groupedControls) {
+                groupedControls.classList.remove('visible');
+                document.querySelectorAll('.grouped-apply-item').forEach(item => {
+                    item.classList.remove('visible');
+                    item.style.display = 'none';
+                });
+            }
+        },
+
         setupMetadataFieldListeners() {
             const fields = ['title', 'artist', 'album', 'albumartist', 'date', 'genre', 'composer', 'track', 'disc'];
+            const groupedFields = ['track', 'disc', 'date'];
             
             fields.forEach(field => {
                 const input = document.getElementById(field);
-                const controls = document.querySelector(`.apply-field-controls[data-field="${field}"]`);
                 
                 const updateControlsVisibility = () => {
-                    const hasValue = input.value.trim().length > 0;
                     const hasChanged = input.value !== (State.originalMetadata[field] || '');
                     
-                    if (hasValue && hasChanged) {
-                        controls.classList.add('visible');
+                    if (groupedFields.includes(field)) {
+                        // Handle grouped fields (track, disc, date)
+                        const groupedControls = document.getElementById('grouped-apply-controls');
+                        const fieldItem = document.querySelector(`.grouped-apply-item[data-field="${field}"]`);
+                        
+                        if (hasChanged) {
+                            fieldItem.classList.add('visible');
+                            fieldItem.style.display = 'flex';
+                        } else {
+                            fieldItem.classList.remove('visible');
+                            fieldItem.style.display = 'none';
+                        }
+                        
+                        // Show/hide the entire grouped controls container
+                        const anyGroupedFieldChanged = groupedFields.some(f => {
+                            const inp = document.getElementById(f);
+                            return inp.value !== (State.originalMetadata[f] || '');
+                        });
+                        
+                        if (anyGroupedFieldChanged) {
+                            groupedControls.classList.add('visible');
+                        } else {
+                            groupedControls.classList.remove('visible');
+                        }
                     } else {
-                        controls.classList.remove('visible');
+                        // Handle regular fields (title, artist, album, etc.)
+                        const controls = document.querySelector(`.apply-field-controls[data-field="${field}"]`);
+                        if (controls) {
+                            if (hasChanged) {
+                                controls.classList.add('visible');
+                            } else {
+                                controls.classList.remove('visible');
+                            }
+                        }
                     }
                 };
                 
@@ -60,6 +146,9 @@
          */
         async save(showButtonStatus) {
             if (!State.currentFile) return;
+            
+            // Store the currently focused element
+            const previouslyFocused = document.activeElement;
             
             const button = document.querySelector('.save-btn');
             const data = {
@@ -93,9 +182,7 @@
                         }
                     });
                     
-                    document.querySelectorAll('.apply-field-controls').forEach(controls => {
-                        controls.classList.remove('visible');
-                    });
+                    this.hideAllApplyControls();
                     
                     if (State.pendingAlbumArt) {
                         State.currentAlbumArt = State.pendingAlbumArt;
@@ -120,6 +207,16 @@
             }
             
             UIUtils.setFormEnabled(true);
+            
+            // Restore focus to the previously focused element
+            if (previouslyFocused && previouslyFocused.id && document.getElementById(previouslyFocused.id)) {
+                const element = document.getElementById(previouslyFocused.id);
+                element.focus();
+                if (element.tagName === 'INPUT') {
+                    element.dataset.editing = 'false';
+                    element.readOnly = true;
+                }
+            }
         },
         
         /**
@@ -128,6 +225,9 @@
          */
         async resetForm(showButtonStatus) {
             if (!State.currentFile) return;
+            
+            // Store the currently focused element
+            const previouslyFocused = document.activeElement;
             
             const button = document.querySelector('.clear-btn');
             showButtonStatus(button, 'Resetting...', 'processing');
@@ -151,9 +251,7 @@
                     document.getElementById(field).value = value;
                 });
                 
-                document.querySelectorAll('.apply-field-controls').forEach(controls => {
-                    controls.classList.remove('visible');
-                });
+                this.hideAllApplyControls();
                 
                 State.pendingAlbumArt = null;
                 
@@ -177,6 +275,16 @@
                 }
                 
                 showButtonStatus(button, 'Reset!', 'success', 2000);
+                
+                // Restore focus to the previously focused element
+                if (previouslyFocused && previouslyFocused.id && document.getElementById(previouslyFocused.id)) {
+                    const element = document.getElementById(previouslyFocused.id);
+                    element.focus();
+                    if (element.tagName === 'INPUT') {
+                        element.dataset.editing = 'false';
+                        element.readOnly = true;
+                    }
+                }
             } catch (err) {
                 console.error('Error resetting form:', err);
                 showButtonStatus(button, 'Error', 'error');
@@ -211,12 +319,19 @@
                     
                     // Hide controls after successful save
                     setTimeout(() => {
-                        const controls = document.querySelector(`.apply-field-controls[data-field="${field}"]`);
-                        controls.classList.remove('visible');
+                        this.hideFieldControls(field);
                     }, 1000);
                     
                     // Refresh history
                     loadHistoryCallback();
+                    
+                    // Maintain focus on the field
+                    const fieldElement = document.getElementById(field);
+                    if (fieldElement) {
+                        fieldElement.focus();
+                        fieldElement.dataset.editing = 'false';
+                        fieldElement.readOnly = true;
+                    }
                 } else {
                     showButtonStatus(button, 'Failed to save', 'error');
                 }
@@ -259,11 +374,18 @@
                     showButtonStatus(button, `Applied to ${result.filesUpdated} files!`, 'success', 3000);
                     State.originalMetadata[field] = value;
                     setTimeout(() => {
-                        const controls = document.querySelector(`.apply-field-controls[data-field="${field}"]`);
-                        controls.classList.remove('visible');
+                        this.hideFieldControls(field);
                     }, 1000);
                     
                     loadHistoryCallback();
+                    
+                    // Maintain focus on the field
+                    const fieldElement = document.getElementById(field);
+                    if (fieldElement) {
+                        fieldElement.focus();
+                        fieldElement.dataset.editing = 'false';
+                        fieldElement.readOnly = true;
+                    }
                 } else {
                     showButtonStatus(button, result.error || 'Failed to apply to folder', 'error');
                 }

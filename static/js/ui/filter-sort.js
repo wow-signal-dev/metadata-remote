@@ -97,8 +97,11 @@
             
             foldersSortBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
+                const wasActive = foldersSortDropdown.classList.contains('active');
                 foldersSortDropdown.classList.toggle('active');
                 State.focusedPane = 'folders';
+                // Update sort dropdown active state
+                State.sortDropdownActive = !wasActive ? 'folders' : null;
             });
             
             foldersSortDirection.addEventListener('click', (e) => {
@@ -118,6 +121,7 @@
                     this.updateSortUI('folders');
                     window.MetadataRemote.Navigation.Tree.rebuildTree();
                     foldersSortDropdown.classList.remove('active');
+                    State.sortDropdownActive = null;
                 });
             });
             
@@ -128,8 +132,11 @@
             
             filesSortBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
+                const wasActive = filesSortDropdown.classList.contains('active');
                 filesSortDropdown.classList.toggle('active');
                 State.focusedPane = 'files';
+                // Update sort dropdown active state
+                State.sortDropdownActive = !wasActive ? 'files' : null;
             });
             
             filesSortDirection.addEventListener('click', (e) => {
@@ -141,11 +148,28 @@
                 window.MetadataRemote.Files.Manager.sortAndRenderFiles();
             });
             
+            // Files sort options
+            filesSortDropdown.querySelectorAll('.sort-option').forEach(option => {
+                option.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const sortBy = option.dataset.sort;
+                    State.currentSort.files.method = sortBy;
+                    State.currentSort.files.direction = 'asc';
+                    this.updateSortUI('files');
+                    window.MetadataRemote.Files.Manager.sortAndRenderFiles();
+                    filesSortDropdown.classList.remove('active');
+                    State.sortDropdownActive = null;
+                });
+            });
+            
             // Close dropdowns on outside click
             document.addEventListener('click', () => {
                 foldersSortDropdown.classList.remove('active');
                 filesSortDropdown.classList.remove('active');
+                State.sortDropdownActive = null;
             });
+            
+            // Remove keyboard event logging - no longer needed
         },
         
         /**

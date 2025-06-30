@@ -66,16 +66,6 @@
                     // Re-render the file list with the new filter
                     this.renderFileList();
                 });
-                
-                // Escape key to close filter
-                filterInput.addEventListener('keydown', (e) => {
-                    if (e.key === 'Escape') {
-                        filterContainer.classList.remove('active');
-                        filterBtn.classList.remove('active');
-                        State.activeFilterPane = null;
-                        document.getElementById('files-pane').focus();
-                    }
-                });
             }
             
             // Sort field button
@@ -267,6 +257,13 @@
         },
         
         /**
+         * Sort and render files (called from UI controls)
+         */
+        sortAndRenderFiles() {
+            this.renderFileList();
+        },
+        
+        /**
          * Render the file list with current filter and sort settings
          */
         renderFileList() {
@@ -433,7 +430,11 @@
                 };
                 
                 Object.entries(State.originalMetadata).forEach(([field, value]) => {
-                    document.getElementById(field).value = value;
+                    const input = document.getElementById(field);
+                    input.value = value;
+                    // Initialize as read-only until user presses Enter to edit
+                    input.dataset.editing = 'false';
+                    input.readOnly = true;
                 });
                 
                 // Handle format limitations
@@ -570,6 +571,9 @@
                     showButtonStatus(button, 'Renamed!', 'success');
                     loadFilesCallback(State.currentPath);
                     loadHistoryCallback();
+                    
+                    // Restore focus to filename display after successful save
+                    document.getElementById('current-filename').focus();
                 } else {
                     showButtonStatus(button, result.error || 'Error', 'error');
                 }

@@ -63,16 +63,6 @@
                     State.foldersFilter = e.target.value;
                     this.rebuildTree();
                 });
-                
-                // Escape key to close filter
-                filterInput.addEventListener('keydown', (e) => {
-                    if (e.key === 'Escape') {
-                        filterContainer.classList.remove('active');
-                        filterBtn.classList.remove('active');
-                        State.activeFilterPane = null;
-                        document.getElementById('folders-pane').focus();
-                    }
-                });
             }
             
             // Sort field button
@@ -152,6 +142,9 @@
          */
         async loadTree() {
             try {
+                // Set loading state
+                document.getElementById('folder-count').textContent = '(loading...)';
+                
                 const data = await API.loadTree();
                 State.treeData[''] = data.items;
                 this.buildTreeFromData();
@@ -159,6 +152,8 @@
             } catch (err) {
                 console.error('Error loading tree:', err);
                 UIUtils.showStatus('Error loading folders', 'error');
+                // Set error state
+                document.getElementById('folder-count').textContent = '(error)';
             }
         },
 
@@ -173,11 +168,16 @@
             const filteredItems = this.filterTreeItems(State.treeData[''] || [], State.foldersFilter);
             const sortedItems = this.sortItems(filteredItems);
             
+            let folderCount = 0;
             sortedItems.forEach(item => {
                 if (item.type === 'folder') {
                     tree.appendChild(this.createTreeItem(item, 0));
+                    folderCount++;
                 }
             });
+            
+            // Update folder count in the header
+            document.getElementById('folder-count').textContent = `(${folderCount})`;
             
             // Auto-select the first folder on initial load
             const firstTreeItem = tree.querySelector('.tree-item');

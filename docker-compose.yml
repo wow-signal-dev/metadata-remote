@@ -6,7 +6,7 @@ services:
     ports:
       - "8338:8338"
     volumes:
-      - /path/to/your/music:/music  # Users must change this
+      - /mnt/storage/media/music:/music  # Users must change this
       # To add multiple music folders, mount them as subdirectories:
       # - /path/to/music1:/music/Library1
       # - /path/to/music2:/music/Library2
