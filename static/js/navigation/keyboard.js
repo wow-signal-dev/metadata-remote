@@ -51,11 +51,6 @@
             // Initialize state machine
             StateMachine.init();
             
-            // Add debug logging for state changes
-            StateMachine.on('statechange', (oldState, newState, context) => {
-                console.log(`[StateMachine] Navigation state: ${oldState} → ${newState}`, context);
-            });
-            
             // Initialize PaneNavigation
             window.MetadataRemote.Navigation.PaneNavigation.init({
                 selectTreeItem: selectTreeItemCallback,
@@ -1031,12 +1026,21 @@
             }
 
             if (targetElement) {
-                // Transition to header focus state
-                StateMachine.transition(StateMachine.States.HEADER_FOCUS, { 
-                    pane, 
-                    iconType, 
-                    element: targetElement.id 
-                });
+                // Only transition to header focus state if we're not already in it
+                if (StateMachine.getState() !== StateMachine.States.HEADER_FOCUS) {
+                    StateMachine.transition(StateMachine.States.HEADER_FOCUS, { 
+                        pane, 
+                        iconType, 
+                        element: targetElement.id 
+                    });
+                } else {
+                    // Update context without transitioning
+                    StateMachine.updateContext({ 
+                        pane, 
+                        iconType, 
+                        element: targetElement.id 
+                    });
+                }
                 
                 // Add keyboard focus indicator
                 FocusManager.addKeyboardFocus(targetElement);

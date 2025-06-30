@@ -169,7 +169,6 @@
                 // Transition to header navigation
                 const HeaderNav = window.MetadataRemote.Navigation.HeaderNavigation;
                 if (HeaderNav && HeaderNav.focusIcon) {
-                    window.MetadataRemote.Navigation.StateMachine.transition('header_focus', { from: 'folders' });
                     HeaderNav.focusIcon('folders', 'filter');
                 } else {
                     // Fallback to direct header navigation
@@ -225,7 +224,6 @@
                 // Transition to header navigation
                 const HeaderNav = window.MetadataRemote.Navigation.HeaderNavigation;
                 if (HeaderNav && HeaderNav.focusIcon) {
-                    window.MetadataRemote.Navigation.StateMachine.transition('header_focus', { from: 'files' });
                     HeaderNav.focusIcon('files', 'filter');
                 } else {
                     // Fallback to direct header navigation

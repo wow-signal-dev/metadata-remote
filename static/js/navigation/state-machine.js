@@ -154,7 +154,7 @@
          * Initialize the module
          */
         init() {
-            console.log('Navigation State Machine initialized');
+            // Module initialized
         }
     };
 
