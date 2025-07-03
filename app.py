@@ -15,7 +15,6 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 from flask import Flask, jsonify, request, render_template, send_file, Response
-import subprocess
 import json
 import os
 import logging
@@ -54,8 +53,7 @@ from core.history import (
 from core.inference import inference_engine
 from core.file_utils import validate_path, fix_file_ownership, get_file_format
 from core.metadata.normalizer import normalize_metadata_tags, get_metadata_field_mapping
-from core.metadata.ffmpeg import run_ffprobe
-from core.metadata.reader import read_metadata
+from core.metadata.reader import read_metadata, get_format_limitations
 from core.metadata.writer import apply_metadata_to_file
 from core.metadata.mutagen_handler import mutagen_handler
 from core.album_art.extractor import extract_album_art
@@ -77,6 +75,24 @@ def add_cache_headers(response):
         response.headers['Pragma'] = 'no-cache'
         response.headers['Expires'] = '0'
     return response
+
+# =============
+# HELPER FUNCTIONS
+# =============
+
+def sanitize_log_data(data):
+    """Sanitize data for logging by truncating base64 image data"""
+    if not isinstance(data, dict):
+        return data
+    
+    sanitized = {}
+    for key, value in data.items():
+        if key == 'art' and isinstance(value, str) and value.startswith('data:image'):
+            # Truncate base64 image data
+            sanitized[key] = value[:50] + '...[truncated]'
+        else:
+            sanitized[key] = value
+    return sanitized
 
 # =============
 # APP FUNCTIONS
@@ -320,6 +336,10 @@ def get_metadata(filename):
         standard_fields['hasArt'] = bool(art)
         standard_fields['art'] = art
         
+        # Get format limitations
+        base_format = standard_fields.get('base_format', '')
+        format_limitations = get_format_limitations(base_format)
+        
         # Merge standard fields with discovered fields
         # Standard fields take precedence for display
         response_data = {
@@ -329,7 +349,8 @@ def get_metadata(filename):
             'standard_fields': standard_fields,  # Existing 9 fields (with empty values for compatibility)
             'existing_standard_fields': existing_standard_fields,  # Only fields that actually exist
             'all_fields': all_fields,            # All discovered fields
-            'album_art_data': art
+            'album_art_data': art,
+            'formatLimitations': format_limitations
         }
         
         # For backward compatibility, also include standard fields at root level
@@ -355,7 +376,7 @@ def set_metadata(filename):
             return jsonify({'error': 'File not found'}), 404
         
         data = request.json
-        logger.info(f"[set_metadata] Received data for {filename}: {data}")
+        logger.info(f"[set_metadata] Received data for {filename}: {sanitize_log_data(data)}")
         
         # Get current metadata before changes using the correct method for OGG/OPUS
         current_metadata = read_metadata(filepath)

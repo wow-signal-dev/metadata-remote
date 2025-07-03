@@ -102,21 +102,6 @@ class OggAlbumArtHandler:
     def _detect_mime_type(self, image_data: bytes) -> str:
         """Detect MIME type from image data"""
         return mutagen_handler._detect_mime_type(image_data)
-    
-    def _create_picture_block(self, image_data: bytes, mime_type: str, 
-                             pic_type: int = 3, description: str = "") -> bytes:
-        """
-        Create METADATA_BLOCK_PICTURE binary data
-        This method is kept for backward compatibility with the FFmpeg fallback
-        """
-        return mutagen_handler._create_flac_picture_block(image_data, mime_type, pic_type, description)
-    
-    def _parse_picture_block(self, data: bytes) -> Tuple[int, str, bytes]:
-        """
-        Parse METADATA_BLOCK_PICTURE binary data
-        This method is kept for backward compatibility
-        """
-        return mutagen_handler._parse_flac_picture_block(data)
 
 
 # Global instance for reuse

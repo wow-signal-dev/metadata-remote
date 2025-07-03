@@ -2,16 +2,15 @@
 Album art extraction operations for Metadata Remote
 Handles extracting album artwork from audio files
 """
-import subprocess
-import base64
 import logging
 
 from config import FORMAT_METADATA_CONFIG, logger
 from core.file_utils import get_file_format
+from core.metadata.mutagen_handler import mutagen_handler
 
 def extract_album_art(filepath):
     """
-    Extract album art from audio file
+    Extract album art from audio file using Mutagen
     
     Args:
         filepath: Path to the audio file
@@ -25,30 +24,28 @@ def extract_album_art(filepath):
         logger.debug(f"Format {base_format} does not support embedded album art")
         return None
     
-    # Special handling for OGG/Opus files
-    if base_format in ['ogg', 'opus']:
-        from core.album_art.ogg import ogg_album_art_handler
-        return ogg_album_art_handler.extract_album_art(filepath)
-    
-    # Build ffmpeg command to extract album art (for other formats)
-    art_cmd = ['ffmpeg', '-i', filepath, '-an', '-vcodec', 'copy', '-f', 'image2pipe', '-']
-    
     try:
-        result = subprocess.run(art_cmd, capture_output=True, timeout=10)
+        # Use mutagen handler for all formats
+        art_data = mutagen_handler.get_album_art(filepath)
         
-        if result.returncode == 0 and result.stdout:
-            # Successfully extracted album art
-            encoded_data = base64.b64encode(result.stdout).decode('utf-8')
-            logger.debug(f"Successfully extracted album art from {filepath}")
-            return encoded_data
-        else:
-            # No album art found or extraction failed
-            logger.debug(f"No album art found in {filepath}")
-            return None
+        # If extraction returned None but format supports art, check for corruption
+        # This catches cases like truncated OGG/Opus METADATA_BLOCK_PICTURE
+        if art_data is None and base_format not in ['wav', 'wv']:
+            # Import here to avoid circular dependency at module level
+            from core.album_art.processor import detect_corrupted_album_art, fix_corrupted_album_art
             
-    except subprocess.TimeoutExpired:
-        logger.error(f"Timeout while extracting album art from {filepath}")
-        return None
+            if detect_corrupted_album_art(filepath):
+                logger.info(f"Detected corrupted album art during read for {filepath}")
+                if fix_corrupted_album_art(filepath):
+                    # Try extraction again after repair
+                    art_data = mutagen_handler.get_album_art(filepath)
+                    if art_data:
+                        logger.info(f"Successfully extracted album art after repair")
+                    else:
+                        logger.info(f"Album art removed due to corruption")
+        
+        return art_data
+        
     except Exception as e:
         logger.error(f"Error extracting album art from {filepath}: {e}")
         return None

@@ -784,11 +784,18 @@ class MutagenHandler:
                 # WMA album art
                 for key in audio_file.keys():
                     if 'WM/Picture' in key:
-                        picture = audio_file[key][0]
-                        if hasattr(picture, 'value'):
-                            # Skip the picture type and description to get to the actual data
-                            # WM/Picture format is complex, might need adjustment
-                            return base64.b64encode(picture.value).decode('utf-8')
+                        picture_data = audio_file[key][0]
+                        if hasattr(picture_data, 'value'):
+                            # Parse ASF picture structure
+                            # Format: Type(1) + Mime Length(4) + Mime + Desc Length(4) + Desc + Data
+                            data = picture_data.value
+                            offset = 1  # Skip picture type
+                            mime_len = int.from_bytes(data[offset:offset+4], 'little')
+                            offset += 4 + mime_len
+                            desc_len = int.from_bytes(data[offset:offset+4], 'little')
+                            offset += 4 + desc_len
+                            image_data = data[offset:]
+                            return base64.b64encode(image_data).decode('utf-8')
             
             elif isinstance(audio_file, (WAVE, WavPack)):
                 # WAV and WavPack don't support embedded album art
@@ -874,10 +881,29 @@ class MutagenHandler:
             audio_file['covr'] = [MP4Cover(image_data, imageformat=cover_format)]
         
         elif isinstance(audio_file, ASF):
-            # WMA is more complex, might need specialized handling
-            # For now, log a warning
-            logger.warning("WMA album art writing is not fully implemented yet")
-            return
+            # Build WM/Picture structure
+            import struct
+            picture_data = bytearray()
+            picture_data.append(3)  # Picture type (front cover)
+            
+            mime_bytes = mime_type.encode('utf-16-le')
+            picture_data.extend(struct.pack('<I', len(mime_bytes)))
+            picture_data.extend(mime_bytes)
+            
+            desc_bytes = 'Cover'.encode('utf-16-le')
+            picture_data.extend(struct.pack('<I', len(desc_bytes)))
+            picture_data.extend(desc_bytes)
+            
+            picture_data.extend(image_data)
+            
+            # Remove existing pictures
+            keys_to_remove = [k for k in audio_file.keys() if 'WM/Picture' in k]
+            for key in keys_to_remove:
+                del audio_file[key]
+            
+            # Add new picture
+            from mutagen.asf import ASFByteArrayAttribute
+            audio_file['WM/Picture'] = ASFByteArrayAttribute(bytes(picture_data))
         
         elif isinstance(audio_file, (WAVE, WavPack)):
             # WAV and WavPack don't support embedded album art

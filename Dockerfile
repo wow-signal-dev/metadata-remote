@@ -11,8 +11,13 @@ RUN pip install --user --no-cache-dir -r requirements.txt
 # Final stage
 FROM python:3.11-alpine
 
-# Install only runtime dependencies
-RUN apk add --no-cache ffmpeg
+# Install only runtime dependencies for image processing
+RUN apk add --no-cache \
+    libjpeg-turbo \
+    libpng \
+    libwebp \
+    zlib \
+    freetype
 
 WORKDIR /app
 
