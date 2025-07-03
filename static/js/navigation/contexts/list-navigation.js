@@ -100,7 +100,6 @@
                 // Update state for backward compatibility
                 window.MetadataRemote.State.keyHeldDown = key;
                 
-                // FIXED: isRepeating is a property, not a function
                 window.MetadataRemote.State.isKeyRepeating = keyRepeatHandler.isRepeating;
             } else {
                 // Fallback if no key repeat handler
@@ -318,8 +317,6 @@
                 // Scroll to the new item
                 if (window.MetadataRemote?.Navigation?.ScrollManager) {
                     window.MetadataRemote.Navigation.ScrollManager.immediateScrollToCenter(visibleFolders[newIndex], container);
-                } else {
-                    console.warn('[ListNavigation] ScrollManager not available, skipping scroll');
                 }
             }
         },
@@ -356,8 +353,6 @@
                 // Scroll to the new item
                 if (window.MetadataRemote?.Navigation?.ScrollManager) {
                     window.MetadataRemote.Navigation.ScrollManager.immediateScrollToCenter(fileItems[newIndex], container);
-                } else {
-                    console.warn('[ListNavigation] ScrollManager not available, skipping scroll');
                 }
             }
         },
@@ -436,7 +431,10 @@
             } else if (window.MetadataRemote.State.focusedPane === 'files' && window.MetadataRemote.State.selectedListItem) {
                 const filepath = window.MetadataRemote.State.selectedListItem.dataset.filepath;
                 if (filepath) {
-                    callbacks.loadFile(filepath, window.MetadataRemote.State.selectedListItem);
+                    const playButton = window.MetadataRemote.State.selectedListItem.querySelector('.play-button');
+                    if (playButton) {
+                        window.MetadataRemote.Audio.Player.togglePlayback(filepath, playButton);
+                    }
                 }
             }
         }

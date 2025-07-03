@@ -48,7 +48,7 @@ from config import (
 from core.history import (
     history, ActionType, HistoryAction,
     create_metadata_action, create_batch_metadata_action,
-    create_album_art_action
+    create_album_art_action, create_delete_field_action
 )
 
 from core.inference import inference_engine
@@ -57,6 +57,7 @@ from core.metadata.normalizer import normalize_metadata_tags, get_metadata_field
 from core.metadata.ffmpeg import run_ffprobe
 from core.metadata.reader import read_metadata
 from core.metadata.writer import apply_metadata_to_file
+from core.metadata.mutagen_handler import mutagen_handler
 from core.album_art.extractor import extract_album_art
 from core.album_art.processor import detect_corrupted_album_art, fix_corrupted_album_art
 from core.album_art.manager import (
@@ -305,13 +306,36 @@ def get_metadata(filename):
     try:
         filepath = validate_path(os.path.join(MUSIC_DIR, filename))
         
-        metadata = read_metadata(filepath)
+        # Get standard fields (for compatibility)
+        standard_fields = read_metadata(filepath)
         
+        # Get only existing standard fields
+        existing_standard_fields = mutagen_handler.read_existing_metadata(filepath)
+        
+        # Discover all fields
+        all_fields = mutagen_handler.discover_all_metadata(filepath)
+        
+        # Get album art
         art = extract_album_art(filepath)
-        metadata['hasArt'] = bool(art)
-        metadata['art'] = art
+        standard_fields['hasArt'] = bool(art)
+        standard_fields['art'] = art
         
-        return jsonify(metadata)
+        # Merge standard fields with discovered fields
+        # Standard fields take precedence for display
+        response_data = {
+            'status': 'success',
+            'filename': os.path.basename(filepath),
+            'file_path': filename,
+            'standard_fields': standard_fields,  # Existing 9 fields (with empty values for compatibility)
+            'existing_standard_fields': existing_standard_fields,  # Only fields that actually exist
+            'all_fields': all_fields,            # All discovered fields
+            'album_art_data': art
+        }
+        
+        # For backward compatibility, also include standard fields at root level
+        response_data.update(standard_fields)
+        
+        return jsonify(response_data)
         
     except FileNotFoundError:
         return jsonify({'error': 'File not found'}), 404
@@ -331,12 +355,15 @@ def set_metadata(filename):
             return jsonify({'error': 'File not found'}), 404
         
         data = request.json
+        logger.info(f"[set_metadata] Received data for {filename}: {data}")
         
         # Get current metadata before changes using the correct method for OGG/OPUS
         current_metadata = read_metadata(filepath)
+        logger.info(f"[set_metadata] Current metadata fields: {list(current_metadata.keys())}")
         
         # Separate metadata from special operations
         metadata_tags = {k: v for k, v in data.items() if k not in ['art', 'removeArt']}
+        logger.info(f"[set_metadata] Metadata tags to save: {metadata_tags}")
         
         # Process album art changes
         has_art_change, art_data, remove_art = process_album_art_change(filepath, data, current_metadata)
@@ -350,18 +377,174 @@ def set_metadata(filename):
         
         # Apply all changes
         if has_art_change:
+            logger.info(f"[set_metadata] Applying metadata with album art changes")
             # This will apply both metadata and album art, and track art history
             save_album_art_to_file(filepath, art_data, remove_art, metadata_tags, track_history=True)
         else:
+            logger.info(f"[set_metadata] Applying metadata only (no album art changes)")
             # Just apply metadata changes without album art
             apply_metadata_to_file(filepath, metadata_tags)
         
+        logger.info(f"[set_metadata] Successfully saved metadata for {filename}")
         return jsonify({'status': 'success'})
         
     except ValueError:
         return jsonify({'error': 'Invalid path'}), 403
     except Exception as e:
         logger.error(f"Error setting metadata: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/metadata/<path:filename>/<field_id>', methods=['DELETE'])
+def delete_metadata_field(filename, field_id):
+    """Delete a metadata field from a file"""
+    try:
+        logger.info(f"[DEBUG] DELETE request for field_id: {field_id} from file: {filename}")
+        
+        file_path = validate_path(os.path.join(MUSIC_DIR, filename))
+        
+        if not os.path.exists(file_path):
+            return jsonify({'error': 'File not found'}), 404
+        
+        
+        # Get current metadata for history
+        current_metadata = mutagen_handler.read_metadata(file_path)
+        logger.info(f"[DEBUG] Current metadata keys: {list(current_metadata.keys())}")
+        
+        all_fields = mutagen_handler.get_all_fields(file_path)
+        logger.info(f"[DEBUG] All fields keys: {list(all_fields.keys())}")
+        
+        # Define standard fields that are always valid for deletion
+        standard_fields = ['title', 'artist', 'album', 'albumartist', 'date', 'genre', 'composer', 'track', 'disc']
+        is_standard = field_id.lower() in standard_fields
+        logger.info(f"[DEBUG] Is standard field: {is_standard}")
+        
+        # Check if field exists (skip check for standard fields as they're excluded from all_fields)
+        if field_id.lower() not in standard_fields and field_id not in all_fields:
+            return jsonify({'error': 'Field not found'}), 404
+        
+        
+        # Store previous value for history
+        if field_id in all_fields:
+            previous_value = all_fields[field_id].get('value', '')
+        else:
+            # For standard fields, get the value from current_metadata
+            previous_value = current_metadata.get(field_id, '')
+        
+        logger.info(f"[DEBUG] Previous value: {previous_value}")
+        
+        # Delete the field
+        success = mutagen_handler.delete_field(file_path, field_id)
+        logger.info(f"[DEBUG] Delete operation success: {success}")
+        
+        if success:
+            # Record in history
+            action = create_delete_field_action(file_path, field_id, previous_value)
+            history.add_action(action)
+            
+            return jsonify({
+                'status': 'success',
+                'message': 'Field deleted successfully'
+            })
+        else:
+            return jsonify({
+                'status': 'error', 
+                'error': 'Failed to delete field'
+            }), 500
+            
+    except ValueError:
+        return jsonify({'error': 'Invalid path'}), 403
+    except Exception as e:
+        logger.error(f"Error deleting metadata field: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/metadata/create-field', methods=['POST'])
+def create_custom_field():
+    """New endpoint for creating custom metadata fields"""
+    data = request.json
+    filepath = data.get('filepath')
+    field_name = data.get('field_name')
+    field_value = data.get('field_value', '')
+    apply_to_folder = data.get('apply_to_folder', False)
+    
+    # Validate inputs
+    if not field_name or not filepath:
+        return jsonify({'status': 'error', 'message': 'Missing required fields'}), 400
+    
+    # Validate field name length
+    if len(field_name) > 50:
+        return jsonify({'status': 'error', 'message': 'Field name must be 50 characters or less'}), 400
+    
+    # Check for null bytes
+    if '\x00' in field_name:
+        return jsonify({'status': 'error', 'message': 'Field name contains invalid characters'}), 400
+    
+    # Sanitize field name (alphanumeric and underscore only)
+    if not re.match(r'^[A-Za-z0-9_]+$', field_name):
+        return jsonify({'status': 'error', 'message': 'Invalid field name. Only alphanumeric characters and underscores are allowed.'}), 400
+    
+    try:
+        if apply_to_folder:
+            # Apply to all files in folder
+            folder_path = os.path.dirname(os.path.join(MUSIC_DIR, filepath))
+            results = {'status': 'success', 'filesUpdated': 0, 'errors': []}
+            
+            # Get all audio files in the folder
+            audio_files = []
+            for filename in os.listdir(folder_path):
+                file_path = os.path.join(folder_path, filename)
+                if os.path.isfile(file_path) and filename.lower().endswith(AUDIO_EXTENSIONS):
+                    audio_files.append(file_path)
+            
+            # Apply the custom field to each file
+            for file_path in audio_files:
+                try:
+                    success = mutagen_handler.write_custom_field(file_path, field_name, field_value)
+                    if success:
+                        results['filesUpdated'] += 1
+                        # Record in history
+                        rel_path = os.path.relpath(file_path, MUSIC_DIR)
+                        action = create_metadata_action(file_path, f'custom:{field_name}', '', field_value)
+                        history.add_action(action)
+                    else:
+                        results['errors'].append(f"{os.path.basename(file_path)}: Failed to write field")
+                except Exception as e:
+                    results['errors'].append(f"{os.path.basename(file_path)}: {str(e)}")
+            
+            # Determine overall status
+            if results['filesUpdated'] == 0:
+                results['status'] = 'error'
+                results['message'] = 'No files were updated'
+            elif results['errors']:
+                results['status'] = 'partial'
+                results['message'] = f"Updated {results['filesUpdated']} files with errors"
+            else:
+                results['message'] = f"Successfully updated {results['filesUpdated']} files"
+            
+            return jsonify(results)
+        else:
+            # Apply to single file
+            full_path = validate_path(os.path.join(MUSIC_DIR, filepath))
+            success = mutagen_handler.write_custom_field(full_path, field_name, field_value)
+            
+            if success:
+                # Record in history
+                action = create_metadata_action(full_path, f'custom:{field_name}', '', field_value)
+                history.add_action(action)
+                
+                return jsonify({
+                    'status': 'success',
+                    'message': 'Field created successfully'
+                })
+            else:
+                return jsonify({
+                    'status': 'error',
+                    'message': 'Failed to create field'
+                }), 500
+                
+    except ValueError:
+        return jsonify({'error': 'Invalid path'}), 403
+    except Exception as e:
+        logger.error(f"Error creating custom field: {e}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/apply-art-to-folder', methods=['POST'])
@@ -528,6 +711,18 @@ def undo_action(action_id):
                     files_updated += 1
                 except Exception as e:
                     errors.append(f"{os.path.basename(filepath)}: {str(e)}")
+        
+        elif action.action_type == ActionType.DELETE_FIELD:
+            # Undo field deletion by restoring the field
+            filepath = action.files[0]
+            field = action.field
+            old_value = action.old_values[filepath]
+            
+            try:
+                apply_metadata_to_file(filepath, {field: old_value})
+                files_updated += 1
+            except Exception as e:
+                errors.append(f"{os.path.basename(filepath)}: {str(e)}")
 
         # Mark as undone
         action.is_undone = True
@@ -625,6 +820,17 @@ def redo_action(action_id):
                     files_updated += 1
                 except Exception as e:
                     errors.append(f"{os.path.basename(filepath)}: {str(e)}")
+        
+        elif action.action_type == ActionType.DELETE_FIELD:
+            # Redo field deletion by deleting the field again
+            filepath = action.files[0]
+            field = action.field
+            
+            try:
+                mutagen_handler.delete_field(filepath, field)
+                files_updated += 1
+            except Exception as e:
+                errors.append(f"{os.path.basename(filepath)}: {str(e)}")
 
         # Mark as not undone
         action.is_undone = False

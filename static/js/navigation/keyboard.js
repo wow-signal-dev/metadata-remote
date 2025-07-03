@@ -91,10 +91,13 @@
                 }
             }, true);
             
+            
             // Handle click events on metadata input fields to immediately activate editing
             document.addEventListener('click', (e) => {
+                
                 if (e.target.tagName === 'INPUT' && e.target.type === 'text' && 
                     e.target.closest('.metadata') && e.target.dataset.editing === 'false') {
+                    
                     
                     // Clear focus from any other metadata input fields first
                     document.querySelectorAll('.metadata input[type="text"]').forEach(input => {
@@ -131,6 +134,7 @@
             
             // Global keyboard handler with custom repeat
             document.addEventListener('keydown', (e) => {
+                
                 // Check for active sort dropdown
                 const activeSortDropdown = document.querySelector('.sort-dropdown.active');
 
@@ -161,6 +165,7 @@
                 
                 // Handle metadata pane navigation
                 if (State.focusedPane === 'metadata') {
+                    
                     // Tab key now handled by Router (removed from here)
                     
                     // Handle Enter key on filename - MUST come before arrow key navigation
@@ -180,7 +185,7 @@
                     }
                     
                     // Handle navigation on buttons and non-editable elements
-                    if ((e.target.tagName === 'BUTTON' || e.target.id === 'current-filename') &&
+                    if ((e.target.tagName === 'BUTTON' || e.target.id === 'current-filename' || e.target.classList.contains('extended-fields-toggle') || e.target.classList.contains('new-field-header')) &&
                         (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
                         e.preventDefault();
                         this.navigateMetadata(e.key);
@@ -454,6 +459,11 @@
             const metadataSection = document.getElementById('metadata-section');
             if (!metadataSection) return;
             
+            // Special case: Up arrow from filename goes to help button
+            if (key === 'ArrowUp' && activeElement.id === 'current-filename' && activeElement.contentEditable !== 'true') {
+                this.navigateToHeaderIcon('metadata', 'help');
+                return;
+            }
             
             // Define the navigation order
             const navigableElements = [
@@ -474,10 +484,37 @@
                 'genre',
                 'track',
                 'disc',
-                'date',
-                '.save-btn',
-                '.clear-btn'
+                'date'
             ];
+            
+            // Add extended fields toggle button
+            navigableElements.push('.extended-fields-toggle');
+            
+            // Add dynamic fields to the navigation order
+            const dynamicFieldsContainer = document.getElementById('dynamic-fields-container');
+            
+            if (dynamicFieldsContainer) {
+                const dynamicInputs = dynamicFieldsContainer.querySelectorAll('input[data-dynamic="true"]');
+                
+                dynamicInputs.forEach(input => {
+                    if (input.id) {
+                        navigableElements.push('#' + input.id);
+                    }
+                });
+            }
+            
+            // Add new field creator toggle button
+            navigableElements.push('.new-field-header');
+            
+            // Add new field creator inputs if visible
+            const newFieldForm = document.getElementById('new-field-form');
+            if (newFieldForm && newFieldForm.style.display !== 'none') {
+                navigableElements.push('#new-field-name', '#new-field-value');
+                navigableElements.push('.new-field-actions .btn');
+            }
+            
+            // Add save buttons at the end
+            navigableElements.push('.save-btn', '.clear-btn');
             
             // Build list of visible focusable elements
             const focusableElements = [];
@@ -487,20 +524,53 @@
                 if (selector.startsWith('.')) {
                     elements = metadataSection.querySelectorAll(selector);
                 } else if (selector.startsWith('#')) {
-                    const el = metadataSection.querySelector(selector);
+                    // For ID selectors, use getElementById to avoid issues with special characters
+                    const id = selector.substring(1); // Remove the # prefix
+                    const el = document.getElementById(id);
                     elements = el ? [el] : [];
                 } else {
                     const el = document.getElementById(selector);
                     elements = el ? [el] : [];
                 }
                 
+                
                 elements.forEach(el => {
-                    if (el && el.offsetParent !== null && !el.disabled) {
+                    const isVisible = el && el.offsetParent !== null && !el.disabled;
+                    
+                    
+                    if (isVisible) {
                         focusableElements.push(el);
                     }
                 });
             });
             
+            // Add visible apply buttons for standard fields
+            const standardFieldIds = ['title', 'artist', 'album', 'albumartist', 'composer', 'genre'];
+            for (let i = standardFieldIds.length - 1; i >= 0; i--) {
+                const fieldId = standardFieldIds[i];
+                const fieldIndex = focusableElements.findIndex(el => el.id === fieldId);
+                
+                if (fieldIndex !== -1) {
+                    const applyControls = document.querySelector(`.apply-field-controls[data-field="${fieldId}"].visible`);
+                    if (applyControls) {
+                        const fileBtn = applyControls.querySelector('.apply-file-btn');
+                        const folderBtn = applyControls.querySelector('.apply-folder-btn-new');
+                        const buttonsToInsert = [];
+                        
+                        if (fileBtn && !fileBtn.disabled) {
+                            buttonsToInsert.push(fileBtn);
+                        }
+                        if (folderBtn && !folderBtn.disabled) {
+                            buttonsToInsert.push(folderBtn);
+                        }
+                        
+                        // Insert buttons after the field
+                        buttonsToInsert.forEach((btn, idx) => {
+                            focusableElements.splice(fieldIndex + 1 + idx, 0, btn);
+                        });
+                    }
+                }
+            }
             
             // Add dynamically visible File/Folder buttons for Track #, Disc #, and Year fields
             // These buttons appear when the user modifies these fields, allowing them to apply
@@ -556,6 +626,37 @@
                 }
             }
             
+            // Add visible apply buttons for dynamic fields
+            if (dynamicFieldsContainer) {
+                const dynamicFields = dynamicFieldsContainer.querySelectorAll('.dynamic-field');
+                dynamicFields.forEach(fieldGroup => {
+                    const input = fieldGroup.querySelector('input[data-dynamic="true"]');
+                    if (input) {
+                        const inputIndex = focusableElements.findIndex(el => el === input);
+                        if (inputIndex !== -1) {
+                            const applyControls = fieldGroup.querySelector('.apply-field-controls.visible');
+                            if (applyControls) {
+                                const fileBtn = applyControls.querySelector('.apply-file-btn');
+                                const folderBtn = applyControls.querySelector('.apply-folder-btn-new');
+                                const buttonsToInsert = [];
+                                
+                                if (fileBtn && !fileBtn.disabled) {
+                                    buttonsToInsert.push(fileBtn);
+                                }
+                                if (folderBtn && !folderBtn.disabled) {
+                                    buttonsToInsert.push(folderBtn);
+                                }
+                                
+                                // Insert buttons after the field
+                                buttonsToInsert.forEach((btn, idx) => {
+                                    focusableElements.splice(inputIndex + 1 + idx, 0, btn);
+                                });
+                            }
+                        }
+                    }
+                });
+            }
+            
             // Final check of what buttons were added
             const finalButtonCount = focusableElements.filter(el => 
                 el.classList?.contains('apply-file-btn') || 
@@ -566,305 +667,25 @@
             let nextIndex = -1;
             
             
-            if (key === 'ArrowUp') {
-                // Check if we're on the filename (topmost element) and go to help icon
-                if (activeElement.id === 'current-filename') {
-                    this.navigateToHeaderIcon('metadata', 'help');
-                    return;
+            // Handle case when current element is not in the focusable list
+            if (currentIndex === -1) {
+                // If we can't find the current element, start from the beginning
+                if (key === 'ArrowDown' || key === 'ArrowRight') {
+                    nextIndex = 0;
+                } else if (key === 'ArrowUp' || key === 'ArrowLeft') {
+                    nextIndex = focusableElements.length - 1;
                 }
-                
-                // Check if we're on a grouped apply button (Track/Disc/Year)
-                // These buttons require special handling for vertical navigation to maintain
-                // File->File and Folder->Folder alignment when moving up/down
-                if (activeElement.closest('.grouped-apply-item')) {
-                    
-                    // Find all visible grouped buttons
-                    const allGroupedButtons = focusableElements.filter(el => 
-                        el.closest('.grouped-apply-item') && 
-                        (el.classList?.contains('apply-file-btn') || el.classList?.contains('apply-folder-btn-new'))
-                    );
-                    
-                    const currentButtonIndex = allGroupedButtons.indexOf(activeElement);
-                    
-                    if (currentButtonIndex === 0 || currentButtonIndex === 1) {
-                        // We're on one of the topmost buttons (File or Folder), go to Track #
-                        const trackField = document.getElementById('track');
-                        if (trackField) {
-                            trackField.focus();
-                            trackField.dataset.editing = 'false';
-                            trackField.readOnly = true;
-                            FocusManager.ensureElementVisible(trackField);
-                            return;
-                        }
-                    } else if (currentButtonIndex > 1) {
-                        // Move to the button directly above (maintaining File->File, Folder->Folder alignment)
-                        const isFileButton = activeElement.classList.contains('apply-file-btn');
-                        // Look for button above with same type
-                        for (let i = currentButtonIndex - 1; i >= 0; i--) {
-                            const targetButton = allGroupedButtons[i];
-                            const targetIsFile = targetButton.classList.contains('apply-file-btn');
-                            if (isFileButton === targetIsFile) {
-                                nextIndex = focusableElements.indexOf(targetButton);
-                                break;
-                            }
-                        }
-                    }
-                }
-                // Check if we're on other text field's apply button - treat as same unit
-                else if (activeElement.closest('.apply-field-controls')) {
-                    const field = activeElement.closest('.form-group-with-button')?.querySelector('input');
-                    if (field) {
-                        const fieldIndex = focusableElements.indexOf(field);
-                        if (fieldIndex > 0) {
-                            nextIndex = fieldIndex - 1;
-                        } else {
-                            nextIndex = focusableElements.length - 1;
-                        }
-                    }
-                } else if (activeElement.classList.contains('save-btn')) {
-                    // Special handling for Save button - UP navigates to bottommost File button if any exist,
-                    // otherwise goes to Track # field
-                    // Find all File/Folder buttons that come before the Save button
-                    const buttonsBeforeSave = focusableElements.filter((el, idx) => {
-                        return idx < currentIndex && 
-                               (el.classList?.contains('apply-file-btn') || 
-                                el.classList?.contains('apply-folder-btn-new'));
-                    });
-                    
-                    if (buttonsBeforeSave.length > 0) {
-                        // Find the last File button (bottommost)
-                        const lastFileButton = buttonsBeforeSave.reverse().find(btn => btn.classList.contains('apply-file-btn')) || buttonsBeforeSave[0];
-                        const buttonIndex = focusableElements.indexOf(lastFileButton);
-                        nextIndex = buttonIndex;
-                    } else {
-                        // No buttons visible, go to Track # field
-                        const trackField = document.getElementById('track');
-                        if (trackField) {
-                            trackField.focus();
-                            trackField.dataset.editing = 'false';
-                            trackField.readOnly = true;
-                            FocusManager.ensureElementVisible(trackField);
-                            return;
-                        }
-                    }
-                } else if (activeElement.id === 'track' || activeElement.id === 'disc' || activeElement.id === 'date') {
-                    // Special handling for Track #, Disc #, and Year fields - UP goes to GENRE
-                    const genreField = document.getElementById('genre');
-                    if (genreField) {
-                        genreField.focus();
-                        genreField.dataset.editing = 'false';
-                        genreField.readOnly = true;
-                        FocusManager.ensureElementVisible(genreField);
-                        return;
-                    }
-                } else if (activeElement.classList.contains('clear-btn')) {
-                    // Special handling for Reset button - UP navigates to bottommost File button if any exist,
-                    // otherwise uses default behavior (goes to Save button)
-                    // Find all File/Folder buttons that come before the Reset button
-                    const buttonsBeforeReset = focusableElements.filter((el, idx) => {
-                        return idx < currentIndex && 
-                               el.closest('.grouped-apply-item') &&
-                               (el.classList?.contains('apply-file-btn') || 
-                                el.classList?.contains('apply-folder-btn-new'));
-                    });
-                    
-                    if (buttonsBeforeReset.length > 0) {
-                        // Find the last File button (bottommost)
-                        const lastFileButton = buttonsBeforeReset.reverse().find(btn => btn.classList.contains('apply-file-btn'));
-                        if (lastFileButton) {
-                            const buttonIndex = focusableElements.indexOf(lastFileButton);
-                            nextIndex = buttonIndex;
-                        } else {
-                            // No File buttons, just use default behavior
-                            nextIndex = currentIndex > 0 ? currentIndex - 1 : focusableElements.length - 1;
-                        }
-                    } else {
-                        // No buttons visible, use default behavior (go to Save button)
-                        nextIndex = currentIndex > 0 ? currentIndex - 1 : focusableElements.length - 1;
-                    }
-                } else {
-                    // Default behavior only if no special handling was applied
-                    nextIndex = currentIndex > 0 ? currentIndex - 1 : focusableElements.length - 1;
-                }
+            } else if (key === 'ArrowUp') {
+                // Simple navigation - just go to previous element in the list
+                nextIndex = currentIndex > 0 ? currentIndex - 1 : focusableElements.length - 1;
             } else if (key === 'ArrowDown') {
-                // Check if we're on a text field that has visible apply buttons - skip over them
-                if (activeElement.tagName === 'INPUT' && activeElement.type === 'text') {
-                    const formGroup = activeElement.closest('.form-group-with-button');
-                    if (formGroup) {
-                        const applyControls = formGroup.querySelector('.apply-field-controls.visible');
-                        if (applyControls) {
-                            // Count how many buttons follow this field
-                            let buttonsAfterField = 0;
-                            for (let i = currentIndex + 1; i < focusableElements.length; i++) {
-                                if (focusableElements[i].closest('.apply-field-controls') && 
-                                    focusableElements[i].closest('.form-group-with-button')?.querySelector('input') === activeElement) {
-                                    buttonsAfterField++;
-                                } else {
-                                    break;
-                                }
-                            }
-                            if (buttonsAfterField > 0) {
-                                nextIndex = currentIndex + buttonsAfterField + 1;
-                                if (nextIndex >= focusableElements.length) {
-                                    nextIndex = 0;
-                                }
-                            }
-                        }
-                    }
-                }
-                
-                // Check if we're on a grouped apply button (Track/Disc/Year)
-                // DOWN navigation maintains vertical alignment (File->File, Folder->Folder)
-                // From bottommost button, goes directly to Save button
-                if (!nextIndex || nextIndex === -1) {
-                    if (activeElement.closest('.grouped-apply-item')) {
-                        
-                        // Find all visible grouped buttons
-                        const allGroupedButtons = focusableElements.filter(el => 
-                            el.closest('.grouped-apply-item') && 
-                            (el.classList?.contains('apply-file-btn') || el.classList?.contains('apply-folder-btn-new'))
-                        );
-                        
-                        const currentButtonIndex = allGroupedButtons.indexOf(activeElement);
-                        const isLastButton = currentButtonIndex === allGroupedButtons.length - 1;
-                        
-                        if (isLastButton) {
-                            // We're on the bottommost button, go to Save button
-                            const saveButton = document.querySelector('.save-btn');
-                            if (saveButton) {
-                                saveButton.focus();
-                                FocusManager.ensureElementVisible(saveButton);
-                                return;
-                            }
-                        } else {
-                            // Move to the button directly below (maintaining File->File, Folder->Folder alignment)
-                            const isFileButton = activeElement.classList.contains('apply-file-btn');
-                            
-                            // Look for button below with same type
-                            let foundAlignedButton = false;
-                            for (let i = currentButtonIndex + 1; i < allGroupedButtons.length; i++) {
-                                const targetButton = allGroupedButtons[i];
-                                const targetIsFile = targetButton.classList.contains('apply-file-btn');
-                                if (isFileButton === targetIsFile) {
-                                    nextIndex = focusableElements.indexOf(targetButton);
-                                    foundAlignedButton = true;
-                                    break;
-                                }
-                            }
-                            
-                            if (!foundAlignedButton && isFileButton) {
-                                // We're on a File button with no File button below - go to Save
-                                const saveButton = document.querySelector('.save-btn');
-                                if (saveButton) {
-                                    saveButton.focus();
-                                    FocusManager.ensureElementVisible(saveButton);
-                                    return;
-                                }
-                            }
-                        }
-                    }
-                    // Check if we're on other text field's apply button - treat as same unit
-                    else if (activeElement.closest('.apply-field-controls')) {
-                        const field = activeElement.closest('.form-group-with-button')?.querySelector('input');
-                        if (field) {
-                            // Find the field's index and skip to after all its buttons
-                            const fieldIndex = focusableElements.indexOf(field);
-                            // Count how many buttons follow this field
-                            let buttonsAfterField = 0;
-                            for (let i = fieldIndex + 1; i < focusableElements.length; i++) {
-                                if (focusableElements[i].closest('.apply-field-controls') && 
-                                    focusableElements[i].closest('.form-group-with-button')?.querySelector('input') === field) {
-                                    buttonsAfterField++;
-                                } else {
-                                    break;
-                                }
-                            }
-                            nextIndex = fieldIndex + buttonsAfterField + 1;
-                            if (nextIndex >= focusableElements.length) {
-                                nextIndex = 0;
-                            }
-                        }
-                    }
-                }
-                
-                // Special handling for Track #, Disc #, and Year fields
-                // DOWN from these fields always goes to the topmost File button if any exist
-                if ((!nextIndex || nextIndex === -1) && (activeElement.id === 'track' || activeElement.id === 'disc' || activeElement.id === 'date')) {
-                    // Find ALL grouped File/Folder buttons (not just those after current position)
-                    const allGroupedButtons = focusableElements.filter(el => {
-                        return el.closest('.grouped-apply-item') && 
-                               (el.classList?.contains('apply-file-btn') || 
-                                el.classList?.contains('apply-folder-btn-new'));
-                    });
-                    
-                    if (allGroupedButtons.length > 0) {
-                        // Navigate to the first (topmost) File button
-                        const firstFileButton = allGroupedButtons.find(btn => btn.classList.contains('apply-file-btn'));
-                        if (firstFileButton) {
-                            const buttonIndex = focusableElements.indexOf(firstFileButton);
-                            nextIndex = buttonIndex;
-                        } else {
-                            // No File buttons, use first button available
-                            nextIndex = focusableElements.indexOf(allGroupedButtons[0]);
-                        }
-                    } else {
-                        // No buttons visible, go directly to Save button
-                        const saveButton = document.querySelector('.save-btn');
-                        if (saveButton) {
-                            saveButton.focus();
-                            FocusManager.ensureElementVisible(saveButton);
-                            return;
-                        }
-                    }
-                }
-                
-                // Default behavior only if no special handling was applied
-                if (!nextIndex || nextIndex === -1) {
-                    nextIndex = currentIndex < focusableElements.length - 1 ? currentIndex + 1 : 0;
-                }
+                // Simple navigation - just go to next element in the list
+                nextIndex = currentIndex < focusableElements.length - 1 ? currentIndex + 1 : 0;
             } else if (key === 'ArrowLeft' || key === 'ArrowRight') {
-                // Check if we're on a grouped apply button (Track/Disc/Year)
-                // LEFT/RIGHT navigation between File and Folder buttons in the same row
-                if (activeElement.closest('.grouped-apply-item')) {
-                    const currentItem = activeElement.closest('.grouped-apply-item');
-                    const fileBtn = currentItem.querySelector('.apply-file-btn');
-                    const folderBtn = currentItem.querySelector('.apply-folder-btn-new');
-                    
-                    if (key === 'ArrowLeft' && activeElement === folderBtn && fileBtn) {
-                        // From Folder button, go to File button
-                        fileBtn.focus();
-                        FocusManager.ensureElementVisible(fileBtn);
-                        return;
-                    } else if (key === 'ArrowRight' && activeElement === fileBtn && folderBtn) {
-                        // From File button, go to Folder button
-                        folderBtn.focus();
-                        FocusManager.ensureElementVisible(folderBtn);
-                        return;
-                    } else if (key === 'ArrowLeft' && activeElement === fileBtn) {
-                        // From File button, do nothing (no element to the left spatially)
-                        return;
-                    }
-                    // If we're on Folder button and Right is pressed, do nothing (no element to the right)
-                    return;
-                }
+                // For left/right arrows, we'll keep some basic logic for navigating between grouped elements
+                // This is less intrusive than vertical navigation and makes sense spatially
                 
-                // Check if we're on a text field with visible apply buttons (for non-grouped fields)
-                if (activeElement.tagName === 'INPUT' && activeElement.type === 'text') {
-                    const formGroup = activeElement.closest('.form-group-with-button');
-                    if (formGroup) {
-                        const applyControls = formGroup.querySelector('.apply-field-controls.visible');
-                        if (applyControls && key === 'ArrowRight') {
-                            const fileBtn = applyControls.querySelector('.apply-file-btn');
-                            if (fileBtn && !fileBtn.disabled) {
-                                fileBtn.focus();
-                                FocusManager.ensureElementVisible(fileBtn);
-                                return;
-                            }
-                        }
-                    }
-                }
-                
-                // Handle horizontal navigation for grouped fields
+                // Handle horizontal navigation for grouped fields (Track, Disc, Year)
                 const parentGroup = activeElement.closest('.form-group-three-column');
                 if (parentGroup) {
                     const inputs = Array.from(parentGroup.querySelectorAll('input'));
@@ -872,55 +693,34 @@
                     
                     if (key === 'ArrowLeft' && inputIndex > 0) {
                         inputs[inputIndex - 1].focus();
-                        // Position cursor at end instead of selecting all
                         setTimeout(() => {
                             const input = inputs[inputIndex - 1];
                             input.setSelectionRange(input.value.length, input.value.length);
                         }, 0);
                     } else if (key === 'ArrowRight' && inputIndex < inputs.length - 1) {
                         inputs[inputIndex + 1].focus();
-                        // Position cursor at end instead of selecting all
                         setTimeout(() => {
                             const input = inputs[inputIndex + 1];
                             input.setSelectionRange(input.value.length, input.value.length);
                         }, 0);
                     }
-                    return; // Exit early to prevent other navigation
+                    return;
                 }
                 
-                // Handle horizontal navigation for buttons in same row
-                const buttonParent = activeElement.closest('.filename-edit, .album-art-controls, .apply-field-controls, .buttons');
-                if (buttonParent) {
-                    const buttons = Array.from(buttonParent.querySelectorAll('button:not([disabled])'))
-                        .filter(btn => btn.offsetParent !== null);
-                    const buttonIndex = buttons.indexOf(activeElement);
-                    
-                    // Special handling for apply-field-controls buttons
-                    if (buttonParent.classList.contains('apply-field-controls')) {
-                        // For File button (index 0), Left arrow goes back to text field
-                        if (key === 'ArrowLeft' && buttonIndex === 0) {
-                            const field = buttonParent.closest('.form-group-with-button')?.querySelector('input');
-                            if (field) {
-                                field.focus();
-                                field.dataset.editing = 'false';
-                                field.readOnly = true;
-                                FocusManager.ensureElementVisible(field);
-                                return;
-                            }
-                        }
-                    }
-                    
-                    if (key === 'ArrowLeft' && buttonIndex > 0) {
-                        buttons[buttonIndex - 1].focus();
-                    } else if (key === 'ArrowRight' && buttonIndex < buttons.length - 1) {
-                        buttons[buttonIndex + 1].focus();
-                    }
+                // Simple left/right for other elements - just use DOM order
+                if (currentIndex === -1) {
+                    // If current element not found, start from beginning/end
+                    nextIndex = key === 'ArrowLeft' ? focusableElements.length - 1 : 0;
+                } else if (key === 'ArrowLeft') {
+                    nextIndex = currentIndex > 0 ? currentIndex - 1 : focusableElements.length - 1;
+                } else {
+                    nextIndex = currentIndex < focusableElements.length - 1 ? currentIndex + 1 : 0;
                 }
-                return;
             }
             
             if (nextIndex !== -1 && focusableElements[nextIndex]) {
                 focusableElements[nextIndex].focus();
+                
                 if (focusableElements[nextIndex].tagName === 'INPUT') {
                     // Set to non-edit mode when navigating to input
                     focusableElements[nextIndex].dataset.editing = 'false';
@@ -929,7 +729,6 @@
                 
                 // Auto-scroll to ensure the focused element is visible
                 FocusManager.ensureElementVisible(focusableElements[nextIndex]);
-            } else {
             }
         },
         
@@ -1144,16 +943,9 @@
                         }, 50);
                     }
                 } else if (iconType === 'sort-direction') {
-                    // For sort-direction button, click and update focus after re-sort
+                    // For sort-direction button, click it
                     document.activeElement.click();
-                    
-                    // Move focus to the topmost item after sorting completes
-                    // Use requestAnimationFrame to wait for DOM updates
-                    requestAnimationFrame(() => {
-                        requestAnimationFrame(() => {
-                            this.returnToPaneFromHeader(pane);
-                        });
-                    });
+                    // Focus remains on the button
                 } else {
                     // For other buttons, just click them
                     document.activeElement.click();
@@ -1335,13 +1127,12 @@
                     // The click handler will close the dropdown
                     State.sortDropdownActive = null;
                     
-                    // Move focus to the topmost item in the pane after sorting completes
-                    // Use requestAnimationFrame to wait for DOM updates
-                    requestAnimationFrame(() => {
-                        requestAnimationFrame(() => {
-                            this.returnToPaneFromHeader(pane);
-                        });
-                    });
+                    // Return focus to the sort button
+                    const sortBtn = document.getElementById(`${pane}-sort-btn`);
+                    if (sortBtn) {
+                        FocusManager.addKeyboardFocus(sortBtn);
+                        sortBtn.focus();
+                    }
                 }
             } else if (key === 'Escape') {
                 // Close dropdown and return focus to sort icon
@@ -1387,5 +1178,21 @@
             });
         },
         
+        /**
+         * Update the list of dynamic fields for keyboard navigation
+         * @param {Array<string>} fieldIds - Array of dynamic field input IDs
+         */
+        updateDynamicFields(fieldIds) {
+            // Update the form navigation context with the new dynamic fields
+            if (window.KeyboardRouter && !window.KeyboardRouter.contexts) {
+                window.KeyboardRouter.contexts = {};
+            }
+            if (!window.KeyboardRouter.contexts.form && window.MetadataRemote.Navigation.FormNavigation) {
+                window.KeyboardRouter.contexts.form = window.MetadataRemote.Navigation.FormNavigation;
+            }
+            if (window.KeyboardRouter.contexts.form) {
+                window.KeyboardRouter.contexts.form.updateDynamicFields(fieldIds);
+            }
+        }
     };
 })();

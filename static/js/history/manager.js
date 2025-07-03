@@ -335,8 +335,6 @@
                 const currentFileBefore = State.currentFile;
                 const currentPathBefore = State.currentPath;
                 
-                console.log('Undoing action:', actionDetails.action_type);
-                console.log('Current file before undo:', currentFileBefore);
                 
                 // Perform the undo
                 const result = await API.undoAction(State.selectedHistoryAction);
@@ -350,7 +348,6 @@
                     // Handle file updates based on action type
                     if (result.newPath && actionDetails.action_type === 'file_rename') {
                         // Use the newPath provided by the backend
-                        console.log('File rename undo - new path from backend:', result.newPath);
                         
                         State.currentFile = result.newPath;
                         State.originalFilename = result.newPath.split('/').pop();
@@ -427,8 +424,6 @@
                 const currentFileBefore = State.currentFile;
                 const currentPathBefore = State.currentPath;
                 
-                console.log('Redoing action:', actionDetails.action_type);
-                console.log('Current file before redo:', currentFileBefore);
                 
                 // Perform the redo
                 const result = await API.redoAction(State.selectedHistoryAction);
@@ -442,7 +437,6 @@
                     // Handle file updates based on action type
                     if (result.newPath && actionDetails.action_type === 'file_rename') {
                         // Use the newPath provided by the backend
-                        console.log('File rename redo - new path from backend:', result.newPath);
                         
                         State.currentFile = result.newPath;
                         State.originalFilename = result.newPath.split('/').pop();

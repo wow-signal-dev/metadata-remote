@@ -182,8 +182,6 @@
          * Switch between folder, file, and metadata panes
          */
         switchPanes() {
-            // console.log('[PaneNavigation] switchPanes called, current pane:', State.focusedPane);
-            
             // Clear header focus when switching panes
             if (window.MetadataRemote.Navigation.Keyboard) {
                 window.MetadataRemote.Navigation.Keyboard.clearHeaderFocus();

@@ -26,7 +26,9 @@
 </head>
 <body>
     <div class="header">
-        <h1><b>metadata</b>&nbsp;<img src="{{ url_for('static', filename='favicon.ico') }}" alt="" style="width: 1.2em; height: 1.2em; vertical-align: middle; display: inline-block;">&nbsp;&nbsp;<b>remote</b></h1>
+        <h1 style="margin: 0; padding: 0; display: flex; align-items: center; justify-content: center; height: 1.5rem;">
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="metadata remote" style="height: 1rem; width: auto;">
+        </h1>
         <button class="help-button" id="help-button" title="Show keyboard shortcuts" tabindex="0"><b>?</b></button>
     </div>
     
@@ -140,247 +142,83 @@
                     </div>
                     
                     <form id="metadata-form">
-                        <div class="form-group-with-button">
-                            <div class="form-group-wrapper">
-                                <label for="title">Title</label>
-                                <div class="input-wrapper">
-                                    <input type="text" id="title" placeholder="Enter title" data-field="title">
-                                    <div class="inference-loading" id="title-loading">
-                                        <div class="inference-spinner"></div>
-                                    </div>
-                                    <div class="inference-suggestions" id="title-suggestions"></div>
-                                </div>
-                            </div>
-                            <div class="apply-field-controls" data-field="title">
-                                <span class="apply-field-label">Apply to</span>
-                                <button type="button" class="apply-field-btn apply-file-btn btn-status" data-field="title" onclick="saveFieldToFile('title')">
-                                    <span class="btn-status-content">File</span>
-                                    <span class="btn-status-message"></span>
-                                </button>
-                                <button type="button" class="apply-field-btn apply-folder-btn-new btn-status" data-field="title" onclick="applyFieldToFolder('title')">
-                                    <span class="btn-status-content">Folder</span>
-                                    <span class="btn-status-message"></span>
-                                </button>
-                            </div>
-                        </div>
-                      
-                        <div class="form-group-with-button">
-                            <div class="form-group-wrapper">
-                                <label for="artist">Artist</label>
-                                <div class="input-wrapper">
-                                    <input type="text" id="artist" placeholder="Enter artist" data-field="artist">
-                                    <div class="inference-loading" id="artist-loading">
-                                        <div class="inference-spinner"></div>
-                                    </div>
-                                    <div class="inference-suggestions" id="artist-suggestions"></div>
-                                </div>
-                            </div>
-                            <div class="apply-field-controls" data-field="artist">
-                                <span class="apply-field-label">Apply to</span>
-                                <button type="button" class="apply-field-btn apply-file-btn btn-status" data-field="artist" onclick="saveFieldToFile('artist')">
-                                    <span class="btn-status-content">File</span>
-                                    <span class="btn-status-message"></span>
-                                </button>
-                                <button type="button" class="apply-field-btn apply-folder-btn-new btn-status" data-field="artist" onclick="applyFieldToFolder('artist')">
-                                    <span class="btn-status-content">Folder</span>
-                                    <span class="btn-status-message"></span>
-                                </button>
-                            </div>
-                        </div>
-                        
-                        <div class="form-group-with-button">
-                            <div class="form-group-wrapper">
-                                <label for="album">Album</label>
-                                <div class="input-wrapper">
-                                    <input type="text" id="album" placeholder="Enter album" data-field="album">
-                                    <div class="inference-loading" id="album-loading">
-                                        <div class="inference-spinner"></div>
-                                    </div>
-                                    <div class="inference-suggestions" id="album-suggestions"></div>
-                                </div>
-                            </div>
-                            <div class="apply-field-controls" data-field="album">
-                                <span class="apply-field-label">Apply to</span>
-                                <button type="button" class="apply-field-btn apply-file-btn btn-status" data-field="album" onclick="saveFieldToFile('album')">
-                                    <span class="btn-status-content">File</span>
-                                    <span class="btn-status-message"></span>
-                                </button>
-                                <button type="button" class="apply-field-btn apply-folder-btn-new btn-status" data-field="album" onclick="applyFieldToFolder('album')">
-                                    <span class="btn-status-content">Folder</span>
-                                    <span class="btn-status-message"></span>
-                                </button>
-                            </div>
-                        </div>
-                        
-                        <div class="form-group-with-button">
-                            <div class="form-group-wrapper">
-                                <label for="albumartist">Album Artist</label>
-                                <div class="input-wrapper">
-                                    <input type="text" id="albumartist" placeholder="Enter album artist" data-field="albumartist">
-                                    <div class="inference-loading" id="albumartist-loading">
-                                        <div class="inference-spinner"></div>
-                                    </div>
-                                    <div class="inference-suggestions" id="albumartist-suggestions"></div>
-                                </div>
-                            </div>
-                            <div class="apply-field-controls" data-field="albumartist">
-                                <span class="apply-field-label">Apply to</span>
-                                <button type="button" class="apply-field-btn apply-file-btn btn-status" data-field="albumartist" onclick="saveFieldToFile('albumartist')">
-                                    <span class="btn-status-content">File</span>
-                                    <span class="btn-status-message"></span>
-                                </button>
-                                <button type="button" class="apply-field-btn apply-folder-btn-new btn-status" data-field="albumartist" onclick="applyFieldToFolder('albumartist')">
-                                    <span class="btn-status-content">Folder</span>
-                                    <span class="btn-status-message"></span>
-                                </button>
-                            </div>
-                        </div>
-
-                        <div class="form-group-with-button">
-                            <div class="form-group-wrapper">
-                                <label for="composer">Composer</label>
-                                <div class="input-wrapper">
-                                    <input type="text" id="composer" placeholder="Enter composer" data-field="composer">
-                                    <div class="inference-loading" id="composer-loading">
-                                        <div class="inference-spinner"></div>
-                                    </div>
-                                    <div class="inference-suggestions" id="composer-suggestions"></div>
-                                </div>
-                            </div>
-                            <div class="apply-field-controls" data-field="composer">
-                                <span class="apply-field-label">Apply to</span>
-                                <button type="button" class="apply-field-btn apply-file-btn btn-status" data-field="composer" onclick="saveFieldToFile('composer')">
-                                    <span class="btn-status-content">File</span>
-                                    <span class="btn-status-message"></span>
-                                </button>
-                                <button type="button" class="apply-field-btn apply-folder-btn-new btn-status" data-field="composer" onclick="applyFieldToFolder('composer')">
-                                    <span class="btn-status-content">Folder</span>
-                                    <span class="btn-status-message"></span>
-                                </button>
-                            </div>
-                        </div>
-                      
-                        <div class="form-group-with-button">
-                            <div class="form-group-wrapper">
-                                <label for="genre">Genre</label>
-                                <div class="input-wrapper">
-                                    <input type="text" id="genre" placeholder="Enter genre" data-field="genre">
-                                    <div class="inference-loading" id="genre-loading">
-                                        <div class="inference-spinner"></div>
-                                    </div>
-                                    <div class="inference-suggestions" id="genre-suggestions"></div>
-                                </div>
-                            </div>
-                            <div class="apply-field-controls" data-field="genre">
-                                <span class="apply-field-label">Apply to</span>
-                                <button type="button" class="apply-field-btn apply-file-btn btn-status" data-field="genre" onclick="saveFieldToFile('genre')">
-                                    <span class="btn-status-content">File</span>
-                                    <span class="btn-status-message"></span>
-                                </button>
-                                <button type="button" class="apply-field-btn apply-folder-btn-new btn-status" data-field="genre" onclick="applyFieldToFolder('genre')">
-                                    <span class="btn-status-content">Folder</span>
-                                    <span class="btn-status-message"></span>
-                                </button>
-                            </div>
-                        </div>
-                        
-                        <!-- Track #, Disc #, and Year grouped on same line -->
-                        <div class="form-group-three-column">
-                            <div class="form-group-wrapper">
-                                <label for="track">Track #</label>
-                                <div class="input-wrapper">
-                                    <input type="text" id="track" placeholder="Enter track number" data-field="track">
-                                    <div class="inference-loading" id="track-loading">
-                                        <div class="inference-spinner"></div>
-                                    </div>
-                                    <div class="inference-suggestions" id="track-suggestions"></div>
-                                </div>
-                            </div>
-                            
-                            <div class="form-group-wrapper">
-                                <label for="disc">Disc #</label>
-                                <div class="input-wrapper">
-                                    <input type="text" id="disc" placeholder="Enter CD number" data-field="disc">
-                                    <div class="inference-loading" id="disc-loading">
-                                        <div class="inference-spinner"></div>
-                                    </div>
-                                    <div class="inference-suggestions" id="disc-suggestions"></div>
-                                </div>
-                            </div>
-                            
-                            <div class="form-group-wrapper">
-                                <label for="date">Year</label>
-                                <div class="input-wrapper">
-                                    <input type="text" id="date" placeholder="Enter year" data-field="date">
-                                    <div class="inference-loading" id="date-loading">
-                                        <div class="inference-spinner"></div>
-                                    </div>
-                                    <div class="inference-suggestions" id="date-suggestions"></div>
-                                </div>
-                            </div>
-                        </div>
+                        <!-- Standard fields will be dynamically rendered here -->
+                        <div id="standard-fields-container"></div>
                         
                         <!-- Consolidated apply controls for Track #, Disc #, and Year -->
-                        <div class="grouped-apply-controls" id="grouped-apply-controls">
+                        <div class="grouped-apply-controls" id="grouped-apply-controls" style="display: none;">
                             <div class="grouped-apply-header">
                                 <span class="grouped-apply-title">Apply changes:</span>
                             </div>
-                            <div class="grouped-apply-items">
-                                <div class="grouped-apply-item" data-field="track" style="display: none;">
-                                    <span class="field-change-indicator">Track #</span>
-                                    <div class="apply-field-controls" data-field="track">
-                                        <button type="button" class="apply-field-btn apply-file-btn btn-status" data-field="track" onclick="saveFieldToFile('track')">
-                                            <span class="btn-status-content">File</span>
-                                            <span class="btn-status-message"></span>
-                                        </button>
-                                        <button type="button" class="apply-field-btn apply-folder-btn-new btn-status" data-field="track" onclick="applyFieldToFolder('track')">
-                                            <span class="btn-status-content">Folder</span>
-                                            <span class="btn-status-message"></span>
-                                        </button>
-                                    </div>
-                                </div>
-                                
-                                <div class="grouped-apply-item" data-field="disc" style="display: none;">
-                                    <span class="field-change-indicator">Disc #</span>
-                                    <div class="apply-field-controls" data-field="disc">
-                                        <button type="button" class="apply-field-btn apply-file-btn btn-status" data-field="disc" onclick="saveFieldToFile('disc')">
-                                            <span class="btn-status-content">File</span>
-                                            <span class="btn-status-message"></span>
-                                        </button>
-                                        <button type="button" class="apply-field-btn apply-folder-btn-new btn-status" data-field="disc" onclick="applyFieldToFolder('disc')">
-                                            <span class="btn-status-content">Folder</span>
-                                            <span class="btn-status-message"></span>
-                                        </button>
-                                    </div>
-                                </div>
-                                
-                                <div class="grouped-apply-item" data-field="date" style="display: none;">
-                                    <span class="field-change-indicator">Year</span>
-                                    <div class="apply-field-controls" data-field="date">
-                                        <button type="button" class="apply-field-btn apply-file-btn btn-status" data-field="date" onclick="saveFieldToFile('date')">
-                                            <span class="btn-status-content">File</span>
-                                            <span class="btn-status-message"></span>
-                                        </button>
-                                        <button type="button" class="apply-field-btn apply-folder-btn-new btn-status" data-field="date" onclick="applyFieldToFolder('date')">
-                                            <span class="btn-status-content">Folder</span>
-                                            <span class="btn-status-message"></span>
-                                        </button>
-                                    </div>
-                                </div>
+                            <div class="grouped-apply-items" id="grouped-apply-items">
+                                <!-- Grouped field controls will be dynamically rendered here -->
                             </div>
                         </div>
                         
-                        <div class="buttons">
-                            <button type="button" class="save-btn btn-status" onclick="save()">
-                                <span class="btn-status-content">Save all fields to file</span>
-                                <span class="btn-status-message"></span>
+                    </form>
+                    
+                    <!-- Extended fields toggle -->
+                    <div class="extended-fields-toggle" tabindex="0" role="button" aria-expanded="false" aria-controls="extended-fields-wrapper" onclick="window.MetadataRemote.Metadata.Editor.toggleExtendedFields()">
+                        <span class="expand-icon">▶</span>
+                        <span>Extended metadata fields</span>
+                    </div>
+                    
+                    <!-- Container for extended fields -->
+                    <div id="extended-fields-wrapper" style="display: none;">
+                        <div id="dynamic-fields-container"></div>
+                    </div>
+                    
+                    <!-- Add new metadata field section -->
+                    <div class="new-field-header" tabindex="0" role="button" aria-expanded="false" aria-controls="new-field-form" onclick="window.MetadataRemote.Metadata.Editor.toggleNewFieldForm()">
+                        <span class="expand-icon">▶</span>
+                        <span>Add new metadata field</span>
+                    </div>
+                    <div class="new-field-form" id="new-field-form" style="display: none;">
+                        <div class="form-group">
+                            <label for="new-field-name">Field Name (Tag)</label>
+                            <input type="text" 
+                                   id="new-field-name" 
+                                   placeholder="e.g., RATING, MOOD"
+                                   pattern="[A-Za-z0-9_]+"
+                                   title="Only letters, numbers, and underscores allowed"
+                                   maxlength="50">
+                        </div>
+                        <div class="form-group">
+                            <label for="new-field-value">Initial Value (optional)</label>
+                            <input type="text" 
+                                   id="new-field-value" 
+                                   placeholder="Enter initial value">
+                        </div>
+                        <div class="new-field-actions">
+                            <button type="button" 
+                                    class="btn btn-primary" 
+                                    onclick="window.MetadataRemote.Metadata.Editor.createNewField(false)">
+                                Save to File
                             </button>
-                            <button type="button" class="clear-btn btn-status" onclick="resetForm()">
-                                <span class="btn-status-content">Reset</span>
-                                <span class="btn-status-message"></span>
+                            <button type="button" 
+                                    class="btn btn-secondary" 
+                                    onclick="window.MetadataRemote.Metadata.Editor.createNewField(true)">
+                                Save to Folder
+                            </button>
+                            <button type="button" 
+                                    class="btn btn-cancel" 
+                                    onclick="window.MetadataRemote.Metadata.Editor.cancelNewField()">
+                                Cancel
                             </button>
                         </div>
-                    </form>
+                    </div>
+                    
+                    <!-- Save and Reset buttons at the bottom -->
+                    <div class="buttons">
+                        <button type="button" class="save-btn btn-status" onclick="save()">
+                            <span class="btn-status-content">Save all fields to file</span>
+                            <span class="btn-status-message"></span>
+                        </button>
+                        <button type="button" class="clear-btn btn-status" onclick="resetForm()">
+                            <span class="btn-status-content">Reset</span>
+                            <span class="btn-status-message"></span>
+                        </button>
+                    </div>
                     
                     <div id="status" class="status"></div>
                 </div>

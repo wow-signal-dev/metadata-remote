@@ -45,8 +45,6 @@ class KeyboardRouter {
         }
         
         this.routes.get(priority).push(route);
-        
-        // console.log(`Registered route: ${routeKey} (priority: ${priority})`);
     }
 
     /**
@@ -200,15 +198,6 @@ class KeyboardRouter {
             if (pattern.target !== context.elementType && 
                 pattern.target !== context.tagName &&
                 !context.classList.includes(pattern.target)) {
-                // if (event.key === 'Tab') {
-                //     console.log('[Router] Tab target mismatch:', {
-                //         patternTarget: pattern.target,
-                //         patternTargetType: typeof pattern.target,
-                //         contextElementType: context.elementType,
-                //         contextTagName: context.tagName,
-                //         contextClassList: context.classList
-                //     });
-                // }
                 return false;
             }
         }
@@ -216,28 +205,16 @@ class KeyboardRouter {
         // Check modifiers
         if (pattern.modifiers) {
             if (pattern.modifiers.ctrl !== undefined && pattern.modifiers.ctrl !== event.ctrlKey) {
-                // if (event.key === 'Tab') {
-                //     console.log('[Router] Tab ctrl modifier mismatch');
-                // }
                 return false;
             }
             if (pattern.modifiers.shift !== undefined && pattern.modifiers.shift !== event.shiftKey) {
-                // if (event.key === 'Tab') {
-                //     console.log('[Router] Tab shift modifier mismatch');
-                // }
                 return false;
             }
             if (pattern.modifiers.alt !== undefined && pattern.modifiers.alt !== event.altKey) {
-                // if (event.key === 'Tab') {
-                //     console.log('[Router] Tab alt modifier mismatch');
-                // }
                 return false;
             }
         }
 
-        // if (event.key === 'Tab') {
-        //     console.log('[Router] Tab route MATCHED! All checks passed');
-        // }
         return true;
     }
 

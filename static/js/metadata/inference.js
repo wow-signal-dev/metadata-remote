@@ -18,30 +18,40 @@
          * @param {Object} callbacks - Object containing callback functions
          */
         setupInferenceHandlers(callbacks) {
-            const fields = ['title', 'artist', 'album', 'albumartist', 'date', 'genre', 'composer', 'track', 'disc'];
-            
-            fields.forEach(field => {
-                const input = document.getElementById(field);
-                const suggestions = document.getElementById(`${field}-suggestions`);
-                
-                // Click handler for empty fields
-                input.addEventListener('click', (e) => {
-                    if (input.value.trim() === '' && !input.disabled && State.currentFile) {
-                        this.showInferenceSuggestions(field);
-                    }
-                });
-                
-                // Input handler to hide suggestions when typing
-                input.addEventListener('input', (e) => {
-                    this.hideInferenceSuggestions(field);
-                });
-                
-                // Click outside to hide suggestions
+            // Don't set up handlers here - they'll be set up when fields are created
+            // Just set up the global click handler once
+            if (!this._globalClickHandlerSet) {
                 document.addEventListener('click', (e) => {
-                    if (!e.target.closest(`#${field}`) && !e.target.closest(`#${field}-suggestions`)) {
-                        this.hideInferenceSuggestions(field);
-                    }
+                    // Hide all suggestion boxes when clicking outside
+                    const fields = ['title', 'artist', 'album', 'albumartist', 'date', 'genre', 'composer', 'track', 'disc'];
+                    fields.forEach(field => {
+                        if (!e.target.closest(`#${field}`) && !e.target.closest(`#${field}-suggestions`)) {
+                            this.hideInferenceSuggestions(field);
+                        }
+                    });
                 });
+                this._globalClickHandlerSet = true;
+            }
+        },
+        
+        /**
+         * Attach inference handlers to a specific field
+         * @param {string} field - Field name
+         */
+        attachInferenceHandlers(field) {
+            const input = document.getElementById(field);
+            if (!input) return;
+            
+            // Click handler for empty fields
+            input.addEventListener('click', (e) => {
+                if (input.value.trim() === '' && !input.disabled && State.currentFile) {
+                    this.showInferenceSuggestions(field);
+                }
+            });
+            
+            // Input handler to hide suggestions when typing
+            input.addEventListener('input', (e) => {
+                this.hideInferenceSuggestions(field);
             });
         },
         
@@ -177,8 +187,13 @@
                 delete State.inferenceAbortControllers[field];
             }
             
-            loading.classList.remove('active');
-            suggestions.classList.remove('active');
+            // Only manipulate elements if they exist
+            if (loading) {
+                loading.classList.remove('active');
+            }
+            if (suggestions) {
+                suggestions.classList.remove('active');
+            }
             State.inferenceActive[field] = false;
         }
     };

@@ -52,20 +52,17 @@
                 this.stopPlayback();
                 State.currentlyPlayingFile = filepath;
                 
-                // ADD: Show loading state
                 button.classList.add('loading');
                 button.classList.remove('playing');
                 
                 this.audioPlayer.src = `/stream/${encodeURIComponent(filepath)}`;
                 this.audioPlayer.play()
                     .then(() => {
-                        // ADD: Remove loading state and show playing state
                         button.classList.remove('loading');
                         button.classList.add('playing');
                     })
                     .catch(err => {
                         console.error('Error playing audio:', err);
-                        // ADD: Remove loading state on error
                         button.classList.remove('loading');
                         UIUtils.showStatus('Error playing audio file', 'error');
                         this.stopPlayback();
@@ -85,7 +82,6 @@
             document.querySelectorAll('.play-button.playing').forEach(btn => {
                 btn.classList.remove('playing');
             });
-            // ADD: Also remove any loading states
             document.querySelectorAll('.play-button.loading').forEach(btn => {
                 btn.classList.remove('loading');
             });

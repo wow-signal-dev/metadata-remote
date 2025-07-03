@@ -26,6 +26,7 @@ class ActionType(Enum):
     ALBUM_ART_DELETE = "album_art_delete"
     BATCH_METADATA = "batch_metadata"
     BATCH_ALBUM_ART = "batch_album_art"
+    DELETE_FIELD = "delete_field"
 
 @dataclass
 class HistoryAction:
@@ -58,7 +59,7 @@ class HistoryAction:
         details = self.to_dict()
         
         # Add specific details based on action type
-        if self.action_type in [ActionType.METADATA_CHANGE, ActionType.BATCH_METADATA]:
+        if self.action_type in [ActionType.METADATA_CHANGE, ActionType.BATCH_METADATA, ActionType.DELETE_FIELD]:
             # For metadata changes, include old and new values
             details['changes'] = []
             for filepath in self.files[:10]:  # Limit to first 10 files for UI
@@ -240,6 +241,24 @@ def create_metadata_action(filepath: str, field: str, old_value: str, new_value:
         field=field,
         old_values={filepath: old_value},
         new_values={filepath: new_value},
+        description=description
+    )
+
+def create_delete_field_action(filepath: str, field: str, old_value: str) -> HistoryAction:
+    """Create a history action for deleting a metadata field"""
+    filename = os.path.basename(filepath)
+    description = f"Deleted {field} from \"{filename}\""
+    if old_value:
+        description += f" (was \"{old_value}\")"
+    
+    return HistoryAction(
+        id=str(uuid.uuid4()),
+        timestamp=time.time(),
+        action_type=ActionType.DELETE_FIELD,
+        files=[filepath],
+        field=field,
+        old_values={filepath: old_value},
+        new_values={filepath: None},
         description=description
     )
 

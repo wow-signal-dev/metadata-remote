@@ -120,5 +120,12 @@ window.MetadataRemote.API = {
         return this.call('/history/clear', {
             method: 'POST'
         });
+    },
+    
+    // Delete metadata field
+    async deleteMetadataField(filepath, fieldId) {
+        return this.call(`/metadata/${encodeURIComponent(filepath)}/${fieldId}`, {
+            method: 'DELETE'
+        });
     }
 };

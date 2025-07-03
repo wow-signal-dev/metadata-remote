@@ -363,6 +363,7 @@
          * @param {HTMLElement} listItem - The list item element
          */
         async loadFile(filepath, listItem) {
+            
             // Increment request ID to track this as the latest request
             const requestId = ++State.loadFileRequestId;
             
@@ -416,26 +417,35 @@
                     // A newer request has been made, discard this response
                     return;
                 }
+                    State.originalMetadata = {
+                        title: data.title || '',
+                        artist: data.artist || '',
+                        album: data.album || '',
+                        albumartist: data.albumartist || '',
+                        date: data.date || '',
+                        genre: data.genre || '',
+                        composer: data.composer || '',
+                        track: data.track || '',
+                        disc: data.disc || ''
+                    };
+                    
+                    // Store all fields data if available
+                    if (data.all_fields) {
+                        Object.entries(data.all_fields).forEach(([fieldId, fieldInfo]) => {
+                            if (fieldInfo.value !== undefined && fieldInfo.value !== null) {
+                                State.originalMetadata[fieldId] = fieldInfo.value;
+                            }
+                        });
+                    }
+                    
+                    // Standard field values will be set when fields are rendered
+                    // Just ensure metadata is properly stored in State
+                    State.metadata = data;
                 
-                State.originalMetadata = {
-                    title: data.title || '',
-                    artist: data.artist || '',
-                    album: data.album || '',
-                    albumartist: data.albumartist || '',
-                    date: data.date || '',
-                    genre: data.genre || '',
-                    composer: data.composer || '',
-                    track: data.track || '',
-                    disc: data.disc || ''
-                };
-                
-                Object.entries(State.originalMetadata).forEach(([field, value]) => {
-                    const input = document.getElementById(field);
-                    input.value = value;
-                    // Initialize as read-only until user presses Enter to edit
-                    input.dataset.editing = 'false';
-                    input.readOnly = true;
-                });
+                // Render dynamic fields
+                if (window.MetadataRemote.Metadata && window.MetadataRemote.Metadata.Editor) {
+                    window.MetadataRemote.Metadata.Editor.renderMetadataFields(data);
+                }
                 
                 // Handle format limitations
                 const formatLimitations = data.formatLimitations || {};
@@ -451,6 +461,11 @@
                         allFields.forEach(field => {
                             const input = document.getElementById(field);
                             const controls = document.querySelector(`.apply-field-controls[data-field="${field}"]`);
+                            
+                            if (!input) {
+                                return;
+                            }
+                            
                             if (!data.supportedFields.includes(field)) {
                                 input.disabled = true;
                                 input.style.opacity = '0.5';
@@ -485,33 +500,43 @@
                 const applyFolderBtn = document.querySelector('.apply-folder-btn');
                 const uploadBtn = document.querySelector('.upload-btn');
                 
+                // Only handle album art if elements exist
+                if (!artDisplay) {
+                    console.error('Album art display element not found!');
+                } else {
+                
                 // Check if format supports album art
                 if (!formatLimitations.supportsAlbumArt) {
                     artDisplay.innerHTML = `<div class="album-art-placeholder" style="opacity: 0.5;">Album art not supported for ${format.toUpperCase()}</div>`;
-                    deleteBtn.style.display = 'none';
-                    saveImageBtn.style.display = 'none';
-                    applyFolderBtn.style.display = 'none';
-                    uploadBtn.disabled = true;
-                    uploadBtn.style.opacity = '0.5';
-                    uploadBtn.title = `${format.toUpperCase()} format does not support embedded album art`;
+                    if (deleteBtn) deleteBtn.style.display = 'none';
+                    if (saveImageBtn) saveImageBtn.style.display = 'none';
+                    if (applyFolderBtn) applyFolderBtn.style.display = 'none';
+                    if (uploadBtn) {
+                        uploadBtn.disabled = true;
+                        uploadBtn.style.opacity = '0.5';
+                        uploadBtn.title = `${format.toUpperCase()} format does not support embedded album art`;
+                    }
                 } else {
-                    uploadBtn.disabled = false;
-                    uploadBtn.style.opacity = '1';
-                    uploadBtn.title = '';
+                    if (uploadBtn) {
+                        uploadBtn.disabled = false;
+                        uploadBtn.style.opacity = '1';
+                        uploadBtn.title = '';
+                    }
                     
                     if (data.hasArt && data.art) {
                         State.currentAlbumArt = data.art;
                         artDisplay.innerHTML = `<img src="data:image/jpeg;base64,${data.art}" class="album-art">`;
-                        deleteBtn.style.display = 'block';
-                        saveImageBtn.style.display = 'none';
-                        applyFolderBtn.style.display = 'none';
+                        if (deleteBtn) deleteBtn.style.display = 'block';
+                        if (saveImageBtn) saveImageBtn.style.display = 'none';
+                        if (applyFolderBtn) applyFolderBtn.style.display = 'none';
                     } else {
                         artDisplay.innerHTML = '<div class="album-art-placeholder">No album art</div>';
-                        deleteBtn.style.display = 'none';
-                        saveImageBtn.style.display = 'none';
-                        applyFolderBtn.style.display = 'none';
+                        if (deleteBtn) deleteBtn.style.display = 'none';
+                        if (saveImageBtn) saveImageBtn.style.display = 'none';
+                        if (applyFolderBtn) applyFolderBtn.style.display = 'none';
                     }
                 }
+                } // Close the else block for artDisplay check
                 
                 UIUtils.setFormEnabled(true);
                 
