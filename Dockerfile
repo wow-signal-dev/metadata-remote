@@ -18,7 +18,10 @@ WORKDIR /app
 
 # Copy Python dependencies from builder
 COPY --from=builder /root/.local /root/.local
+
+# Explicitly set both PATH and PYTHONPATH
 ENV PATH=/root/.local/bin:$PATH
+ENV PYTHONPATH=/root/.local/lib/python3.11/site-packages:$PYTHONPATH
 
 # Copy application files
 COPY app.py .
