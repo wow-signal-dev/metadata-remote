@@ -19,6 +19,9 @@ WORKDIR /app
 # Copy Python dependencies from builder
 COPY --from=builder /root/.local /root/.local
 
+# Force complete rebuild to fix ARM64/ARMv7 images
+RUN echo "Rebuild at $(date)" > /tmp/rebuild-marker.txt
+
 # Explicitly set both PATH and PYTHONPATH
 ENV PATH=/root/.local/bin:$PATH
 ENV PYTHONPATH=/root/.local/lib/python3.11/site-packages:$PYTHONPATH
