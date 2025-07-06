@@ -1270,8 +1270,10 @@ input:autofill {
     max-height: 120px;
     border-radius: 6px;
     box-shadow: 0 4px 12px rgba(0,0,0,0.6);
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, z-index 0.2s ease;
     cursor: pointer;
+    position: relative;
+    z-index: 10;
 }
 
 .album-art:hover {
@@ -1367,9 +1369,13 @@ input:autofill {
     color: var(--text-primary);
 }
 
-.upload-btn:hover:not(.processing):not(.success):not(.error):not(.warning) {
+.upload-btn:hover:not(:disabled):not(.processing):not(.success):not(.error):not(.warning) {
     transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(58, 58, 58, 0.4);
+}
+
+.album-art-controls .upload-btn:disabled {
+    cursor: not-allowed;
 }
 
 .save-image-btn {
@@ -1738,7 +1744,7 @@ label {
 
 input[type="text"] {
     padding: 0.5rem 0.75rem;
-    padding-right: 2rem; /* Make room for inference spinner */
+    padding-right: 0.75rem; /* Default padding, increased when inference active */
     border: 1px solid var(--border-color);
     border-radius: 8px;
     font-size: 0.95rem;
@@ -1753,6 +1759,11 @@ input[type="text"]:focus {
     border-color: var(--border-color);
     background: rgba(74, 127, 255, 0.05);
     transform: translateY(-1px);
+}
+
+/* Increase padding when inference spinner is active */
+.input-wrapper:has(.inference-loading.active) input[type="text"] {
+    padding-right: 2rem;
 }
 
 /* Consistent focus styling for all focusable elements */
@@ -2457,6 +2468,7 @@ button:focus:not(:active):not(.processing):not(.success):not(.error):not(.warnin
     transition: padding 0.2s ease, background 0.2s ease;
     border-bottom: 1px solid var(--border-color);
     font-size: 0.9rem;
+    border-radius: 8px;
 }
 
 .new-field-header:hover {
@@ -2476,7 +2488,6 @@ button:focus:not(:active):not(.processing):not(.success):not(.error):not(.warnin
 }
 
 .new-field-header.expanded .expand-icon {
-    transform: rotate(90deg);
     color: var(--accent-primary);
 }
 
@@ -2579,7 +2590,7 @@ button:focus:not(:active):not(.processing):not(.success):not(.error):not(.warnin
 .extended-fields-toggle {
     margin-top: 1rem;
     margin-bottom: 0.75rem;
-    padding: 0.75rem 1rem;
+    padding: 0.5rem 0.75rem;
     background: linear-gradient(180deg, #1f1f1f 0%, #1a1a1a 100%);
     border: 1px solid var(--border-color);
     border-radius: 8px;
@@ -2593,7 +2604,7 @@ button:focus:not(:active):not(.processing):not(.success):not(.error):not(.warnin
 
 .extended-fields-toggle:hover {
     background: linear-gradient(180deg, #222 0%, #1c1c1c 100%);
-    padding-left: 1.25rem;
+    padding-left: 1rem;
 }
 
 .extended-fields-toggle:focus {
@@ -2608,7 +2619,6 @@ button:focus:not(:active):not(.processing):not(.success):not(.error):not(.warnin
 }
 
 .extended-fields-toggle.expanded .expand-icon {
-    transform: rotate(90deg);
     color: var(--accent-primary);
 }
 

@@ -46,6 +46,10 @@
                     return;
                 }
                 if (!button.classList.contains('btn-status') || !button.classList.contains('processing')) {
+                    // Don't re-enable buttons that are disabled due to format restrictions
+                    if (enabled && button.title && button.title.includes('does not support embedded album art')) {
+                        return; // Skip re-enabling this button
+                    }
                     button.disabled = !enabled;
                 }
             });

@@ -22,11 +22,14 @@ from config import MAX_HISTORY_ITEMS, logger
 class ActionType(Enum):
     """Types of actions that can be performed"""
     METADATA_CHANGE = "metadata_change"
+    CLEAR_FIELD = "clear_field"
     ALBUM_ART_CHANGE = "album_art_change"
     ALBUM_ART_DELETE = "album_art_delete"
     BATCH_METADATA = "batch_metadata"
     BATCH_ALBUM_ART = "batch_album_art"
     DELETE_FIELD = "delete_field"
+    CREATE_FIELD = "create_field"
+    BATCH_CREATE_FIELD = "batch_create_field"
 
 @dataclass
 class HistoryAction:
@@ -222,21 +225,37 @@ class EditingHistory:
 # HELPER FUNCTIONS FOR HISTORY TRACKING
 # =====================================
 
-def create_metadata_action(filepath: str, field: str, old_value: str, new_value: str) -> HistoryAction:
+def create_metadata_action(filepath: str, field: str, old_value: str, new_value: str, action_type: str = 'metadata_change') -> HistoryAction:
     """Create a history action for a single metadata change"""
     filename = os.path.basename(filepath)
-    description = f"Changed {field} in \"{filename}\""
-    if old_value and new_value:
-        description += f" from \"{old_value}\" to \"{new_value}\""
-    elif new_value:
-        description += f" to \"{new_value}\""
-    elif old_value:
-        description += f" (cleared)"
+    
+    # Normalize single spaces for display
+    display_old = '' if old_value == ' ' else old_value
+    display_new = '' if new_value == ' ' else new_value
+    
+    # Determine action type and description
+    if action_type == 'clear_field':
+        description = f"Cleared {field} in \"{filename}\""
+        if display_old:
+            description += f" (was \"{display_old}\")"
+        action_type_enum = ActionType.CLEAR_FIELD
+    elif action_type == 'delete_field':
+        description = f"Deleted field {field} in \"{filename}\""
+        action_type_enum = ActionType.DELETE_FIELD
+    else:
+        description = f"Changed {field} in \"{filename}\""
+        if display_old and display_new:
+            description += f" from \"{display_old}\" to \"{display_new}\""
+        elif display_new:
+            description += f" to \"{display_new}\""
+        elif display_old:
+            description += f" (cleared)"
+        action_type_enum = ActionType.METADATA_CHANGE
     
     return HistoryAction(
         id=str(uuid.uuid4()),
         timestamp=time.time(),
-        action_type=ActionType.METADATA_CHANGE,
+        action_type=action_type_enum,
         files=[filepath],
         field=field,
         old_values={filepath: old_value},
@@ -339,6 +358,43 @@ def create_batch_album_art_action(folder_path: str, art_data: str, file_changes:
         field='art',
         old_values=old_values,
         new_values=new_values,
+        description=description
+    )
+
+def create_field_creation_action(filepath: str, field_name: str, field_value: str) -> HistoryAction:
+    """Create a history action for new field creation"""
+    filename = os.path.basename(filepath)
+    
+    # Normalize for display
+    display_value = '' if field_value == ' ' else field_value
+    
+    description = f"Created field '{field_name}' in \"{filename}\""
+    if display_value:
+        description += f" with value \"{display_value}\""
+    
+    return HistoryAction(
+        id=str(uuid.uuid4()),
+        timestamp=time.time(),
+        action_type=ActionType.CREATE_FIELD,
+        files=[filepath],
+        field=field_name,
+        old_values={filepath: None},  # Field didn't exist
+        new_values={filepath: field_value},
+        description=description
+    )
+
+def create_batch_field_creation_action(filepaths: List[str], field_name: str, field_values: Dict[str, str]) -> HistoryAction:
+    """Create a history action for batch field creation"""
+    description = f"Created field '{field_name}' in {len(filepaths)} files"
+    
+    return HistoryAction(
+        id=str(uuid.uuid4()),
+        timestamp=time.time(),
+        action_type=ActionType.BATCH_CREATE_FIELD,
+        files=filepaths,
+        field=field_name,
+        old_values={fp: None for fp in filepaths},  # Fields didn't exist
+        new_values=field_values,
         description=description
     )
 

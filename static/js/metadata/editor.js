@@ -219,7 +219,8 @@
             standardFields.forEach(field => {
                 const input = document.getElementById(field);
                 if (input) {
-                    data[field] = input.value;
+                    // Treat single space as empty to ensure consistency
+                    data[field] = input.value === ' ' ? '' : input.value;
                 }
             });
             
@@ -227,7 +228,8 @@
             dynamicFields.forEach((fieldInfo, fieldId) => {
                 const input = document.getElementById(`dynamic-${fieldId}`);
                 if (input && !input.disabled && fieldInfo.is_editable) {
-                    data[fieldId] = input.value;
+                    // Treat single space as empty to ensure consistency
+                    data[fieldId] = input.value === ' ' ? '' : input.value;
                 }
             });
             
@@ -391,7 +393,8 @@
             
             // Create metadata object with only this field
             const data = {};
-            data[field] = value;
+            // Treat single space as empty to ensure consistency
+            data[field] = value === ' ' ? '' : value;
             
             try {
                 const result = await API.setMetadata(State.currentFile, data);
@@ -452,7 +455,9 @@
             const labelElement = document.querySelector(`label[for="${input.id}"]`);
             const fieldLabel = labelElement ? labelElement.textContent : field;
             
-            if (!confirm(`Apply "${fieldLabel}" value "${value}" to all files in the folder "${folderPath || 'root'}"?`)) {
+            // Treat single space as empty for display
+            const displayValue = value === ' ' ? '' : value;
+            if (!confirm(`Apply "${fieldLabel}" value "${displayValue}" to all files in the folder "${folderPath || 'root'}"?`)) {
                 return;
             }
             
@@ -461,7 +466,9 @@
             showButtonStatus(button, 'Applying to folder...', 'processing');
             
             try {
-                const result = await API.applyFieldToFolder(folderPath, field, value);
+                // Send normalized value (single space becomes empty)
+                const normalizedValue = value === ' ' ? '' : value;
+                const result = await API.applyFieldToFolder(folderPath, field, normalizedValue);
                 
                 if (result.status === 'success') {
                     showButtonStatus(button, `Applied to ${result.filesUpdated} files!`, 'success', 3000);
@@ -1092,7 +1099,7 @@
                         UIUtils.showStatus(result.error || 'Failed to create field', 'error');
                     }
                 } else {
-                    const result = await API.setMetadata(State.currentFile, data);
+                    const result = await API.createField(State.currentFile, fieldName, fieldValue);
                     
                     if (result.status === 'success') {
                         UIUtils.showStatus('Field created successfully', 'success');
@@ -1194,7 +1201,6 @@
          * @param {string} fieldId - Field ID to delete
          */
         async confirmDelete(fieldId) {
-            
             // Get field display name for success message
             let displayName = fieldId;
             

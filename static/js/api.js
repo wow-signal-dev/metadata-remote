@@ -124,8 +124,22 @@ window.MetadataRemote.API = {
     
     // Delete metadata field
     async deleteMetadataField(filepath, fieldId) {
-        return this.call(`/metadata/${encodeURIComponent(filepath)}/${fieldId}`, {
+        const url = `/metadata/${encodeURIComponent(filepath)}/${fieldId.replace(/\//g, '__')}`;
+        return this.call(url, {
             method: 'DELETE'
+        });
+    },
+    
+    // Create new metadata field
+    async createField(filepath, fieldName, fieldValue) {
+        return this.call('/metadata/create-field', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                filepath: filepath,
+                field_name: fieldName,
+                field_value: fieldValue
+            })
         });
     }
 };

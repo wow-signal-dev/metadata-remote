@@ -15,7 +15,7 @@ import unicodedata
 
 from mutagen import File
 from mutagen.mp3 import MP3
-from mutagen.id3 import ID3, APIC, TPE1, TPE2, TIT2, TALB, TDRC, TCON, TRCK, TPOS, TCOM, TXXX, ID3NoHeaderError
+from mutagen.id3 import ID3, APIC, TPE1, TPE2, TIT2, TALB, TDRC, TCON, TRCK, TPOS, TCOM, TXXX, ID3NoHeaderError, Frames
 from mutagen.oggvorbis import OggVorbis
 from mutagen.oggopus import OggOpus
 from mutagen.flac import FLAC, Picture
@@ -119,6 +119,223 @@ class MutagenHandler:
                 'composer': 'Composer'
             }
         }
+        
+        # Comprehensive ID3v2 TEXT frame mappings
+        self.id3_text_frames = {
+            # Essential/Core Fields
+            "TIT2": {
+                "primary_name": "title",
+                "display_name": "Title",
+                "variations": ["title", "song", "track", "name", "song name", "track title", "track name"],
+                "versions": ["2.3", "2.4"],
+                "category": "essential"
+            },
+            "TPE1": {
+                "primary_name": "artist",
+                "display_name": "Artist",
+                "variations": ["artist", "artists", "performer", "performers", "lead performer", "lead artist", "main artist"],
+                "versions": ["2.3", "2.4"],
+                "category": "essential"
+            },
+            "TALB": {
+                "primary_name": "album",
+                "display_name": "Album",
+                "variations": ["album", "album title", "release", "release title"],
+                "versions": ["2.3", "2.4"],
+                "category": "essential"
+            },
+            "TPE2": {
+                "primary_name": "albumartist",
+                "display_name": "Album Artist",
+                "variations": ["albumartist", "album artist", "album_artist", "band", "orchestra", "accompaniment", "ensemble"],
+                "versions": ["2.3", "2.4"],
+                "category": "essential"
+            },
+            "TCON": {
+                "primary_name": "genre",
+                "display_name": "Genre",
+                "variations": ["genre", "genres", "content type", "style"],
+                "versions": ["2.3", "2.4"],
+                "category": "essential"
+            },
+            "TRCK": {
+                "primary_name": "tracknumber",
+                "display_name": "Track Number",
+                "variations": ["tracknumber", "track", "track number", "track_number", "tracknum", "track#", "track #"],
+                "versions": ["2.3", "2.4"],
+                "category": "essential"
+            },
+            "TPOS": {
+                "primary_name": "discnumber",
+                "display_name": "Disc Number",
+                "variations": ["discnumber", "disc", "disc number", "disc_number", "disknum", "part of set", "disc#"],
+                "versions": ["2.3", "2.4"],
+                "category": "essential"
+            },
+            "TCOM": {
+                "primary_name": "composer",
+                "display_name": "Composer",
+                "variations": ["composer", "composers", "written by", "writtenby", "music by"],
+                "versions": ["2.3", "2.4"],
+                "category": "essential"
+            },
+            # Date/Time Fields
+            "TYER": {
+                "primary_name": "year",
+                "display_name": "Year",
+                "variations": ["year", "release year", "date"],
+                "versions": ["2.3"],
+                "category": "date"
+            },
+            "TDRC": {
+                "primary_name": "date",
+                "display_name": "Recording Date",
+                "variations": ["date", "recording date", "year", "recording time"],
+                "versions": ["2.4"],
+                "category": "date"
+            },
+            # Extended Common Fields
+            "TPUB": {
+                "primary_name": "publisher",
+                "display_name": "Publisher",
+                "variations": ["publisher", "label", "record label", "record_label", "organization", "music publisher"],
+                "versions": ["2.3", "2.4"],
+                "category": "extended"
+            },
+            "TENC": {
+                "primary_name": "encodedby",
+                "display_name": "Encoded By",
+                "variations": ["encodedby", "encoded by", "encoded_by", "encoder", "ripped by"],
+                "versions": ["2.3", "2.4"],
+                "category": "extended"
+            },
+            "TEXT": {
+                "primary_name": "lyricist",
+                "display_name": "Lyricist",
+                "variations": ["lyricist", "lyricists", "text writer", "lyrics by", "words by"],
+                "versions": ["2.3", "2.4"],
+                "category": "extended"
+            },
+            "TPE3": {
+                "primary_name": "conductor",
+                "display_name": "Conductor",
+                "variations": ["conductor", "conductors", "performed by"],
+                "versions": ["2.3", "2.4"],
+                "category": "extended"
+            },
+            "TPE4": {
+                "primary_name": "remixer",
+                "display_name": "Remixer",
+                "variations": ["remixer", "remixed by", "mixed by", "mixartist", "modified by"],
+                "versions": ["2.3", "2.4"],
+                "category": "extended"
+            },
+            "TIT1": {
+                "primary_name": "contentgroup",
+                "display_name": "Content Group",
+                "variations": ["contentgroup", "content group", "grouping", "work", "movement"],
+                "versions": ["2.3", "2.4"],
+                "category": "extended"
+            },
+            "TIT3": {
+                "primary_name": "subtitle",
+                "display_name": "Subtitle",
+                "variations": ["subtitle", "sub title", "description", "version"],
+                "versions": ["2.3", "2.4"],
+                "category": "extended"
+            },
+            # Technical/Production Fields
+            "TBPM": {
+                "primary_name": "bpm",
+                "display_name": "BPM",
+                "variations": ["bpm", "beats per minute", "beatsperminute", "tempo", "beats_per_minute"],
+                "versions": ["2.3", "2.4"],
+                "category": "technical"
+            },
+            "TKEY": {
+                "primary_name": "initialkey",
+                "display_name": "Initial Key",
+                "variations": ["initialkey", "initial key", "key", "musical key", "musickey"],
+                "versions": ["2.3", "2.4"],
+                "category": "technical"
+            },
+            "TLEN": {
+                "primary_name": "length",
+                "display_name": "Length",
+                "variations": ["length", "duration", "time", "track length"],
+                "versions": ["2.3", "2.4"],
+                "category": "technical"
+            },
+            "TSSE": {
+                "primary_name": "encodersettings",
+                "display_name": "Encoder Settings",
+                "variations": ["encodersettings", "encoder settings", "software", "encoding software"],
+                "versions": ["2.3", "2.4"],
+                "category": "technical"
+            },
+            # Rights/Legal Fields
+            "TCOP": {
+                "primary_name": "copyright",
+                "display_name": "Copyright",
+                "variations": ["copyright", "copyright message", "(c)", "©"],
+                "versions": ["2.3", "2.4"],
+                "category": "rights"
+            },
+            "TOWN": {
+                "primary_name": "fileowner",
+                "display_name": "File Owner",
+                "variations": ["fileowner", "file owner", "owner", "licensee"],
+                "versions": ["2.3", "2.4"],
+                "category": "rights"
+            },
+            # Sorting Fields (ID3v2.4 only)
+            "TSOA": {
+                "primary_name": "albumsort",
+                "display_name": "Album Sort Order",
+                "variations": ["albumsort", "album sort", "albumsortorder", "album sort order"],
+                "versions": ["2.4"],
+                "category": "sorting"
+            },
+            "TSOP": {
+                "primary_name": "artistsort",
+                "display_name": "Artist Sort Order",
+                "variations": ["artistsort", "artist sort", "performersort", "performer sort order"],
+                "versions": ["2.4"],
+                "category": "sorting"
+            },
+            "TSOT": {
+                "primary_name": "titlesort",
+                "display_name": "Title Sort Order",
+                "variations": ["titlesort", "title sort", "titlesortorder", "title sort order"],
+                "versions": ["2.4"],
+                "category": "sorting"
+            },
+            # Other Important Fields
+            "TSRC": {
+                "primary_name": "isrc",
+                "display_name": "ISRC",
+                "variations": ["isrc", "international standard recording code"],
+                "versions": ["2.3", "2.4"],
+                "category": "technical"
+            },
+            "TLAN": {
+                "primary_name": "language",
+                "display_name": "Language",
+                "variations": ["language", "languages", "lang"],
+                "versions": ["2.3", "2.4"],
+                "category": "extended"
+            },
+            "TMED": {
+                "primary_name": "media",
+                "display_name": "Media Type",
+                "variations": ["media", "mediatype", "media type", "source"],
+                "versions": ["2.3", "2.4"],
+                "category": "technical"
+            }
+        }
+        
+        # Build reverse mappings
+        self._build_id3_mappings()
     
     def _is_valid_field(self, field_id: str, field_value: Any) -> bool:
         """Check if field should be sent to frontend"""
@@ -171,6 +388,88 @@ class MutagenHandler:
             normalized = normalized.replace(bad, good)
         
         return normalized.strip()
+    
+    def _build_id3_mappings(self):
+        """Build reverse mappings for ID3 frame lookups"""
+        # Simple field name to frame ID mapping
+        self.field_to_frame = {}
+        # Frame ID to field name mapping
+        self.frame_to_field = {}
+        # All variations to frame ID mapping
+        self.field_variations = {}
+        
+        for frame_id, info in self.id3_text_frames.items():
+            # Add primary name
+            primary = info["primary_name"]
+            self.field_to_frame[primary] = frame_id
+            self.frame_to_field[frame_id] = primary
+            
+            # Add all variations
+            variations_list = []
+            for variation in info["variations"]:
+                normalized = variation.lower()
+                variations_list.append(normalized)
+                # Also add without spaces/underscores
+                no_sep = normalized.replace(" ", "").replace("_", "")
+                if no_sep != normalized:
+                    variations_list.append(no_sep)
+            
+            self.field_variations[primary] = variations_list
+    
+    def normalize_field_name(self, user_input: str) -> Optional[str]:
+        """Normalize user input to find matching ID3v2 frame"""
+        if not user_input:
+            return None
+            
+        # Basic normalization
+        normalized = user_input.strip().lower()
+        
+        # Remove TXXX: prefix if present
+        if normalized.startswith("txxx:"):
+            normalized = normalized[5:]
+        
+        # Check if it's already a frame ID
+        if user_input.upper() in self.id3_text_frames:
+            return user_input.upper()
+        
+        # Check primary names
+        if normalized in self.field_to_frame:
+            return self.field_to_frame[normalized]
+        
+        # Check all variations
+        for primary, variations in self.field_variations.items():
+            if normalized in variations:
+                return self.field_to_frame[primary]
+            
+            # Try without spaces/underscores
+            no_sep = normalized.replace(" ", "").replace("_", "")
+            if no_sep in variations:
+                return self.field_to_frame[primary]
+        
+        # Try removing trailing 's' for plurals
+        if normalized.endswith('s') and len(normalized) > 2:
+            singular = normalized[:-1]
+            if singular in self.field_to_frame:
+                return self.field_to_frame[singular]
+            
+            # Check variations again with singular form
+            for primary, variations in self.field_variations.items():
+                if singular in variations:
+                    return self.field_to_frame[primary]
+        
+        # No match found - would create TXXX frame
+        return None
+    
+    def get_frame_info(self, frame_id: str) -> Optional[Dict[str, Any]]:
+        """Get complete information about a frame"""
+        return self.id3_text_frames.get(frame_id, None)
+    
+    def is_frame_supported(self, frame_id: str, version: str) -> bool:
+        """Check if frame is supported in specific ID3v2 version"""
+        frame_info = self.get_frame_info(frame_id)
+        if frame_info:
+            return version in frame_info["versions"]
+        return False
     
     def detect_format(self, filepath: str) -> Tuple[Optional[File], str]:
         """
@@ -299,7 +598,12 @@ class MutagenHandler:
                         value = value[0] if value else ''
                     metadata[field] = str(value)
         
-        return metadata
+        # Normalize single spaces to empty strings for UI display
+        normalized_metadata = {}
+        for field, value in metadata.items():
+            normalized_metadata[field] = self._normalize_display_value(value)
+        
+        return normalized_metadata
     
     def read_existing_metadata(self, filepath: str) -> Dict[str, Any]:
         """
@@ -391,10 +695,26 @@ class MutagenHandler:
                     if value:  # Only include non-empty values
                         metadata[field] = str(value)
         
-        return metadata
+        # Normalize single spaces to empty strings for UI display
+        normalized_metadata = {}
+        for field, value in metadata.items():
+            normalized_metadata[field] = self._normalize_display_value(value)
+        
+        return normalized_metadata
+    
+    def _is_vorbis_format(self, audio_file) -> bool:
+        """Check if audio file uses Vorbis Comments"""
+        from mutagen.flac import FLAC
+        from mutagen.oggvorbis import OggVorbis
+        from mutagen.oggopus import OggOpus
+        return isinstance(audio_file, (OggVorbis, OggOpus, FLAC))
+    
+    def _normalize_display_value(self, value: str) -> str:
+        """Convert single space to empty string for UI display"""
+        return '' if value == ' ' else value
     
     def write_metadata(self, filepath: str, metadata: Dict[str, str], 
-                      preserve_other_tags: bool = True) -> None:
+                      preserve_other_tags: bool = True) -> bool:
         """
         Write metadata to audio file using Mutagen
         
@@ -402,337 +722,414 @@ class MutagenHandler:
             filepath: Path to audio file
             metadata: Dictionary of metadata to write
             preserve_other_tags: Whether to preserve existing tags not in metadata dict
+            
+        Returns:
+            bool: True if successful, False otherwise
         """
-        logger.info(f"[write_metadata] Writing metadata to {filepath}")
-        logger.info(f"[write_metadata] Metadata to write: {metadata}")
-        
-        audio_file, format_type = self.detect_format(filepath)
-        if audio_file is None:
-            raise Exception("Could not open file with Mutagen")
-        
-        logger.info(f"[write_metadata] File format: {format_type}")
-        logger.info(f"[write_metadata] Existing tags: {list(audio_file.tags.keys()) if audio_file.tags else 'No tags'}")
-        
-        # Get the appropriate tag mapping
-        tag_map = self.tag_mappings.get(format_type, {})
-        
-        # Separate standard fields from custom fields
-        standard_fields = {}
-        custom_fields = {}
-        
-        for field, value in metadata.items():
-            if field in tag_map:
-                standard_fields[field] = value
-            else:
-                # This is a custom field
-                custom_fields[field] = value
-        
-        logger.info(f"[write_metadata] Standard fields: {standard_fields}")
-        logger.info(f"[write_metadata] Custom fields: {custom_fields}")
-        
-        # Special handling for different formats
-        if isinstance(audio_file, MP3):
-            # Initialize ID3 tags if needed
-            if audio_file.tags is None:
-                audio_file.add_tags()
+        try:
+            logger.info(f"[write_metadata] Writing metadata to {filepath}")
+            logger.info(f"[write_metadata] Metadata to write: {metadata}")
             
-            # Update standard tags
-            for field, value in standard_fields.items():
-                if field in ['art', 'removeArt']:
-                    continue
-                
-                tag_name = tag_map.get(field)
-                if not tag_name:
-                    continue
-                
-                logger.info(f"[write_metadata] Processing standard field '{field}' -> tag '{tag_name}' with value: '{value}'")
-                
-                # Normalize composer text
-                if field == 'composer' and value:
-                    value = self.normalize_composer_text(value)
-                
-                # Handle empty values by deleting the frame
-                if not value:
-                    logger.info(f"[write_metadata] Field '{field}' has empty value, checking if tag '{tag_name}' exists")
-                    if tag_name in audio_file.tags:
-                        logger.info(f"[write_metadata] Deleting existing tag '{tag_name}'")
-                        del audio_file.tags[tag_name]
+            audio_file, format_type = self.detect_format(filepath)
+            if audio_file is None:
+                logger.error("Could not open file with Mutagen")
+                return False
+            
+            logger.info(f"[write_metadata] File format: {format_type}")
+            logger.info(f"[write_metadata] Existing tags: {list(audio_file.tags.keys()) if audio_file.tags else 'No tags'}")
+            
+            # Get the appropriate tag mapping
+            tag_map = self.tag_mappings.get(format_type, {})
+            
+            # Separate standard fields from custom fields
+            standard_fields = {}
+            custom_fields = {}
+        
+            for field, value in metadata.items():
+                if field in tag_map:
+                    # Existing standard field
+                    standard_fields[field] = value
+                elif isinstance(audio_file, (MP3, WAVE)):
+                    # For ID3-based formats, check additional mappings
+                    frame_id = self.normalize_field_name(field)
+                    if frame_id:
+                        # Field name maps to standard frame
+                        standard_fields[frame_id] = value
+                    elif field.upper() in self.id3_text_frames:
+                        # Direct frame ID
+                        standard_fields[field.upper()] = value
+                    elif field.startswith('T') and len(field) == 4 and field[1:].isupper():
+                        # Looks like an ID3 frame ID
+                        standard_fields[field] = value
+                    elif field.startswith('TXXX:'):
+                        # This is a direct TXXX frame reference (e.g., from history)
+                        # Extract the actual field name and treat as custom field
+                        actual_field_name = field[5:]  # Remove 'TXXX:' prefix
+                        custom_fields[actual_field_name] = value
                     else:
-                        logger.info(f"[write_metadata] Tag '{tag_name}' doesn't exist, nothing to delete")
-                    continue
-                
-                # Create appropriate ID3 frames
-                logger.info(f"[write_metadata] Creating/updating tag '{tag_name}' for field '{field}'")
-                if tag_name == 'TPE1':
-                    audio_file.tags[tag_name] = TPE1(encoding=3, text=value)
-                elif tag_name == 'TPE2':
-                    audio_file.tags[tag_name] = TPE2(encoding=3, text=value)
-                elif tag_name == 'TIT2':
-                    audio_file.tags[tag_name] = TIT2(encoding=3, text=value)
-                elif tag_name == 'TALB':
-                    audio_file.tags[tag_name] = TALB(encoding=3, text=value)
-                elif tag_name == 'TDRC':
-                    audio_file.tags[tag_name] = TDRC(encoding=3, text=value)
-                elif tag_name == 'TCON':
-                    audio_file.tags[tag_name] = TCON(encoding=3, text=value)
-                elif tag_name == 'TRCK':
-                    audio_file.tags[tag_name] = TRCK(encoding=3, text=value)
-                elif tag_name == 'TPOS':
-                    audio_file.tags[tag_name] = TPOS(encoding=3, text=value)
-                elif tag_name == 'TCOM':
-                    audio_file.tags[tag_name] = TCOM(encoding=3, text=value)
+                        # True custom field
+                        custom_fields[field] = value
+                else:
+                    # Non-ID3 format custom field
+                    custom_fields[field] = value
             
-            # Handle custom fields using TXXX frames
-            for field, value in custom_fields.items():
-                if field in ['art', 'removeArt']:
-                    continue
-                    
-                # Create TXXX frame key
-                txxx_key = f'TXXX:{field}'
+            logger.info(f"[write_metadata] Standard fields: {standard_fields}")
+            logger.info(f"[write_metadata] Custom fields: {custom_fields}")
+            
+            # Special handling for different formats
+            if isinstance(audio_file, MP3):
+                # Initialize ID3 tags if needed
+                if audio_file.tags is None:
+                    audio_file.add_tags()
                 
-                if value:
+                # Update standard tags
+                for field, value in standard_fields.items():
+                    if field in ['art', 'removeArt']:
+                        continue
+                    
+                    tag_name = tag_map.get(field)
+                    if not tag_name:
+                        continue
+                    
+                    logger.info(f"[write_metadata] Processing standard field '{field}' -> tag '{tag_name}' with value: '{value}'")
+                    
+                    # Normalize composer text
+                    if field == 'composer' and value:
+                        value = self.normalize_composer_text(value)
+                    
+                    # Handle empty values by using space placeholder instead of deletion
+                    if not value:
+                        logger.info(f"[write_metadata] Field '{field}' has empty value, preserving with space placeholder")
+                        value = ' '  # Use space placeholder for empty fields
+                    
+                    # Create appropriate ID3 frames
+                    logger.info(f"[write_metadata] Creating/updating tag '{tag_name}' for field '{field}'")
+                    if tag_name == 'TPE1':
+                        audio_file.tags[tag_name] = TPE1(encoding=3, text=value)
+                    elif tag_name == 'TPE2':
+                        audio_file.tags[tag_name] = TPE2(encoding=3, text=value)
+                    elif tag_name == 'TIT2':
+                        audio_file.tags[tag_name] = TIT2(encoding=3, text=value)
+                    elif tag_name == 'TALB':
+                        audio_file.tags[tag_name] = TALB(encoding=3, text=value)
+                    elif tag_name == 'TDRC':
+                        audio_file.tags[tag_name] = TDRC(encoding=3, text=value)
+                    elif tag_name == 'TCON':
+                        audio_file.tags[tag_name] = TCON(encoding=3, text=value)
+                    elif tag_name == 'TRCK':
+                        audio_file.tags[tag_name] = TRCK(encoding=3, text=value)
+                    elif tag_name == 'TPOS':
+                        audio_file.tags[tag_name] = TPOS(encoding=3, text=value)
+                    elif tag_name == 'TCOM':
+                        audio_file.tags[tag_name] = TCOM(encoding=3, text=value)
+                
+                # Handle all other standard ID3 frames dynamically
+                for frame_id, value in standard_fields.items():
+                    # Skip if already handled in basic mappings
+                    if frame_id in tag_map.values():
+                        continue
+                    
+                    # Skip special fields
+                    if frame_id in ['art', 'removeArt']:
+                        continue
+                    
+                    # Use Frames registry to create the appropriate frame
+                    frame_class = Frames.get(frame_id)
+                    if frame_class:
+                        # Check if it's a text frame by checking if it starts with 'T' (except TXXX)
+                        if frame_id.startswith('T') and frame_id != 'TXXX':
+                            # This is likely a text frame
+                            if not value:
+                                value = ' '  # Use space placeholder for empty fields
+                            
+                            try:
+                                audio_file.tags[frame_id] = frame_class(encoding=3, text=value)
+                                logger.info(f"[write_metadata] Created {frame_id} frame with value: '{value}'")
+                            except Exception as e:
+                                logger.warning(f"Failed to create frame {frame_id}: {e}")
+                        else:
+                            logger.warning(f"Frame {frame_id} is not a text frame, skipping")
+                    else:
+                        logger.warning(f"Unknown frame ID: {frame_id}")
+                
+                # Handle custom fields using TXXX frames
+                for field, value in custom_fields.items():
+                    if field in ['art', 'removeArt']:
+                        continue
+                        
+                    # Create TXXX frame key
+                    txxx_key = f'TXXX:{field}'
+                    
+                    if not value:
+                        # Use space placeholder for empty custom fields
+                        value = ' '
+                    
                     # Add or update TXXX frame
                     audio_file.tags[txxx_key] = TXXX(
                         encoding=3,  # UTF-8
                         desc=field,
                         text=[value]
                     )
-                else:
-                    # Remove field if empty value
-                    if txxx_key in audio_file.tags:
-                        del audio_file.tags[txxx_key]
-        
-        elif isinstance(audio_file, (OggVorbis, OggOpus, FLAC)):
-            # Vorbis comments - handle standard fields
-            for field, value in standard_fields.items():
-                if field in ['art', 'removeArt']:
-                    continue
-                
-                tag_name = tag_map.get(field)
-                if not tag_name:
-                    continue
-                
-                # FLAC uses lowercase
-                if isinstance(audio_file, FLAC):
-                    tag_name = tag_name.lower()
-                
-                # Normalize composer text
-                if field == 'composer' and value:
-                    value = self.normalize_composer_text(value)
-                
-                if value:
-                    audio_file[tag_name] = value
-                else:
-                    # Delete tag when empty value is explicitly provided
-                    if tag_name in audio_file:
-                        del audio_file[tag_name]
             
-            # Handle custom fields - Vorbis comments are flexible
-            for field, value in custom_fields.items():
-                if field in ['art', 'removeArt']:
-                    continue
+            elif isinstance(audio_file, (OggVorbis, OggOpus, FLAC)):
+                # Vorbis comments - handle standard fields
+                for field, value in standard_fields.items():
+                    if field in ['art', 'removeArt']:
+                        continue
+                    
+                    tag_name = tag_map.get(field)
+                    if not tag_name:
+                        continue
+                    
+                    # FLAC uses lowercase
+                    if isinstance(audio_file, FLAC):
+                        tag_name = tag_name.lower()
+                    
+                    # Normalize composer text
+                    if field == 'composer' and value:
+                        value = self.normalize_composer_text(value)
+                    
+                    # Even though Vorbis formats theoretically support empty strings,
+                    # Mutagen still removes them on save. Use space placeholder.
+                    if not value:
+                        audio_file[tag_name] = ' '
+                        logger.info(f"[write_metadata] Preserving empty field '{field}' with space placeholder")
+                    else:
+                        audio_file[tag_name] = value
                 
-                # Use uppercase for consistency
-                field_key = field.upper()
-                
-                if value:
-                    audio_file[field_key] = value
-                else:
-                    # Remove field if empty value
-                    if field_key in audio_file:
-                        del audio_file[field_key]
-        
-        elif isinstance(audio_file, MP4):
-            # MP4 atoms - handle standard fields
-            for field, value in standard_fields.items():
-                if field in ['art', 'removeArt']:
-                    continue
-                
-                atom = tag_map.get(field)
-                if not atom:
-                    continue
-                
-                # Normalize composer text
-                if field == 'composer' and value:
-                    value = self.normalize_composer_text(value)
-                
-                # Handle empty values by deleting the atom
-                if not value:
-                    if atom in audio_file:
-                        del audio_file[atom]
-                    continue
-                
-                # Special handling for track/disc
-                if field == 'track':
-                    try:
-                        track_num = int(value.split('/')[0])
-                        total = int(value.split('/')[1]) if '/' in value else 0
-                        audio_file[atom] = [(track_num, total)]
-                    except:
-                        audio_file[atom] = [value]
-                elif field == 'disc':
-                    try:
-                        disc_num = int(value.split('/')[0])
-                        total = int(value.split('/')[1]) if '/' in value else 0
-                        audio_file[atom] = [(disc_num, total)]
-                    except:
-                        audio_file[atom] = [value]
-                else:
-                    audio_file[atom] = [value]
+                # Handle custom fields - Vorbis comments are flexible
+                for field, value in custom_fields.items():
+                    if field in ['art', 'removeArt']:
+                        continue
+                    
+                    # Use uppercase for consistency
+                    field_key = field.upper()
+                    
+                    # Use space placeholder for empty custom fields too
+                    if not value:
+                        audio_file[field_key] = ' '
+                        logger.info(f"[write_metadata] Preserving empty custom field '{field}' with space placeholder")
+                    else:
+                        audio_file[field_key] = value
             
-            # Handle custom fields using freeform atoms
-            for field, value in custom_fields.items():
-                if field in ['art', 'removeArt']:
-                    continue
+            elif isinstance(audio_file, MP4):
+                # MP4 atoms - handle standard fields
+                for field, value in standard_fields.items():
+                    if field in ['art', 'removeArt']:
+                        continue
+                    
+                    atom = tag_map.get(field)
+                    if not atom:
+                        continue
+                    
+                    # Normalize composer text
+                    if field == 'composer' and value:
+                        value = self.normalize_composer_text(value)
+                    
+                    # Handle empty values with space placeholder
+                    if not value:
+                        value = ' '
+                        logger.info(f"[write_metadata] Preserving empty MP4 field '{field}' with space")
+                    
+                    # Special handling for track/disc
+                    if field == 'track':
+                        try:
+                            track_num = int(value.split('/')[0])
+                            total = int(value.split('/')[1]) if '/' in value else 0
+                            audio_file[atom] = [(track_num, total)]
+                        except:
+                            audio_file[atom] = [value]
+                    elif field == 'disc':
+                        try:
+                            disc_num = int(value.split('/')[0])
+                            total = int(value.split('/')[1]) if '/' in value else 0
+                            audio_file[atom] = [(disc_num, total)]
+                        except:
+                            audio_file[atom] = [value]
+                    else:
+                        audio_file[atom] = [value]
                 
-                # Use freeform atoms for custom fields
-                key = f"----:com.apple.iTunes:{field}"
-                
-                if value:
+                # Handle custom fields using freeform atoms
+                for field, value in custom_fields.items():
+                    if field in ['art', 'removeArt']:
+                        continue
+                    
+                    # Use freeform atoms for custom fields
+                    key = f"----:com.apple.iTunes:{field}"
+                    
+                    if not value:
+                        # Use space placeholder for empty custom fields
+                        value = ' '
+                        logger.info(f"[write_metadata] Preserving empty MP4 custom field '{field}' with space")
+                    
                     # MP4 freeform atoms store bytes
                     audio_file[key] = [value.encode('utf-8')]
-                else:
-                    # Remove field if empty value
-                    if key in audio_file:
-                        del audio_file[key]
-        
-        elif isinstance(audio_file, ASF):
-            # WMA/ASF - handle standard fields
-            for field, value in standard_fields.items():
-                if field in ['art', 'removeArt']:
-                    continue
-                
-                tag_name = tag_map.get(field)
-                if not tag_name:
-                    continue
-                
-                # Normalize composer text
-                if field == 'composer' and value:
-                    value = self.normalize_composer_text(value)
-                
-                if value:
-                    audio_file[tag_name] = value
-                else:
-                    # Delete tag when empty value is explicitly provided
-                    if tag_name in audio_file:
-                        del audio_file[tag_name]
             
-            # Handle custom fields - ASF uses WM/ prefix for extended attributes
-            for field, value in custom_fields.items():
-                if field in ['art', 'removeArt']:
-                    continue
-                
-                # ASF uses WM/ prefix for extended attributes
-                field_key = f"WM/{field}" if not field.startswith('WM/') else field
-                
-                if value:
-                    audio_file[field_key] = value
-                else:
-                    # Remove field if empty value
-                    if field_key in audio_file:
-                        del audio_file[field_key]
-        
-        elif isinstance(audio_file, WAVE):
-            # WAV uses ID3 tags in Mutagen
-            if audio_file.tags is None:
-                audio_file.add_tags()
-            
-            # WAV files use ID3 tags, so handle them like MP3 - standard fields
-            for field, value in standard_fields.items():
-                if field in ['art', 'removeArt']:
-                    continue
-                
-                tag_name = tag_map.get(field)
-                if not tag_name:
-                    continue
-                
-                # Normalize composer text
-                if field == 'composer' and value:
-                    value = self.normalize_composer_text(value)
-                
-                # Handle empty values by deleting the frame
-                if not value:
-                    if tag_name in audio_file.tags:
-                        del audio_file.tags[tag_name]
-                    continue
-                
-                # Create appropriate ID3 frames (same as MP3)
-                if tag_name == 'TPE1':
-                    audio_file.tags[tag_name] = TPE1(encoding=3, text=value)
-                elif tag_name == 'TPE2':
-                    audio_file.tags[tag_name] = TPE2(encoding=3, text=value)
-                elif tag_name == 'TIT2':
-                    audio_file.tags[tag_name] = TIT2(encoding=3, text=value)
-                elif tag_name == 'TALB':
-                    audio_file.tags[tag_name] = TALB(encoding=3, text=value)
-                elif tag_name == 'TDRC':
-                    audio_file.tags[tag_name] = TDRC(encoding=3, text=value)
-                elif tag_name == 'TCON':
-                    audio_file.tags[tag_name] = TCON(encoding=3, text=value)
-                elif tag_name == 'TRCK':
-                    audio_file.tags[tag_name] = TRCK(encoding=3, text=value)
-                elif tag_name == 'TPOS':
-                    audio_file.tags[tag_name] = TPOS(encoding=3, text=value)
-                elif tag_name == 'TCOM':
-                    audio_file.tags[tag_name] = TCOM(encoding=3, text=value)
-            
-            # Handle custom fields using TXXX frames (same as MP3)
-            for field, value in custom_fields.items():
-                if field in ['art', 'removeArt']:
-                    continue
+            elif isinstance(audio_file, ASF):
+                # WMA/ASF - handle standard fields
+                for field, value in standard_fields.items():
+                    if field in ['art', 'removeArt']:
+                        continue
                     
-                # Create TXXX frame key
-                txxx_key = f'TXXX:{field}'
+                    tag_name = tag_map.get(field)
+                    if not tag_name:
+                        continue
+                    
+                    # Normalize composer text
+                    if field == 'composer' and value:
+                        value = self.normalize_composer_text(value)
+                    
+                    if not value:
+                        value = ' '
+                        logger.info(f"[write_metadata] Preserving empty ASF field '{field}' with space")
+                    
+                    audio_file[tag_name] = value
                 
-                if value:
+                # Handle custom fields - ASF uses WM/ prefix for extended attributes
+                for field, value in custom_fields.items():
+                    if field in ['art', 'removeArt']:
+                        continue
+                    
+                    # ASF uses WM/ prefix for extended attributes
+                    field_key = f"WM/{field}" if not field.startswith('WM/') else field
+                    
+                    if not value:
+                        value = ' '
+                        logger.info(f"[write_metadata] Preserving empty ASF custom field '{field}' with space")
+                    
+                    audio_file[field_key] = value
+            
+            elif isinstance(audio_file, WAVE):
+                # WAV uses ID3 tags in Mutagen
+                if audio_file.tags is None:
+                    audio_file.add_tags()
+                
+                # WAV files use ID3 tags, so handle them like MP3 - standard fields
+                for field, value in standard_fields.items():
+                    if field in ['art', 'removeArt']:
+                        continue
+                    
+                    tag_name = tag_map.get(field)
+                    if not tag_name:
+                        continue
+                    
+                    # Normalize composer text
+                    if field == 'composer' and value:
+                        value = self.normalize_composer_text(value)
+                    
+                    # Handle empty values with space placeholder (same as MP3)
+                    if not value:
+                        value = ' '
+                        logger.info(f"[write_metadata] Preserving empty WAV field '{field}' with space")
+                    
+                    # Create appropriate ID3 frames (same as MP3)
+                    if tag_name == 'TPE1':
+                        audio_file.tags[tag_name] = TPE1(encoding=3, text=value)
+                    elif tag_name == 'TPE2':
+                        audio_file.tags[tag_name] = TPE2(encoding=3, text=value)
+                    elif tag_name == 'TIT2':
+                        audio_file.tags[tag_name] = TIT2(encoding=3, text=value)
+                    elif tag_name == 'TALB':
+                        audio_file.tags[tag_name] = TALB(encoding=3, text=value)
+                    elif tag_name == 'TDRC':
+                        audio_file.tags[tag_name] = TDRC(encoding=3, text=value)
+                    elif tag_name == 'TCON':
+                        audio_file.tags[tag_name] = TCON(encoding=3, text=value)
+                    elif tag_name == 'TRCK':
+                        audio_file.tags[tag_name] = TRCK(encoding=3, text=value)
+                    elif tag_name == 'TPOS':
+                        audio_file.tags[tag_name] = TPOS(encoding=3, text=value)
+                    elif tag_name == 'TCOM':
+                        audio_file.tags[tag_name] = TCOM(encoding=3, text=value)
+                
+                # Handle all other standard ID3 frames dynamically (same as MP3)
+                for frame_id, value in standard_fields.items():
+                    # Skip if already handled in basic mappings
+                    if frame_id in tag_map.values():
+                        continue
+                    
+                    # Skip special fields
+                    if frame_id in ['art', 'removeArt']:
+                        continue
+                    
+                    # Use Frames registry to create the appropriate frame
+                    frame_class = Frames.get(frame_id)
+                    if frame_class:
+                        # Check if it's a text frame by checking if it starts with 'T' (except TXXX)
+                        if frame_id.startswith('T') and frame_id != 'TXXX':
+                            # This is likely a text frame
+                            if not value:
+                                value = ' '  # Use space placeholder for empty fields
+                            
+                            try:
+                                audio_file.tags[frame_id] = frame_class(encoding=3, text=value)
+                                logger.info(f"[write_metadata] Created {frame_id} frame with value: '{value}'")
+                            except Exception as e:
+                                logger.warning(f"Failed to create frame {frame_id}: {e}")
+                        else:
+                            logger.warning(f"Frame {frame_id} is not a text frame, skipping")
+                    else:
+                        logger.warning(f"Unknown frame ID: {frame_id}")
+                
+                # Handle custom fields using TXXX frames (same as MP3)
+                for field, value in custom_fields.items():
+                    if field in ['art', 'removeArt']:
+                        continue
+                        
+                    # Create TXXX frame key
+                    txxx_key = f'TXXX:{field}'
+                    
+                    if not value:
+                        # Use space placeholder for empty custom fields
+                        value = ' '
+                        logger.info(f"[write_metadata] Preserving empty WAV custom field '{field}' with space")
+                    
                     # Add or update TXXX frame
                     audio_file.tags[txxx_key] = TXXX(
                         encoding=3,  # UTF-8
                         desc=field,
                         text=[value]
                     )
-                else:
-                    # Remove field if empty value
-                    if txxx_key in audio_file.tags:
-                        del audio_file.tags[txxx_key]
-        
-        elif isinstance(audio_file, WavPack):
-            # WavPack uses APEv2 tags - handle standard fields
-            for field, value in standard_fields.items():
-                if field in ['art', 'removeArt']:
-                    continue
-                
-                tag_name = tag_map.get(field)
-                if not tag_name:
-                    continue
-                
-                # Normalize composer text
-                if field == 'composer' and value:
-                    value = self.normalize_composer_text(value)
-                
-                if value:
-                    audio_file[tag_name] = value
-                else:
-                    # Delete tag when empty value is explicitly provided
-                    if tag_name in audio_file:
-                        del audio_file[tag_name]
             
-            # Handle custom fields - APEv2 tags are straightforward
-            for field, value in custom_fields.items():
-                if field in ['art', 'removeArt']:
-                    continue
+            elif isinstance(audio_file, WavPack):
+                # WavPack uses APEv2 tags - handle standard fields
+                for field, value in standard_fields.items():
+                    if field in ['art', 'removeArt']:
+                        continue
+                    
+                    tag_name = tag_map.get(field)
+                    if not tag_name:
+                        continue
+                    
+                    # Normalize composer text
+                    if field == 'composer' and value:
+                        value = self.normalize_composer_text(value)
+                    
+                    if not value:
+                        value = ' '
+                        logger.info(f"[write_metadata] Preserving empty WavPack field '{field}' with space")
+                    
+                    audio_file[tag_name] = value
                 
-                if value:
+                # Handle custom fields - APEv2 tags are straightforward
+                for field, value in custom_fields.items():
+                    if field in ['art', 'removeArt']:
+                        continue
+                    
+                    if not value:
+                        value = ' '
+                        logger.info(f"[write_metadata] Preserving empty WavPack custom field '{field}' with space")
+                    
                     audio_file[field] = value
-                else:
-                    # Remove field if empty value
-                    if field in audio_file:
-                        del audio_file[field]
-        
-        # Save the file
-        logger.info(f"[write_metadata] Saving file with updated metadata")
-        audio_file.save()
-        logger.info(f"[write_metadata] File saved successfully")
+            
+            # Save the file
+            logger.info(f"[write_metadata] Saving file with updated metadata")
+            audio_file.save()
+            logger.info(f"[write_metadata] File saved successfully")
+            return True
+        except Exception as e:
+            logger.error(f"Error writing metadata to {filepath}: {e}")
+            return False
     
     def get_album_art(self, filepath: str) -> Optional[str]:
         """
@@ -1077,8 +1474,11 @@ class MutagenHandler:
         """Discover all ID3 frames"""
         fields = {}
         
-        # Define standard ID3 frame IDs that should be excluded
-        standard_frame_ids = {'TIT2', 'TPE1', 'TALB', 'TPE2', 'TDRC', 'TCON', 'TRCK', 'TPOS', 'TCOM'}
+        # Only exclude the basic fields that are shown in the main UI
+        # We want to show extended standard frames like TPUB in the extended fields section
+        standard_frame_ids = set(self.tag_mappings.get('mp3', {}).values())
+        # Also exclude version-specific date/time frames that are handled specially
+        standard_frame_ids.update(['TYER', 'TDAT', 'TIME'])  # ID3v2.3 date/time frames
         
         for frame_id, frame in tags.items():
             # Skip standard fields to avoid duplicates
@@ -1347,7 +1747,12 @@ class MutagenHandler:
     
     def _get_id3_display_name(self, frame_id: str) -> str:
         """Convert ID3 frame IDs to human-readable names"""
-        # Map common ID3 frames to display names
+        # First check our comprehensive mappings
+        frame_info = self.get_frame_info(frame_id)
+        if frame_info:
+            return frame_info['display_name']
+        
+        # Fall back to existing display names
         id3_display_names = {
             'TIT2': 'Title',
             'TPE1': 'Artist',
@@ -1456,6 +1861,11 @@ class MutagenHandler:
             
             # Determine format and use appropriate method
             if isinstance(audio_file, MP3):
+                # Check if this should be a standard frame
+                frame_id = self.normalize_field_name(field_name)
+                if frame_id:
+                    # This is a standard field, use write_metadata instead
+                    return self.write_metadata(filepath, {field_name: field_value})
                 return self._write_custom_id3_field(filepath, field_name, field_value)
             elif isinstance(audio_file, (FLAC, OggVorbis, OggOpus)):
                 return self._write_custom_vorbis_field(audio_file, field_name, field_value)
@@ -1466,7 +1876,29 @@ class MutagenHandler:
             elif isinstance(audio_file, WavPack):
                 return self._write_custom_apev2_field(audio_file, field_name, field_value)
             elif isinstance(audio_file, WAVE):
-                return self._write_custom_id3_field(filepath, field_name, field_value)
+                # Check if this should be a standard frame
+                frame_id = self.normalize_field_name(field_name)
+                if frame_id:
+                    # This is a standard field, use write_metadata instead
+                    return self.write_metadata(filepath, {field_name: field_value})
+                
+                # Handle WAVE files like write_metadata does - use the file object's save method
+                if audio_file.tags is None:
+                    audio_file.add_tags()
+                
+                txxx_key = f'TXXX:{field_name}'
+                if field_value:
+                    audio_file.tags[txxx_key] = TXXX(
+                        encoding=3,
+                        desc=field_name,
+                        text=[field_value]
+                    )
+                else:
+                    if txxx_key in audio_file.tags:
+                        del audio_file.tags[txxx_key]
+                
+                audio_file.save()
+                return True
             else:
                 logger.error(f"Unsupported format for custom fields: {type(audio_file)}")
                 return False
@@ -1607,6 +2039,12 @@ class MutagenHandler:
             
             # Get the appropriate tag mapping for standard fields
             tag_map = self.tag_mappings.get(format_type, {})
+            
+            # For ID3-based formats, normalize field name to frame ID if needed
+            if isinstance(audio_file, (MP3, WAVE)):
+                normalized_frame = self.normalize_field_name(field_id)
+                if normalized_frame:
+                    field_id = normalized_frame
             
             # Check if it's a standard field
             if field_id in tag_map:

@@ -47,7 +47,8 @@ from config import (
 from core.history import (
     history, ActionType, HistoryAction,
     create_metadata_action, create_batch_metadata_action,
-    create_album_art_action, create_delete_field_action
+    create_album_art_action, create_delete_field_action,
+    create_field_creation_action, create_batch_field_creation_action
 )
 
 from core.inference import inference_engine
@@ -101,6 +102,7 @@ def sanitize_log_data(data):
 @app.route('/')
 def index():
     return render_template('index.html')
+
 
 @app.route('/stream/<path:filepath>')
 def stream_audio(filepath):
@@ -392,8 +394,14 @@ def set_metadata(filename):
         # Track individual metadata field changes
         for field, new_value in metadata_tags.items():
             old_value = current_metadata.get(field, '')
-            if old_value != new_value:
-                action = create_metadata_action(filepath, field, old_value, new_value)
+            # Normalize for comparison (space = empty)
+            normalized_old = '' if old_value == ' ' else old_value
+            normalized_new = '' if new_value == ' ' else new_value
+            
+            if normalized_old != normalized_new:
+                # Determine action type
+                action_type = 'clear_field' if not normalized_new and normalized_old else 'metadata_change'
+                action = create_metadata_action(filepath, field, old_value, new_value, action_type)
                 history.add_action(action)
         
         # Apply all changes
@@ -415,11 +423,14 @@ def set_metadata(filename):
         logger.error(f"Error setting metadata: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
+
 @app.route('/metadata/<path:filename>/<field_id>', methods=['DELETE'])
 def delete_metadata_field(filename, field_id):
     """Delete a metadata field from a file"""
     try:
-        logger.info(f"[DEBUG] DELETE request for field_id: {field_id} from file: {filename}")
+        
+        # Restore forward slashes that were replaced in the frontend
+        field_id = field_id.replace('__', '/')
         
         file_path = validate_path(os.path.join(MUSIC_DIR, filename))
         
@@ -429,15 +440,12 @@ def delete_metadata_field(filename, field_id):
         
         # Get current metadata for history
         current_metadata = mutagen_handler.read_metadata(file_path)
-        logger.info(f"[DEBUG] Current metadata keys: {list(current_metadata.keys())}")
         
         all_fields = mutagen_handler.get_all_fields(file_path)
-        logger.info(f"[DEBUG] All fields keys: {list(all_fields.keys())}")
         
         # Define standard fields that are always valid for deletion
         standard_fields = ['title', 'artist', 'album', 'albumartist', 'date', 'genre', 'composer', 'track', 'disc']
         is_standard = field_id.lower() in standard_fields
-        logger.info(f"[DEBUG] Is standard field: {is_standard}")
         
         # Check if field exists (skip check for standard fields as they're excluded from all_fields)
         if field_id.lower() not in standard_fields and field_id not in all_fields:
@@ -451,11 +459,8 @@ def delete_metadata_field(filename, field_id):
             # For standard fields, get the value from current_metadata
             previous_value = current_metadata.get(field_id, '')
         
-        logger.info(f"[DEBUG] Previous value: {previous_value}")
-        
         # Delete the field
         success = mutagen_handler.delete_field(file_path, field_id)
-        logger.info(f"[DEBUG] Delete operation success: {success}")
         
         if success:
             # Record in history
@@ -480,7 +485,7 @@ def delete_metadata_field(filename, field_id):
 
 @app.route('/metadata/create-field', methods=['POST'])
 def create_custom_field():
-    """New endpoint for creating custom metadata fields"""
+    """Create custom metadata fields with proper history tracking"""
     data = request.json
     filepath = data.get('filepath')
     field_name = data.get('field_name')
@@ -505,57 +510,173 @@ def create_custom_field():
     
     try:
         if apply_to_folder:
-            # Apply to all files in folder
+            # Batch processing
             folder_path = os.path.dirname(os.path.join(MUSIC_DIR, filepath))
-            results = {'status': 'success', 'filesUpdated': 0, 'errors': []}
+            results = {
+                'status': 'success', 
+                'filesCreated': 0, 
+                'filesUpdated': 0, 
+                'errors': []
+            }
             
-            # Get all audio files in the folder
+            # Collect files by operation type
+            files_to_create = []
+            files_to_update = []
+            create_values = {}
+            
+            # Get all audio files in folder
             audio_files = []
             for filename in os.listdir(folder_path):
                 file_path = os.path.join(folder_path, filename)
                 if os.path.isfile(file_path) and filename.lower().endswith(AUDIO_EXTENSIONS):
                     audio_files.append(file_path)
             
-            # Apply the custom field to each file
+            # Check each file and categorize
             for file_path in audio_files:
                 try:
-                    success = mutagen_handler.write_custom_field(file_path, field_name, field_value)
-                    if success:
-                        results['filesUpdated'] += 1
-                        # Record in history
-                        rel_path = os.path.relpath(file_path, MUSIC_DIR)
-                        action = create_metadata_action(file_path, f'custom:{field_name}', '', field_value)
+                    # Check if field exists (case-insensitive for some formats)
+                    existing_metadata = mutagen_handler.read_existing_metadata(file_path)
+                    all_discovered = mutagen_handler.discover_all_metadata(file_path)
+                    
+                    # Debug logging for batch
+                    if file_path == audio_files[0]:  # Log only for first file to avoid spam
+                        logger.info(f"[create_custom_field batch] Checking field '{field_name}'")
+                        logger.info(f"[create_custom_field batch] existing_metadata keys: {list(existing_metadata.keys())}")
+                        logger.info(f"[create_custom_field batch] all_discovered keys: {list(all_discovered.keys())}")
+                    
+                    field_exists = (field_name in existing_metadata or 
+                                  field_name.upper() in existing_metadata or
+                                  field_name in all_discovered or
+                                  field_name.upper() in all_discovered)
+                    
+                    # Determine appropriate value to write
+                    value_to_write = field_value
+                    if not value_to_write:
+                        from core.file_utils import get_file_format
+                        _, _, base_format = get_file_format(file_path)
+                        if base_format not in ['flac', 'ogg', 'opus']:
+                            value_to_write = ' '
+                    
+                    if field_exists:
+                        # Get existing value for history
+                        old_value = (existing_metadata.get(field_name) or 
+                                   existing_metadata.get(field_name.upper()) or
+                                   all_discovered.get(field_name, {}).get('value') or
+                                   all_discovered.get(field_name.upper(), {}).get('value') or '')
+                        
+                        # Track as update
+                        action = create_metadata_action(file_path, field_name, old_value, value_to_write)
                         history.add_action(action)
+                        files_to_update.append(file_path)
+                    else:
+                        # Track for batch creation
+                        files_to_create.append(file_path)
+                        create_values[file_path] = value_to_write
+                    
+                    # Write the field
+                    success = mutagen_handler.write_custom_field(file_path, field_name, value_to_write)
+                    if success:
+                        if field_exists:
+                            results['filesUpdated'] += 1
+                        else:
+                            results['filesCreated'] += 1
                     else:
                         results['errors'].append(f"{os.path.basename(file_path)}: Failed to write field")
+                        
                 except Exception as e:
                     results['errors'].append(f"{os.path.basename(file_path)}: {str(e)}")
             
-            # Determine overall status
-            if results['filesUpdated'] == 0:
+            # Create batch history action for new fields
+            if files_to_create:
+                batch_action = create_batch_field_creation_action(files_to_create, field_name, create_values)
+                history.add_action(batch_action)
+            
+            # Determine overall status and message
+            total_processed = results['filesCreated'] + results['filesUpdated']
+            if total_processed == 0:
                 results['status'] = 'error'
-                results['message'] = 'No files were updated'
+                results['message'] = 'No files were processed'
             elif results['errors']:
                 results['status'] = 'partial'
-                results['message'] = f"Updated {results['filesUpdated']} files with errors"
+                results['message'] = f"Created in {results['filesCreated']} files, updated in {results['filesUpdated']} files, {len(results['errors'])} errors"
             else:
-                results['message'] = f"Successfully updated {results['filesUpdated']} files"
+                results['message'] = f"Created in {results['filesCreated']} files, updated in {results['filesUpdated']} files"
             
             return jsonify(results)
+            
         else:
-            # Apply to single file
+            # Single file processing
             full_path = validate_path(os.path.join(MUSIC_DIR, filepath))
-            success = mutagen_handler.write_custom_field(full_path, field_name, field_value)
+            
+            # Check if field already exists
+            existing_metadata = mutagen_handler.read_existing_metadata(full_path)
+            all_discovered = mutagen_handler.discover_all_metadata(full_path)
+            
+            # Debug logging
+            logger.info(f"[create_custom_field] Checking field '{field_name}'")
+            logger.info(f"[create_custom_field] existing_metadata keys: {list(existing_metadata.keys())}")
+            logger.info(f"[create_custom_field] all_discovered keys: {list(all_discovered.keys())}")
+            
+            field_exists = (field_name in existing_metadata or 
+                          field_name.upper() in existing_metadata or
+                          field_name in all_discovered or
+                          field_name.upper() in all_discovered)
+            
+            logger.info(f"[create_custom_field] field_exists: {field_exists}")
+            
+            # Handle empty values appropriately
+            value_to_write = field_value
+            if not value_to_write:
+                from core.file_utils import get_file_format
+                _, _, base_format = get_file_format(full_path)
+                if base_format not in ['flac', 'ogg', 'opus']:
+                    value_to_write = ' '
+            
+            # Write the field
+            success = mutagen_handler.write_custom_field(full_path, field_name, value_to_write)
             
             if success:
-                # Record in history
-                action = create_metadata_action(full_path, f'custom:{field_name}', '', field_value)
-                history.add_action(action)
-                
-                return jsonify({
-                    'status': 'success',
-                    'message': 'Field created successfully'
-                })
+                if field_exists:
+                    # Track as update
+                    old_value = (existing_metadata.get(field_name) or 
+                               existing_metadata.get(field_name.upper()) or
+                               all_discovered.get(field_name, {}).get('value') or
+                               all_discovered.get(field_name.upper(), {}).get('value') or '')
+                    
+                    # Determine the correct field identifier for history
+                    history_field_name = field_name
+                    from core.file_utils import get_file_format
+                    _, _, base_format = get_file_format(full_path)
+                    if base_format in ['mp3', 'wav']:
+                        frame_id = mutagen_handler.normalize_field_name(field_name)
+                        if frame_id:
+                            history_field_name = frame_id
+                    
+                    action = create_metadata_action(full_path, history_field_name, old_value, value_to_write, 'metadata_change')
+                    history.add_action(action)
+                    
+                    return jsonify({
+                        'status': 'success',
+                        'message': f"Field '{field_name}' updated successfully"
+                    })
+                else:
+                    # Track as creation
+                    # Determine the correct field identifier for history
+                    history_field_name = field_name
+                    from core.file_utils import get_file_format
+                    _, _, base_format = get_file_format(full_path)
+                    if base_format in ['mp3', 'wav']:
+                        frame_id = mutagen_handler.normalize_field_name(field_name)
+                        if frame_id:
+                            history_field_name = frame_id
+                    
+                    action = create_field_creation_action(full_path, history_field_name, value_to_write)
+                    history.add_action(action)
+                    
+                    return jsonify({
+                        'status': 'success',
+                        'message': f"Field '{field_name}' created successfully"
+                    })
             else:
                 return jsonify({
                     'status': 'error',
@@ -676,8 +797,8 @@ def undo_action(action_id):
         errors = []
         files_updated = 0
         
-        if action.action_type == ActionType.METADATA_CHANGE:
-            # Undo single metadata change
+        if action.action_type in [ActionType.METADATA_CHANGE, ActionType.CLEAR_FIELD]:
+            # Undo single metadata change or field clear
             filepath = action.files[0]
             field = action.field
             old_value = action.old_values[filepath]
@@ -744,6 +865,32 @@ def undo_action(action_id):
                 files_updated += 1
             except Exception as e:
                 errors.append(f"{os.path.basename(filepath)}: {str(e)}")
+        
+        elif action.action_type == ActionType.CREATE_FIELD:
+            # Undo field creation by deleting the field
+            filepath = action.files[0]
+            field = action.field
+            
+            try:
+                success = mutagen_handler.delete_field(filepath, field)
+                if success:
+                    files_updated += 1
+                else:
+                    errors.append(f"{os.path.basename(filepath)}: Failed to delete field")
+            except Exception as e:
+                errors.append(f"{os.path.basename(filepath)}: {str(e)}")
+        
+        elif action.action_type == ActionType.BATCH_CREATE_FIELD:
+            # Undo batch field creation
+            for filepath in action.files:
+                try:
+                    success = mutagen_handler.delete_field(filepath, action.field)
+                    if success:
+                        files_updated += 1
+                    else:
+                        errors.append(f"{os.path.basename(filepath)}: Failed to delete field")
+                except Exception as e:
+                    errors.append(f"{os.path.basename(filepath)}: {str(e)}")
 
         # Mark as undone
         action.is_undone = True
@@ -785,8 +932,8 @@ def redo_action(action_id):
         errors = []
         files_updated = 0
         
-        if action.action_type == ActionType.METADATA_CHANGE:
-            # Redo single metadata change
+        if action.action_type in [ActionType.METADATA_CHANGE, ActionType.CLEAR_FIELD]:
+            # Redo single metadata change or field clear
             filepath = action.files[0]
             field = action.field
             new_value = action.new_values[filepath]
@@ -852,6 +999,34 @@ def redo_action(action_id):
                 files_updated += 1
             except Exception as e:
                 errors.append(f"{os.path.basename(filepath)}: {str(e)}")
+        
+        elif action.action_type == ActionType.CREATE_FIELD:
+            # Redo field creation
+            filepath = action.files[0]
+            field = action.field
+            value = action.new_values[filepath]
+            
+            try:
+                success = mutagen_handler.write_custom_field(filepath, field, value)
+                if success:
+                    files_updated += 1
+                else:
+                    errors.append(f"{os.path.basename(filepath)}: Failed to recreate field")
+            except Exception as e:
+                errors.append(f"{os.path.basename(filepath)}: {str(e)}")
+        
+        elif action.action_type == ActionType.BATCH_CREATE_FIELD:
+            # Redo batch field creation
+            for filepath in action.files:
+                try:
+                    value = action.new_values.get(filepath, '')
+                    success = mutagen_handler.write_custom_field(filepath, action.field, value)
+                    if success:
+                        files_updated += 1
+                    else:
+                        errors.append(f"{os.path.basename(filepath)}: Failed to recreate field")
+                except Exception as e:
+                    errors.append(f"{os.path.basename(filepath)}: {str(e)}")
 
         # Mark as not undone
         action.is_undone = False
