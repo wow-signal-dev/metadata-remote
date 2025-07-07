@@ -927,6 +927,7 @@
                 icon.textContent = '▶';
                 header.setAttribute('aria-expanded', 'false');
                 header.classList.remove('expanded');
+                header.focus();
             }
         },
         
