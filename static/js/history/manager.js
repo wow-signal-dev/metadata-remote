@@ -572,16 +572,5 @@
             }
         },
         
-        /**
-         * Start auto-refresh timer for history
-         */
-        startHistoryAutoRefresh() {
-            // Auto-refresh history every 5 seconds when panel is expanded
-            setInterval(() => {
-                if (State.historyPanelExpanded) {
-                    this.loadHistory();
-                }
-            }, 5000);
-        }
     };
 })();

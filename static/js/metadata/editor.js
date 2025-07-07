@@ -1091,6 +1091,12 @@
                     
                     if (result.status === 'success') {
                         UIUtils.showStatus(`Created field in ${result.filesUpdated} files`, 'success');
+                        
+                        // Refresh history to show new field creation
+                        if (loadHistoryCallback) {
+                            loadHistoryCallback();
+                        }
+                        
                         this.cancelNewField();
                         // Reload current file to show new field
                         if (window.MetadataRemote.Files && window.MetadataRemote.Files.Manager) {
@@ -1104,6 +1110,12 @@
                     
                     if (result.status === 'success') {
                         UIUtils.showStatus('Field created successfully', 'success');
+                        
+                        // Refresh history to show new field creation
+                        if (loadHistoryCallback) {
+                            loadHistoryCallback();
+                        }
+                        
                         this.cancelNewField();
                         // Reload current file to show new field
                         if (window.MetadataRemote.Files && window.MetadataRemote.Files.Manager) {
