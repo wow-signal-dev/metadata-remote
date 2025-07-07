@@ -710,9 +710,11 @@
         },
         
         renderMetadataFields(metadata) {
+            console.log('[METADATA_RENDERING] Starting renderMetadataFields');
             
             // First render standard fields that exist
             this.renderStandardFields(metadata);
+            console.log('[METADATA_RENDERING] Standard fields rendered');
             
             const dynamicFieldsContainer = document.getElementById('dynamic-fields-container');
             
@@ -756,6 +758,7 @@
             
             // Update keyboard navigation
             this.updateNavigableElements();
+            console.log('[METADATA_RENDERING] Completed renderMetadataFields');
         },
         
         /**
