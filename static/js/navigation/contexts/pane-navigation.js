@@ -107,6 +107,16 @@
                     
                     // Exit edit mode if currently editing a metadata field
                     if (event.target.tagName === 'INPUT' && event.target.dataset.editing === 'true') {
+                        // Check if inference suggestions are active for this field
+                        const fieldId = event.target.id;
+                        const suggestionsEl = document.getElementById(`${fieldId}-suggestions`);
+                        const hasSuggestions = suggestionsEl && suggestionsEl.classList.contains('active');
+                        
+                        // Hide inference suggestions if they are active
+                        if (hasSuggestions && window.MetadataRemote.Metadata.Inference) {
+                            window.MetadataRemote.Metadata.Inference.hideInferenceSuggestions(fieldId);
+                        }
+                        
                         event.target.dataset.editing = 'false';
                         event.target.readOnly = true;
                     }
@@ -281,21 +291,35 @@
         },
         
         /**
-         * Focus the metadata pane and set focus to Title field
+         * Focus the metadata pane and set focus to the first available input field
          */
         focusMetadataPane() {
             this.updatePaneFocus();
             
-            // Focus the Title field
-            const titleField = document.getElementById('title');
-            if (titleField) {
-                titleField.dataset.editing = 'false';
-                titleField.readOnly = true;
-                titleField.focus();
-                // Don't select text - user must press Enter to edit
+            // Try to find the first available metadata input field
+            const metadataForm = document.getElementById('metadata-form');
+            let focusTarget = null;
+            
+            if (metadataForm) {
+                // Look for the first visible, enabled text input in the metadata form
+                focusTarget = metadataForm.querySelector('input[type="text"]:not([disabled]):not([style*="display: none"])');
+            }
+            
+            // If no metadata field is available, fall back to the filename display
+            if (!focusTarget) {
+                focusTarget = document.getElementById('current-filename');
+            }
+            
+            if (focusTarget) {
+                // For input fields, ensure they're in read-only mode initially
+                if (focusTarget.tagName === 'INPUT' && focusTarget.type === 'text') {
+                    focusTarget.dataset.editing = 'false';
+                    focusTarget.readOnly = true;
+                }
+                focusTarget.focus();
                 
-                // Ensure the title field is visible
-                FocusManager.ensureElementVisible(titleField);
+                // Ensure the focused element is visible
+                FocusManager.ensureElementVisible(focusTarget);
             }
         },
         

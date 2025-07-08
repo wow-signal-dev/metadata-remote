@@ -230,6 +230,17 @@
                             return;
                         } else if (e.key === 'Escape' && isEditing) {
                             e.preventDefault();
+                            
+                            // Check if inference suggestions are active for this field
+                            const fieldId = e.target.id;
+                            const suggestionsEl = document.getElementById(`${fieldId}-suggestions`);
+                            const hasSuggestions = suggestionsEl && suggestionsEl.classList.contains('active');
+                            
+                            // Hide inference suggestions if they are active
+                            if (hasSuggestions && window.MetadataRemote.Metadata.Inference) {
+                                window.MetadataRemote.Metadata.Inference.hideInferenceSuggestions(fieldId);
+                            }
+                            
                             // Transition back to normal state
                             StateMachine.transition(StateMachine.States.NORMAL);
                             
@@ -257,6 +268,29 @@
                         
                         if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && isEditing) {
                             e.preventDefault();
+                            
+                            // Check if inference suggestions are active for this field
+                            const fieldId = e.target.id;
+                            const suggestionsEl = document.getElementById(`${fieldId}-suggestions`);
+                            const hasSuggestions = suggestionsEl && 
+                                                  suggestionsEl.classList.contains('active') && 
+                                                  suggestionsEl.querySelectorAll('.suggestion-item').length > 0;
+                            
+                            if (hasSuggestions && e.key === 'ArrowDown') {
+                                // Navigate into suggestions
+                                const firstSuggestion = suggestionsEl.querySelector('.suggestion-item');
+                                if (firstSuggestion) {
+                                    firstSuggestion.focus();
+                                    firstSuggestion.classList.add('keyboard-focus');
+                                }
+                                return;
+                            }
+                            // Otherwise, proceed with normal navigation
+                            // Hide inference suggestions if they are active
+                            if (hasSuggestions) {
+                                window.MetadataRemote.Metadata.Inference.hideInferenceSuggestions(fieldId);
+                            }
+                            
                             // Transition back to normal state
                             StateMachine.transition(StateMachine.States.NORMAL);
                             

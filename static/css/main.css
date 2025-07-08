@@ -1934,6 +1934,22 @@ input[type="text"]::placeholder {
     padding-left: 1.25rem;
 }
 
+.suggestion-item:focus,
+.suggestion-item.keyboard-focus {
+    outline: 1px solid var(--accent-primary);
+    outline-offset: -2px;
+    background: var(--bg-hover);
+    padding-left: 1.25rem;
+}
+
+.suggestion-item:focus {
+    outline: none;
+}
+
+.suggestion-item.keyboard-focus {
+    outline: 1px solid var(--accent-primary);
+}
+
 .suggestion-value {
     flex: 1;
     color: var(--text-primary);

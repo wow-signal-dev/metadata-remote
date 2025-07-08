@@ -1870,8 +1870,36 @@ class MutagenHandler:
             elif isinstance(audio_file, (FLAC, OggVorbis, OggOpus)):
                 return self._write_custom_vorbis_field(audio_file, field_name, field_value)
             elif isinstance(audio_file, MP4):
+                # Check if this should be a standard field
+                frame_id = self.normalize_field_name(field_name)
+                if frame_id and frame_id in self.frame_to_field:
+                    # Get the standard field name from the frame ID
+                    standard_field = self.frame_to_field[frame_id]
+                    # Handle special mappings for track/disc
+                    if standard_field == 'tracknumber':
+                        standard_field = 'track'
+                    elif standard_field == 'discnumber':
+                        standard_field = 'disc'
+                    # Check if this standard field exists in MP4 tag mappings
+                    if standard_field in self.tag_mappings['mp4']:
+                        # This is a standard field, use write_metadata instead
+                        return self.write_metadata(filepath, {field_name: field_value})
                 return self._write_custom_mp4_field(audio_file, field_name, field_value)
             elif isinstance(audio_file, ASF):
+                # Check if this should be a standard field
+                frame_id = self.normalize_field_name(field_name)
+                if frame_id and frame_id in self.frame_to_field:
+                    # Get the standard field name from the frame ID
+                    standard_field = self.frame_to_field[frame_id]
+                    # Handle special mappings for track/disc
+                    if standard_field == 'tracknumber':
+                        standard_field = 'track'
+                    elif standard_field == 'discnumber':
+                        standard_field = 'disc'
+                    # Check if this standard field exists in ASF tag mappings
+                    if standard_field in self.tag_mappings['asf']:
+                        # This is a standard field, use write_metadata instead
+                        return self.write_metadata(filepath, {field_name: field_value})
                 return self._write_custom_asf_field(audio_file, field_name, field_value)
             elif isinstance(audio_file, WavPack):
                 return self._write_custom_apev2_field(audio_file, field_name, field_value)

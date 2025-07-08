@@ -743,6 +743,26 @@ class MetadataInferenceEngine:
         if field == 'date':
             return bool(existing_metadata.get('artist') and existing_metadata.get('album'))
         
+        # For album field, query if we have artist OR title
+        if field == 'album':
+            return bool(existing_metadata.get('artist') or existing_metadata.get('title'))
+        
+        # For artist field, query if we have title OR album
+        if field == 'artist':
+            return bool(existing_metadata.get('title') or existing_metadata.get('album'))
+        
+        # For title field, query if we have artist OR album
+        if field == 'title':
+            return bool(existing_metadata.get('artist') or existing_metadata.get('album'))
+        
+        # For albumartist field, query if we have album
+        if field == 'albumartist':
+            return bool(existing_metadata.get('album'))
+        
+        # For composer field, query if we have title (work name)
+        if field == 'composer':
+            return bool(existing_metadata.get('title'))
+        
         return False
     
     def _query_musicbrainz(self, evidence_state: dict, field: str, local_candidates: List[dict]) -> List[dict]:

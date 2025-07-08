@@ -49,9 +49,15 @@
                 }
             });
             
-            // Input handler to hide suggestions when typing
+            // Input handler to show/hide suggestions based on field content
             input.addEventListener('input', (e) => {
-                this.hideInferenceSuggestions(field);
+                if (input.value.trim() === '' && !input.disabled && State.currentFile) {
+                    // Field is now empty, show suggestions
+                    this.showInferenceSuggestions(field);
+                } else {
+                    // Field has content, hide suggestions
+                    this.hideInferenceSuggestions(field);
+                }
             });
         },
         
@@ -129,6 +135,9 @@
                 suggestions.forEach(suggestion => {
                     const item = document.createElement('div');
                     item.className = 'suggestion-item';
+                    item.setAttribute('tabindex', '0');
+                    item.setAttribute('role', 'option');
+                    item.setAttribute('aria-selected', 'false');
                     
                     const value = document.createElement('div');
                     value.className = 'suggestion-value';
@@ -165,6 +174,53 @@
                         const event = new Event('input', { bubbles: true });
                         document.getElementById(field).dispatchEvent(event);
                     });
+
+                    // Keyboard navigation handler
+                    item.addEventListener('keydown', (e) => {
+                        const suggestions = container.querySelectorAll('.suggestion-item');
+                        const currentIndex = Array.from(suggestions).indexOf(item);
+                        
+                        if (e.key === 'ArrowDown') {
+                            e.preventDefault();
+                            if (currentIndex < suggestions.length - 1) {
+                                suggestions[currentIndex + 1].focus();
+                                suggestions[currentIndex + 1].classList.add('keyboard-focus');
+                                item.classList.remove('keyboard-focus');
+                            }
+                        } else if (e.key === 'ArrowUp') {
+                            e.preventDefault();
+                            if (currentIndex > 0) {
+                                suggestions[currentIndex - 1].focus();
+                                suggestions[currentIndex - 1].classList.add('keyboard-focus');
+                                item.classList.remove('keyboard-focus');
+                            } else {
+                                // Go back to input field
+                                const input = document.getElementById(field);
+                                input.focus();
+                                input.dataset.editing = 'true';
+                                input.readOnly = false;
+                                container.querySelectorAll('.suggestion-item').forEach(s => {
+                                    s.classList.remove('keyboard-focus');
+                                });
+                            }
+                        } else if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            item.click();
+                        } else if (e.key === 'Escape') {
+                            e.preventDefault();
+                            this.hideInferenceSuggestions(field);
+                            const input = document.getElementById(field);
+                            input.focus();
+                        }
+                    });
+
+                    // Focus handler
+                    item.addEventListener('focus', () => {
+                        container.querySelectorAll('.suggestion-item').forEach(s => {
+                            s.classList.remove('keyboard-focus');
+                        });
+                        item.classList.add('keyboard-focus');
+                    });
                     
                     container.appendChild(item);
                 });
@@ -193,6 +249,10 @@
             }
             if (suggestions) {
                 suggestions.classList.remove('active');
+                // Clean up keyboard focus
+                suggestions.querySelectorAll('.suggestion-item').forEach(item => {
+                    item.classList.remove('keyboard-focus');
+                });
             }
             State.inferenceActive[field] = false;
         }
