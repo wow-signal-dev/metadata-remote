@@ -157,7 +157,7 @@
                 // Check if any other grouped fields are still changed
                 const anyGroupedFieldChanged = groupedFields.some(f => {
                     const inp = document.getElementById(f);
-                    return inp.value !== (State.originalMetadata[f] || '');
+                    return inp && inp.value !== (State.originalMetadata[f] || '');
                 });
                 
                 // Hide entire grouped controls if no fields are changed
@@ -165,6 +165,7 @@
                     const groupedControls = document.getElementById('grouped-apply-controls');
                     if (groupedControls) {
                         groupedControls.classList.remove('visible');
+                        groupedControls.style.display = 'none';
                     }
                 }
             } else {
