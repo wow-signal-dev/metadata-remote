@@ -929,6 +929,76 @@ input:autofill {
     transform: scale(1.1);
 }
 
+/* Tree folder rename specific styling */
+.tree-rename-edit {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    flex: 1;
+    margin-right: -1rem;  /* Compensate for parent's right padding */
+}
+
+.tree-rename-input {
+    flex: 1;
+    padding: 0rem 0.5rem;
+    height: 20px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: var(--bg-input);
+    color: var(--text-primary);
+    font-size: 0.85rem;
+}
+
+.tree-rename-input:focus {
+    outline: 1px solid var(--accent-primary);
+    outline-offset: -2px;
+    border-color: var(--border-color);
+}
+
+.tree-rename-btn {
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.tree-rename-save {
+    background: linear-gradient(135deg, #2d5a2d 0%, #3a7a3a 100%);
+    color: white;
+    margin-left: auto; /* Push buttons to the right */
+}
+
+.tree-rename-save:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(45, 90, 45, 0.4);
+}
+
+.tree-rename-cancel {
+    background: linear-gradient(135deg, #5a2a2a 0%, #7a3a3a 100%);
+    color: white;
+}
+
+.tree-rename-cancel:hover {
+    transform: rotate(90deg);
+}
+
+/* Override btn-status sizing for tree context */
+.tree-rename-save.btn-status {
+    min-width: 20px;
+}
+
+.tree-rename-save.btn-status.processing,
+.tree-rename-save.btn-status.success,
+.tree-rename-save.btn-status.error {
+    min-width: 80px;
+}
+
 .tree-children {
     display: none;
 }

@@ -238,7 +238,24 @@
                             e.target.readOnly = true;
                             // Keep the element focused for navigation without creating a focus cycle
                             return;
-                        } else if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && isEditing) {
+                        }
+                        
+                        // Handle navigation during folder editing
+                        if (StateMachine.getState() === StateMachine.States.INLINE_EDIT && 
+                            State.editingFolder) {
+                            // Allow Tab to navigate between input and buttons
+                            if (e.key === 'Tab') {
+                                // Let default Tab behavior work for navigation
+                                return;
+                            }
+                            // Block other navigation during folder edit
+                            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+                                e.preventDefault();
+                                return;
+                            }
+                        }
+                        
+                        if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && isEditing) {
                             e.preventDefault();
                             // Transition back to normal state
                             StateMachine.transition(StateMachine.States.NORMAL);

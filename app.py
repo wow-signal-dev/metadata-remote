@@ -318,6 +318,83 @@ def rename_file():
         logger.error(f"Error renaming file: {e}")
         return jsonify({'error': str(e)}), 500
 
+@app.route('/rename-folder', methods=['POST'])
+def rename_folder():
+    """Rename a folder and update all associated paths"""
+    try:
+        data = request.json
+        old_path = validate_path(os.path.join(MUSIC_DIR, data['oldPath']))
+        new_name = data['newName']
+        
+        if not os.path.exists(old_path):
+            return jsonify({'error': 'Folder not found'}), 404
+        
+        if not os.path.isdir(old_path):
+            return jsonify({'error': 'Path is not a folder'}), 400
+        
+        # Validate new name
+        if not new_name or '/' in new_name or '\\' in new_name:
+            return jsonify({'error': 'Invalid folder name'}), 400
+        
+        # Additional validation for special characters
+        invalid_chars = '<>:"|?*'
+        if any(char in new_name for char in invalid_chars):
+            return jsonify({'error': 'Folder name contains invalid characters'}), 400
+        
+        # Check length
+        if len(new_name) > 255:
+            return jsonify({'error': 'Folder name too long'}), 400
+        
+        # Check reserved names (Windows compatibility)
+        reserved_names = ['CON', 'PRN', 'AUX', 'NUL'] + \
+                        [f'COM{i}' for i in range(1, 10)] + \
+                        [f'LPT{i}' for i in range(1, 10)]
+        if new_name.upper() in reserved_names:
+            return jsonify({'error': 'Reserved folder name'}), 400
+        
+        # Build new path
+        parent_dir = os.path.dirname(old_path)
+        new_path = os.path.join(parent_dir, new_name)
+        
+        # Check if target exists
+        if os.path.exists(new_path) and new_path != old_path:
+            return jsonify({'error': 'Folder already exists'}), 400
+        
+        # Get all files in the folder recursively before rename
+        old_files = []
+        for root, dirs, files in os.walk(old_path):
+            for file in files:
+                if file.lower().endswith(AUDIO_EXTENSIONS):
+                    old_files.append(os.path.join(root, file))
+        
+        # Rename folder
+        os.rename(old_path, new_path)
+        fix_file_ownership(new_path)
+        
+        # Update history references for all files in the renamed folder
+        for old_file_path in old_files:
+            # Calculate new file path
+            rel_path = os.path.relpath(old_file_path, old_path)
+            new_file_path = os.path.join(new_path, rel_path)
+            history.update_file_references(old_file_path, new_file_path)
+        
+        # Return new relative path with consistent response format
+        new_rel_path = os.path.relpath(new_path, MUSIC_DIR)
+        return jsonify({'status': 'success', 'newPath': new_rel_path})
+        
+    except ValueError:
+        return jsonify({'error': 'Invalid path'}), 403
+    except OSError as e:
+        if e.errno == 13:  # Permission denied
+            return jsonify({'error': 'Permission denied'}), 403
+        elif e.errno == 28:  # No space left
+            return jsonify({'error': 'Insufficient space'}), 507
+        else:
+            return jsonify({'error': f'System error: {str(e)}'}), 500
+    except Exception as e:
+        logger.error(f"Error renaming folder: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
+
 @app.route('/metadata/<path:filename>')
 def get_metadata(filename):
     """Get metadata for a file"""

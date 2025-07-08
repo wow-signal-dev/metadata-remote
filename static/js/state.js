@@ -65,6 +65,12 @@ window.MetadataRemote.State = {
     keyRepeatInterval: 40,
     isKeyRepeating: false,
     
+    // Folder editing state
+    editingFolder: null,         // Currently editing folder element
+    editingFolderData: null,     // Data about the editing operation
+    isRenamingFolder: false,     // Prevent concurrent rename operations
+    lastFolderEnterPress: 0,     // Track last Enter press for double-Enter detection
+    
     // Header navigation state
     headerFocus: null,           // { pane: 'folders'|'files'|'metadata', iconType: 'filter'|'sort'|'sort-direction'|'help' }
     filterInputActive: null,     // 'folders'|'files'|null - tracks which filter input is active

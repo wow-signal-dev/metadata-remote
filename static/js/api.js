@@ -53,6 +53,17 @@ window.MetadataRemote.API = {
         });
     },
     
+    async renameFolder(oldPath, newName) {
+        return this.call('/rename-folder', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                oldPath: oldPath,
+                newName: newName
+            })
+        });
+    },
+    
     // Metadata operations
     async getMetadata(filepath) {
         return this.call(`/metadata/${encodeURIComponent(filepath)}`);

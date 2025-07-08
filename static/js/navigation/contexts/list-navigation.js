@@ -76,7 +76,7 @@
                 { key: 'Enter', state: 'normal', context: { pane: ['folders', 'files'] } },
                 (event) => {
                     event.preventDefault();
-                    this.activateCurrentItem();
+                    this.handleEnterKey();
                 },
                 { priority: 70 }
             );
@@ -436,6 +436,45 @@
                         window.MetadataRemote.Audio.Player.togglePlayback(filepath, playButton);
                     }
                 }
+            }
+        },
+        
+        /**
+         * Handle Enter key with double-press detection for folders
+         */
+        handleEnterKey() {
+            if (window.MetadataRemote.State.focusedPane === 'folders' && 
+                window.MetadataRemote.State.selectedTreeItem) {
+                
+                const now = Date.now();
+                const State = window.MetadataRemote.State;
+                
+                // Check for double-Enter (within 300ms)
+                if (State.lastFolderEnterPress && (now - State.lastFolderEnterPress) < 300) {
+                    // Double-Enter detected - start rename
+                    const folderElement = State.selectedTreeItem;
+                    const folderPath = folderElement.dataset.path;
+                    
+                    // Find folder data efficiently
+                    const parentPath = folderPath.includes('/') ? 
+                        folderPath.substring(0, folderPath.lastIndexOf('/')) : '';
+                    const folderData = State.treeData[parentPath]?.find(
+                        item => item.path === folderPath
+                    );
+                    
+                    if (folderData) {
+                        const TreeNav = window.MetadataRemote.Navigation.Tree;
+                        TreeNav.startFolderRename(folderElement, folderData);
+                    }
+                    State.lastFolderEnterPress = 0; // Reset
+                } else {
+                    // Single Enter - normal behavior
+                    State.lastFolderEnterPress = now;
+                    this.activateCurrentItem();
+                }
+            } else {
+                // Non-folder context - use existing behavior
+                this.activateCurrentItem();
             }
         }
     };
