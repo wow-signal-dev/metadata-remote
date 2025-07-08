@@ -1684,6 +1684,14 @@ input[type="file"] {
     border-color: rgba(255, 255, 255, 0.2);
 }
 
+/* Folder confirmation UI */
+.folder-confirmation {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-left: 0.5rem;
+}
+
 
 /* Label wrapper for inline delete button */
 .label-with-delete {

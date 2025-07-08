@@ -455,12 +455,6 @@
             const labelElement = document.querySelector(`label[for="${input.id}"]`);
             const fieldLabel = labelElement ? labelElement.textContent : field;
             
-            // Treat single space as empty for display
-            const displayValue = value === ' ' ? '' : value;
-            if (!confirm(`Apply "${fieldLabel}" value "${displayValue}" to all files in the folder "${folderPath || 'root'}"?`)) {
-                return;
-            }
-            
             button.disabled = true;
             setFormEnabled(false);
             showButtonStatus(button, 'Applying to folder...', 'processing');
@@ -609,10 +603,17 @@
                             <span class="btn-status-message"></span>
                         </button>
                         <button type="button" class="apply-field-btn apply-folder-btn-new btn-status" 
-                                data-field="${field}" onclick="applyFieldToFolder('${field}')">
+                                data-field="${field}" onclick="window.MetadataRemote.Metadata.Editor.showFolderConfirmation('${field}');">
                             <span class="btn-status-content">Folder</span>
                             <span class="btn-status-message"></span>
                         </button>
+                        <div class="folder-confirmation" data-field="${field}" style="display: none;">
+                            <span class="confirm-text">Apply to folder?</span>
+                            <button type="button" class="confirm-yes" 
+                                    onclick="window.MetadataRemote.Metadata.Editor.confirmFolderApply('${field}');">Yes</button>
+                            <button type="button" class="confirm-no" 
+                                    onclick="window.MetadataRemote.Metadata.Editor.cancelFolderApply('${field}');">No</button>
+                        </div>
                     </div>
                 </div>
             `;
@@ -809,10 +810,17 @@
                             </button>
                             <button type="button" class="apply-field-btn apply-folder-btn-new btn-status" 
                                     data-field="${escapeHtml(fieldId)}" 
-                                    onclick="applyFieldToFolder(this.getAttribute('data-field'))">
+                                    onclick="window.MetadataRemote.Metadata.Editor.showFolderConfirmation(this.getAttribute('data-field'));">
                                 <span class="btn-status-content">Folder</span>
                                 <span class="btn-status-message"></span>
                             </button>
+                            <div class="folder-confirmation" data-field="${escapeHtml(fieldId)}" style="display: none;">
+                                <span class="confirm-text">Apply to folder?</span>
+                                <button type="button" class="confirm-yes" 
+                                        onclick="window.MetadataRemote.Metadata.Editor.confirmFolderApply(this.parentElement.getAttribute('data-field'));">Yes</button>
+                                <button type="button" class="confirm-no" 
+                                        onclick="window.MetadataRemote.Metadata.Editor.cancelFolderApply(this.parentElement.getAttribute('data-field'));">No</button>
+                            </div>
                         </div>
                     ` : ''}
                 </div>
@@ -1285,6 +1293,62 @@
             if (deleteBtn) {
                 deleteBtn.style.display = '';
             }
+        },
+
+        /**
+         * Show folder confirmation UI
+         * @param {string} field - Field ID
+         */
+        showFolderConfirmation(field) {
+            const controls = document.querySelector(`.apply-field-controls[data-field="${field}"]`);
+            if (!controls) return;
+            
+            // Hide the apply label and buttons
+            const applyLabel = controls.querySelector('.apply-field-label');
+            const fileBtn = controls.querySelector('.apply-file-btn');
+            const folderBtn = controls.querySelector('.apply-folder-btn-new');
+            const confirmDiv = controls.querySelector('.folder-confirmation');
+            
+            if (applyLabel) applyLabel.style.display = 'none';
+            if (fileBtn) fileBtn.style.display = 'none';
+            if (folderBtn) folderBtn.style.display = 'none';
+            if (confirmDiv) confirmDiv.style.display = 'flex';
+            
+            // Focus on No button
+            const noBtn = confirmDiv?.querySelector('.confirm-no');
+            if (noBtn) noBtn.focus();
+        },
+
+        /**
+         * Cancel folder confirmation
+         * @param {string} field - Field ID
+         */
+        cancelFolderApply(field) {
+            const controls = document.querySelector(`.apply-field-controls[data-field="${field}"]`);
+            if (!controls) return;
+            
+            // Show the apply label and buttons
+            const applyLabel = controls.querySelector('.apply-field-label');
+            const fileBtn = controls.querySelector('.apply-file-btn');
+            const folderBtn = controls.querySelector('.apply-folder-btn-new');
+            const confirmDiv = controls.querySelector('.folder-confirmation');
+            
+            if (applyLabel) applyLabel.style.display = '';
+            if (fileBtn) fileBtn.style.display = '';
+            if (folderBtn) folderBtn.style.display = '';
+            if (confirmDiv) confirmDiv.style.display = 'none';
+        },
+
+        /**
+         * Confirm folder apply
+         * @param {string} field - Field ID
+         */
+        confirmFolderApply(field) {
+            // First hide the confirmation UI
+            this.cancelFolderApply(field);
+            
+            // Then call the original applyFieldToFolder function
+            this.applyFieldToFolder(field, ButtonStatus.showButtonStatus, UIUtils.setFormEnabled);
         }
     };
 })();
