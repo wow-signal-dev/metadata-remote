@@ -549,10 +549,13 @@
                 
                 
                 if (hasValue || this.shouldAlwaysShowField(field)) {
+                    const fieldValue = standardFields[field] || existingFields[field] || '';
+                    
+                    
                     if (info.group === 'numbers') {
-                        numberFields.push({ field, info, value: standardFields[field] || existingFields[field] || '' });
+                        numberFields.push({ field, info, value: fieldValue });
                     } else {
-                        regularFields.push({ field, info, value: standardFields[field] || existingFields[field] || '' });
+                        regularFields.push({ field, info, value: fieldValue });
                     }
                 }
             });

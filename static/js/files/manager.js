@@ -342,10 +342,19 @@
                 const playButton = document.createElement('div');
                 playButton.className = 'play-button';
                 playButton.innerHTML = '<span class="play-icon">▶</span><span class="pause-icon">❚❚</span><span class="play-spinner"></span>';
-                playButton.onclick = (e) => {
-                    e.stopPropagation();
-                    AudioPlayer.togglePlayback(file.path, playButton);
-                };
+                
+                const isWMA = file.name.toLowerCase().endsWith('.wma');
+                
+                if (isWMA) {
+                    playButton.classList.add('disabled');
+                    playButton.disabled = true;
+                    playButton.title = 'WMA playback not supported in browsers';
+                } else {
+                    playButton.onclick = (e) => {
+                        e.stopPropagation();
+                        AudioPlayer.togglePlayback(file.path, playButton);
+                    };
+                }
                 li.appendChild(playButton);
                 
                 li.onclick = (e) => {
@@ -363,8 +372,6 @@
          * @param {HTMLElement} listItem - The list item element
          */
         async loadFile(filepath, listItem) {
-            console.log('[METADATA_LOADING] Starting to load file:', filepath);
-            
             // Increment request ID to track this as the latest request
             const requestId = ++State.loadFileRequestId;
             
@@ -391,7 +398,6 @@
             document.getElementById('current-filename').textContent = State.originalFilename;
             document.getElementById('no-file-message').style.display = 'none';
             document.getElementById('metadata-section').style.display = 'block';
-            console.log('[METADATA_LOADING] Metadata section now visible');
             
             // Show loading indicator
             document.getElementById('metadata-loading-indicator').style.display = 'flex';
@@ -415,11 +421,9 @@
             State.pendingAlbumArt = null;
             
             UIUtils.setFormEnabled(false);
-            console.log('[METADATA_LOADING] Form disabled, starting API call');
             
             try {
                 const data = await API.getMetadata(filepath);
-                console.log('[METADATA_LOADING] API call completed successfully');
                 
                 if (requestId !== State.loadFileRequestId) {
                     // A newer request has been made, discard this response
@@ -437,11 +441,16 @@
                         disc: data.disc || ''
                     };
                     
-                    // Store all fields data if available
+                    
+                    // Store all fields data if available, but don't overwrite standard fields
                     if (data.all_fields) {
+                        const standardFields = ['title', 'artist', 'album', 'albumartist', 'date', 'genre', 'composer', 'track', 'disc'];
                         Object.entries(data.all_fields).forEach(([fieldId, fieldInfo]) => {
                             if (fieldInfo.value !== undefined && fieldInfo.value !== null) {
-                                State.originalMetadata[fieldId] = fieldInfo.value;
+                                // Only store non-standard fields to avoid overwriting standard field values
+                                if (!standardFields.includes(fieldId)) {
+                                    State.originalMetadata[fieldId] = fieldInfo.value;
+                                }
                             }
                         });
                     }
@@ -451,10 +460,8 @@
                     State.metadata = data;
                 
                 // Render dynamic fields
-                console.log('[METADATA_LOADING] About to render metadata fields');
                 if (window.MetadataRemote.Metadata && window.MetadataRemote.Metadata.Editor) {
                     window.MetadataRemote.Metadata.Editor.renderMetadataFields(data);
-                    console.log('[METADATA_LOADING] Finished rendering metadata fields');
                 }
                 
                 // Hide loading indicator and show form
@@ -545,7 +552,6 @@
                 } // Close the else block for artDisplay check
                 
                 UIUtils.setFormEnabled(true);
-                console.log('[METADATA_LOADING] Form re-enabled, loading complete');
                 
                 if (listItem.classList.contains('keyboard-focus')) {
                     UIUtils.hideStatus();
@@ -554,7 +560,6 @@
                 // Check if this is still the most recent request before showing error
                 if (requestId === State.loadFileRequestId) {
                     console.error('Error loading metadata:', err);
-                    console.log('[METADATA_LOADING] Error occurred, re-enabling form');
                     UIUtils.showStatus('Error loading metadata', 'error');
                     UIUtils.setFormEnabled(true);
                     

@@ -1170,6 +1170,16 @@ input:autofill {
     animation: spin 0.8s linear infinite;
 }
 
+.play-button.disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.play-button.disabled:hover {
+    background-color: inherit;
+    transform: none;
+}
+
 .play-button.loading .play-icon,
 .play-button.loading .pause-icon {
     display: none;

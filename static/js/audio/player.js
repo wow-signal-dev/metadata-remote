@@ -45,6 +45,12 @@
          * @param {HTMLElement} button - The play button element
          */
         togglePlayback(filepath, button) {
+            // Safety check - prevent WMA playback
+            if (filepath.toLowerCase().endsWith('.wma')) {
+                console.warn('WMA playback attempted but blocked');
+                return;
+            }
+            
             if (State.currentlyPlayingFile === filepath && !this.audioPlayer.paused) {
                 this.audioPlayer.pause();
                 button.classList.remove('playing');
@@ -55,7 +61,13 @@
                 button.classList.add('loading');
                 button.classList.remove('playing');
                 
-                this.audioPlayer.src = `/stream/${encodeURIComponent(filepath)}`;
+                // Check if it's a WavPack file
+                const isWavPack = filepath.toLowerCase().endsWith('.wv');
+                const streamUrl = isWavPack 
+                    ? `/stream/wav/${encodeURIComponent(filepath)}`
+                    : `/stream/${encodeURIComponent(filepath)}`;
+                
+                this.audioPlayer.src = streamUrl;
                 this.audioPlayer.play()
                     .then(() => {
                         button.classList.remove('loading');

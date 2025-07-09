@@ -35,6 +35,7 @@ import urllib.error
 import uuid
 from dataclasses import dataclass, asdict
 from enum import Enum
+import subprocess
 
 from config import (
     MUSIC_DIR, OWNER_UID, OWNER_GID, PORT, HOST,
@@ -170,6 +171,40 @@ def stream_audio(filepath):
         return jsonify({'error': 'Invalid path'}), 403
     except Exception as e:
         logger.error(f"Error streaming file {filepath}: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/stream/wav/<path:filepath>')
+def stream_wav_transcoded(filepath):
+    """Stream WavPack files as WAV for browser playback"""
+    try:
+        file_path = validate_path(os.path.join(MUSIC_DIR, filepath))
+        
+        if not os.path.exists(file_path):
+            return jsonify({'error': 'File not found'}), 404
+            
+        # Only transcode .wv files
+        if not file_path.lower().endswith('.wv'):
+            return jsonify({'error': 'Not a WavPack file'}), 400
+            
+        # Use wvunpack to convert to WAV and stream
+        process = subprocess.Popen(
+            ['wvunpack', '-q', file_path, '-o', '-'],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+        )
+        
+        # Stream the WAV output
+        return Response(
+            process.stdout,
+            mimetype='audio/wav',
+            headers={
+                'Accept-Ranges': 'none',
+                'Cache-Control': 'no-cache'
+            }
+        )
+        
+    except Exception as e:
+        logger.error(f"Error transcoding WavPack file {filepath}: {e}")
         return jsonify({'error': str(e)}), 500
 
 def build_tree_items(path, rel_path=''):
