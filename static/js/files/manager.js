@@ -401,7 +401,7 @@
             
             // Show loading indicator
             document.getElementById('metadata-loading-indicator').style.display = 'flex';
-            document.getElementById('metadata-form').style.display = 'none';
+            document.getElementById('metadata-content-wrapper').style.display = 'none';
 
             // Clear all button statuses when loading a new file
             window.MetadataRemote.UI.ButtonStatus.clearAllButtonStatuses();
@@ -464,9 +464,9 @@
                     window.MetadataRemote.Metadata.Editor.renderMetadataFields(data);
                 }
                 
-                // Hide loading indicator and show form
+                // Hide loading indicator and show content
                 document.getElementById('metadata-loading-indicator').style.display = 'none';
-                document.getElementById('metadata-form').style.display = '';
+                document.getElementById('metadata-content-wrapper').style.display = '';
                 
                 // Handle format limitations
                 const formatLimitations = data.formatLimitations || {};
@@ -565,7 +565,7 @@
                     
                     // Hide loading indicator on error
                     document.getElementById('metadata-loading-indicator').style.display = 'none';
-                    document.getElementById('metadata-form').style.display = '';
+                    document.getElementById('metadata-content-wrapper').style.display = '';
                 }
             }
         },
