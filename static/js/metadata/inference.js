@@ -173,6 +173,9 @@
                         // Trigger input event to update apply controls
                         const event = new Event('input', { bubbles: true });
                         document.getElementById(field).dispatchEvent(event);
+                        
+                        // Return focus to the input field
+                        document.getElementById(field).focus();
                     });
 
                     // Keyboard navigation handler
