@@ -187,6 +187,11 @@
                     // Handle navigation on buttons and non-editable elements
                     if ((e.target.tagName === 'BUTTON' || e.target.id === 'current-filename' || e.target.classList.contains('extended-fields-toggle') || e.target.classList.contains('new-field-header')) &&
                         (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+                        // Skip navigation for delete confirmation buttons
+                        if (e.target.classList.contains('inline-choice-file') || e.target.classList.contains('inline-choice-folder')) {
+                            return; // Let the confirmation handler handle it
+                        }
+                        
                         e.preventDefault();
                         this.navigateMetadata(e.key);
                         return;
@@ -490,6 +495,28 @@
                     const filterBtn = document.getElementById(`${State.focusedPane}-filter-btn`);
                     if (filterBtn) filterBtn.click();
                 }
+            );
+            
+            // SHIFT+DELETE for metadata field deletion
+            Router.register(
+                { 
+                    key: 'Delete', 
+                    state: '*',  // Works in both normal and form_edit states
+                    modifiers: { shift: true },
+                    context: { pane: 'metadata' }
+                },
+                (event) => {
+                    // Find the field element - check if we're on an input with data-field
+                    const field = event.target.closest('[data-field]');
+                    if (field && event.target.tagName === 'INPUT') {
+                        event.preventDefault();
+                        const fieldId = field.dataset.field || event.target.id;
+                        if (fieldId) {
+                            window.MetadataRemote.Metadata.Editor.triggerFieldDeletion(fieldId);
+                        }
+                    }
+                },
+                { priority: 80 }  // Higher priority to ensure it's checked before other handlers
             );
             
             // Tab key routing

@@ -600,13 +600,18 @@ def delete_metadata_field(filename, field_id):
 def create_custom_field():
     """Create custom metadata fields with proper history tracking"""
     data = request.json
+    logger.info(f"[create_custom_field] Received request data: {data}")
+    
     filepath = data.get('filepath')
     field_name = data.get('field_name')
     field_value = data.get('field_value', '')
     apply_to_folder = data.get('apply_to_folder', False)
     
+    logger.info(f"[create_custom_field] Parsed values - filepath: {filepath}, field_name: {field_name}, apply_to_folder: {apply_to_folder}")
+    
     # Validate inputs
     if not field_name or not filepath:
+        logger.error(f"[create_custom_field] Missing required fields - field_name: {field_name}, filepath: {filepath}")
         return jsonify({'status': 'error', 'message': 'Missing required fields'}), 400
     
     # Validate field name length

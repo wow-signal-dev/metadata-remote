@@ -1034,6 +1034,8 @@
             const fieldNameInput = document.getElementById('new-field-name').value.trim();
             const fieldValue = document.getElementById('new-field-value').value.trim();
             
+            console.log('[createNewField] State.currentFile:', State.currentFile);
+            console.log('[createNewField] applyToFolder:', applyToFolder);
             
             if (!fieldNameInput) {
                 UIUtils.showStatus('Field name is required', 'error');
@@ -1107,12 +1109,15 @@
                     if (result.status === 'success') {
                         UIUtils.showStatus(`Created field in ${result.filesUpdated} files`, 'success');
                         
+                        // For folder creation, we still need to reload to show the field in current file
+                        // This is acceptable as it's less frequent than deletion
+                        this.cancelNewField();
+                        
                         // Refresh history to show new field creation
                         if (loadHistoryCallback) {
                             loadHistoryCallback();
                         }
                         
-                        this.cancelNewField();
                         // Reload current file to show new field
                         if (window.MetadataRemote.Files && window.MetadataRemote.Files.Manager) {
                             window.MetadataRemote.Files.Manager.loadFile(State.currentFile, State.selectedListItem);
@@ -1121,23 +1126,88 @@
                         UIUtils.showStatus(result.error || 'Failed to create field', 'error');
                     }
                 } else {
+                    console.log('[createNewField] Single file mode - calling API.createField with:', {
+                        filepath: State.currentFile,
+                        fieldName: fieldName,
+                        fieldValue: fieldValue
+                    });
                     const result = await API.createField(State.currentFile, fieldName, fieldValue);
                     
                     if (result.status === 'success') {
                         UIUtils.showStatus('Field created successfully', 'success');
                         
-                        // Refresh history to show new field creation
+                        // Add the field to current metadata
+                        State.originalMetadata[fieldName] = fieldValue;
+                        
+                        // For standard fields that were hidden, show them
+                        if (standardFieldId) {
+                            const fieldElement = document.getElementById(fieldName).closest('.form-group-with-button');
+                            if (fieldElement && fieldElement.style.display === 'none') {
+                                fieldElement.style.display = '';
+                                const input = document.getElementById(fieldName);
+                                if (input) {
+                                    input.disabled = false;
+                                    input.value = fieldValue;
+                                }
+                            }
+                        } else {
+                            // For dynamic fields, render the new field
+                            const dynamicFieldsContainer = document.getElementById('dynamic-fields-container');
+                            const fieldInfo = {
+                                display_name: fieldName,
+                                value: fieldValue,
+                                is_editable: true,
+                                field_type: 'text'
+                            };
+                            
+                            this.renderDynamicField(fieldName, fieldInfo, dynamicFieldsContainer);
+                            dynamicFields.set(fieldName, fieldInfo);
+                            
+                            // Show extended fields section if this is the first dynamic field
+                            if (dynamicFields.size === 1) {
+                                const extendedToggle = document.querySelector('.extended-fields-toggle');
+                                if (extendedToggle) {
+                                    extendedToggle.style.display = 'flex';
+                                }
+                            }
+                            
+                            // Attach event listeners to the new field
+                            const newFieldInputs = dynamicFieldsContainer.querySelectorAll(`input[data-field="${fieldName}"]`);
+                            newFieldInputs.forEach(input => {
+                                if (input && !input.disabled) {
+                                    this.attachFieldEventListeners(input, fieldName);
+                                }
+                            });
+                        }
+                        
+                        // Update navigable elements
+                        this.updateNavigableElements();
+                        
+                        // Clear and close the creation form
+                        this.cancelNewField();
+                        
+                        // Focus the new field
+                        let newFieldElement = null;
+                        if (standardFieldId) {
+                            newFieldElement = document.getElementById(fieldName);
+                        } else {
+                            newFieldElement = document.querySelector(`[data-field="${fieldName}"]`);
+                        }
+                        
+                        if (newFieldElement) {
+                            newFieldElement.focus();
+                            if (newFieldElement.tagName === 'INPUT') {
+                                newFieldElement.dataset.editing = 'true';
+                                newFieldElement.readOnly = false;
+                            }
+                        }
+                        
+                        // Refresh history
                         if (loadHistoryCallback) {
                             loadHistoryCallback();
                         }
-                        
-                        this.cancelNewField();
-                        // Reload current file to show new field
-                        if (window.MetadataRemote.Files && window.MetadataRemote.Files.Manager) {
-                            window.MetadataRemote.Files.Manager.loadFile(State.currentFile, State.selectedListItem);
-                        }
                     } else {
-                        UIUtils.showStatus('Failed to create field', 'error');
+                        UIUtils.showStatus(result.error || 'Failed to create field', 'error');
                     }
                 }
             } catch (err) {
@@ -1184,6 +1254,171 @@
             
             // Show inline confirmation with file/folder options directly
             this.confirmDelete(fieldId);
+        },
+        
+        /**
+         * Trigger field deletion from keyboard shortcut
+         * @param {string} fieldId - Field ID to delete
+         */
+        triggerFieldDeletion(fieldId) {
+            // Exit edit mode if active
+            // Try to find input by id first, then by data-field attribute
+            let input = document.getElementById(fieldId);
+            if (!input) {
+                input = document.querySelector(`input[data-field="${fieldId}"]`);
+            }
+            
+            if (input && input.dataset.editing === 'true') {
+                input.dataset.editing = 'false';
+                input.readOnly = true;
+                // Also transition state machine back to normal if needed
+                if (window.MetadataRemote.Navigation.StateMachine) {
+                    window.MetadataRemote.Navigation.StateMachine.transition('normal');
+                }
+            }
+            
+            // Hide any active inference suggestions for this field
+            if (hideInferenceSuggestionsCallback && input) {
+                hideInferenceSuggestionsCallback(input.id);
+            }
+            
+            // Show confirmation with focus management
+            this.confirmDelete(fieldId);
+            
+            // Set up confirmation navigation after a brief delay to ensure DOM is ready
+            setTimeout(() => {
+                const confirmUI = document.querySelector('.delete-confirmation');
+                if (confirmUI) {
+                    this.setupConfirmationNavigation(confirmUI, fieldId);
+                }
+            }, 0);
+        },
+        
+        /**
+         * Set up keyboard navigation for delete confirmation UI
+         * @param {Element} confirmUI - Confirmation UI element
+         * @param {string} fieldId - Field being deleted
+         */
+        setupConfirmationNavigation(confirmUI, fieldId) {
+            const handleNav = (e) => {
+                const target = e.target;
+                const isFileBtn = target.classList.contains('inline-choice-file');
+                const isFolderBtn = target.classList.contains('inline-choice-folder');
+                
+                if (!isFileBtn && !isFolderBtn) return;
+                
+                switch(e.key) {
+                    case 'ArrowLeft':
+                        if (isFolderBtn) {
+                            e.preventDefault();
+                            const fileBtn = confirmUI.querySelector('.inline-choice-file');
+                            if (fileBtn) fileBtn.focus();
+                        }
+                        break;
+                        
+                    case 'ArrowRight':
+                        if (isFileBtn) {
+                            e.preventDefault();
+                            const folderBtn = confirmUI.querySelector('.inline-choice-folder');
+                            if (folderBtn) folderBtn.focus();
+                        }
+                        break;
+                        
+                    case 'ArrowDown':
+                    case 'Escape':
+                        e.preventDefault();
+                        this.cancelDelete(fieldId);
+                        // Try to find field by id first, then by data-field attribute
+                        let field = document.getElementById(fieldId);
+                        if (!field) {
+                            field = document.querySelector(`input[data-field="${fieldId}"]`);
+                        }
+                        if (field) field.focus();
+                        break;
+                        
+                    case 'ArrowUp':
+                        e.preventDefault();
+                        // Navigate to previous field and cancel deletion
+                        const prevField = this.findPreviousField(fieldId);
+                        this.cancelDelete(fieldId);
+                        if (prevField) {
+                            prevField.focus();
+                            // If it's an input field, ensure it's in non-edit mode
+                            if (prevField.tagName === 'INPUT' && prevField.dataset.editing) {
+                                prevField.dataset.editing = 'false';
+                                prevField.readOnly = true;
+                            }
+                        }
+                        break;
+                }
+            };
+            
+            confirmUI.addEventListener('keydown', handleNav);
+            confirmUI.dataset.navHandler = 'true';
+        },
+        
+        /**
+         * Find the next navigable field after the given field
+         * @param {string} fieldId - Current field ID
+         * @returns {Element|null} Next field element
+         */
+        findNextField(fieldId) {
+            const metadataSection = document.getElementById('metadata-section');
+            if (!metadataSection) return null;
+            
+            // Get all visible, enabled text inputs
+            const allFields = Array.from(metadataSection.querySelectorAll('input[type="text"]:not([disabled])')).filter(
+                field => field.offsetParent !== null  // Check if visible
+            );
+            
+            // Find current field by matching either id or data-field attribute
+            const currentIndex = allFields.findIndex(f => 
+                f.id === fieldId || f.dataset.field === fieldId
+            );
+            
+            if (currentIndex >= 0 && currentIndex < allFields.length - 1) {
+                return allFields[currentIndex + 1];
+            }
+            
+            // If no next field, try to find new field creator header
+            const newFieldHeader = document.querySelector('.new-field-header');
+            if (newFieldHeader && newFieldHeader.offsetParent !== null) {
+                return newFieldHeader;
+            }
+            
+            return null;
+        },
+        
+        /**
+         * Find the previous navigable field before the given field
+         * @param {string} fieldId - Current field ID
+         * @returns {Element|null} Previous field element
+         */
+        findPreviousField(fieldId) {
+            const metadataSection = document.getElementById('metadata-section');
+            if (!metadataSection) return null;
+            
+            // Get all visible, enabled text inputs
+            const allFields = Array.from(metadataSection.querySelectorAll('input[type="text"]:not([disabled])')).filter(
+                field => field.offsetParent !== null  // Check if visible
+            );
+            
+            // Find current field by matching either id or data-field attribute
+            const currentIndex = allFields.findIndex(f => 
+                f.id === fieldId || f.dataset.field === fieldId
+            );
+            
+            if (currentIndex > 0) {
+                return allFields[currentIndex - 1];
+            }
+            
+            // If no previous metadata field, try filename field
+            const filenameField = document.getElementById('current-filename');
+            if (filenameField && filenameField.offsetParent !== null) {
+                return filenameField;
+            }
+            
+            return null;
         },
         
         /**
@@ -1351,6 +1586,23 @@
             }
             
             try {
+                // Determine the next field to focus BEFORE deletion
+                const nextFieldElement = this.findNextField(fieldId);
+                const prevFieldElement = !nextFieldElement ? this.findPreviousField(fieldId) : null;
+                
+                let focusTargetId = null;
+                let focusTargetIsNewFieldHeader = false;
+                
+                if (nextFieldElement) {
+                    focusTargetId = nextFieldElement.id || nextFieldElement.dataset?.field;
+                } else if (prevFieldElement && prevFieldElement.id !== 'current-filename') {
+                    // Only use previous field if it's not the filename
+                    focusTargetId = prevFieldElement.id || prevFieldElement.dataset?.field;
+                } else {
+                    // No suitable field found, will focus on new field header
+                    focusTargetIsNewFieldHeader = true;
+                }
+                
                 const result = await API.deleteMetadataField(State.currentFile, fieldId);
                 
                 if (result.status === 'success') {
@@ -1363,12 +1615,75 @@
                     
                     UIUtils.showStatus(`${fieldName} deleted`, 'success');
                     
-                    // Reload current file to refresh metadata display
-                    if (window.MetadataRemote.Files && window.MetadataRemote.Files.Manager) {
-                        window.MetadataRemote.Files.Manager.loadFile(State.currentFile, State.selectedListItem);
+                    // Remove from UI directly instead of reloading
+                    const isStandardField = standardFields.includes(fieldId);
+                    let fieldElement = null;
+                    
+                    if (isStandardField) {
+                        // For standard fields, find the form-group-with-button container
+                        const input = document.getElementById(fieldId);
+                        if (input) {
+                            fieldElement = input.closest('.form-group-with-button');
+                            // Hide the field instead of removing it
+                            if (fieldElement) {
+                                fieldElement.style.display = 'none';
+                                // Disable the input to prevent it from being collected during save
+                                input.disabled = true;
+                                input.value = '';
+                            }
+                        }
+                    } else {
+                        // For dynamic fields, remove the entire element
+                        fieldElement = document.querySelector(`.dynamic-field[data-field-id="${fieldId}"]`);
+                        if (fieldElement) {
+                            fieldElement.remove();
+                        }
                     }
                     
-                    // Refresh history to show the delete action
+                    // Update internal state
+                    if (isStandardField) {
+                        // For standard fields, clear the value
+                        State.originalMetadata[fieldId] = '';
+                    } else {
+                        // For dynamic fields, remove from tracking
+                        dynamicFields.delete(fieldId);
+                        delete State.originalMetadata[fieldId];
+                    }
+                    
+                    // Update extended fields toggle visibility
+                    const hasExtendedFields = dynamicFields.size > 0;
+                    const extendedToggle = document.querySelector('.extended-fields-toggle');
+                    if (extendedToggle) {
+                        extendedToggle.style.display = hasExtendedFields ? 'flex' : 'none';
+                    }
+                    
+                    // Update navigable elements for keyboard navigation
+                    this.updateNavigableElements();
+                    
+                    // Focus on the predetermined next element
+                    let elementToFocus = null;
+                    
+                    if (focusTargetIsNewFieldHeader) {
+                        elementToFocus = document.querySelector('.new-field-header');
+                    } else if (focusTargetId) {
+                        // Try to find by ID first
+                        elementToFocus = document.getElementById(focusTargetId);
+                        // If not found by ID, try by data-field attribute
+                        if (!elementToFocus) {
+                            elementToFocus = document.querySelector(`[data-field="${focusTargetId}"]`);
+                        }
+                    }
+                    
+                    if (elementToFocus) {
+                        elementToFocus.focus();
+                        // Ensure input fields are in non-edit mode
+                        if (elementToFocus.tagName === 'INPUT') {
+                            elementToFocus.dataset.editing = 'false';
+                            elementToFocus.readOnly = true;
+                        }
+                    }
+                    
+                    // Refresh history
                     if (loadHistoryCallback) {
                         loadHistoryCallback();
                     }
@@ -1392,6 +1707,23 @@
                 UIUtils.showStatus('Another batch operation is in progress', 'warning');
                 this.cancelDelete(fieldId);
                 return;
+            }
+            
+            // Determine the next field to focus BEFORE deletion
+            const nextFieldElement = this.findNextField(fieldId);
+            const prevFieldElement = !nextFieldElement ? this.findPreviousField(fieldId) : null;
+            
+            let focusTargetId = null;
+            let focusTargetIsNewFieldHeader = false;
+            
+            if (nextFieldElement) {
+                focusTargetId = nextFieldElement.id || nextFieldElement.dataset?.field;
+            } else if (prevFieldElement && prevFieldElement.id !== 'current-filename') {
+                // Only use previous field if it's not the filename
+                focusTargetId = prevFieldElement.id || prevFieldElement.dataset?.field;
+            } else {
+                // No suitable field found, will focus on new field header
+                focusTargetIsNewFieldHeader = true;
             }
             
             // Set lock
@@ -1436,6 +1768,9 @@
                     UIUtils.showStatus(message, result.status === 'partial' ? 'warning' : 'success');
                     
                     setTimeout(() => {
+                        // Save the current focused pane before reloading
+                        const currentFocusedPane = State.focusedPane;
+                        
                         // Reload to show updated state
                         if (window.MetadataRemote.Files?.Manager) {
                             window.MetadataRemote.Files.Manager.loadFile(State.currentFile, State.selectedListItem);
@@ -1443,6 +1778,34 @@
                         if (loadHistoryCallback) {
                             loadHistoryCallback();
                         }
+                        
+                        // Restore focus after reload completes
+                        setTimeout(() => {
+                            // Restore the focused pane state
+                            State.focusedPane = currentFocusedPane;
+                            
+                            let elementToFocus = null;
+                            
+                            if (focusTargetIsNewFieldHeader) {
+                                elementToFocus = document.querySelector('.new-field-header');
+                            } else if (focusTargetId) {
+                                // Try to find by ID first
+                                elementToFocus = document.getElementById(focusTargetId);
+                                // If not found by ID, try by data-field attribute
+                                if (!elementToFocus) {
+                                    elementToFocus = document.querySelector(`[data-field="${focusTargetId}"]`);
+                                }
+                            }
+                            
+                            if (elementToFocus) {
+                                elementToFocus.focus();
+                                // Ensure input fields are in non-edit mode
+                                if (elementToFocus.tagName === 'INPUT' && elementToFocus.dataset.editing) {
+                                    elementToFocus.dataset.editing = 'false';
+                                    elementToFocus.readOnly = true;
+                                }
+                            }
+                        }, 100);
                     }, 1000);
                     
                 } else {
