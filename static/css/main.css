@@ -1363,6 +1363,60 @@ input:autofill {
     position: relative;
 }
 
+/* Adjust metadata position when album art is scaled */
+.album-art:hover ~ .album-art-metadata {
+    /* When image scales 2x from center, the bottom-right corner moves 60px outward
+       To maintain 8px offset from scaled edge: 8px - 60px = -52px */
+    bottom: -52px;
+    right: -52px;
+}
+
+/* Album art metadata overlay */
+.album-art-metadata {
+    position: absolute;
+    bottom: 8px;
+    right: 8px;
+    padding: 4px 8px;
+    background: rgba(0, 0, 0, 0.56);
+    backdrop-filter: blur(4px);
+    border-radius: 4px;
+    font-size: 8px;
+    font-family: monospace;
+    color: rgba(255, 255, 255, 0.9);
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 951; /* Above hovered album art (950) */
+    opacity: 0;
+    transition: opacity 0s ease;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Ensure art-display has relative positioning for absolute child */
+#art-display {
+    position: relative;
+}
+
+/* Show metadata on album art hover */
+.album-art:hover ~ .album-art-metadata,
+#art-display:hover .album-art-metadata {
+    opacity: 1;
+}
+
+/* Add delayed transition only when hovering */
+.album-art:hover ~ .album-art-metadata,
+#art-display:hover .album-art-metadata {
+    transition: opacity 0.2s ease 0.2s;
+}
+
+/* Mobile touch support */
+@media (hover: none) {
+    .album-art-metadata {
+        opacity: 1;
+    }
+}
+
 /* Ensure the album art section has proper stacking context but stays below help overlay */
 .album-art-section {
     position: relative;

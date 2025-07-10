@@ -31,6 +31,77 @@
         },
         
         /**
+         * Calculate image metadata from an image element or data URL
+         * @param {string} imageSrc - The image source (data URL or base64)
+         * @returns {Promise<Object>} - Object with width, height, size, and format
+         */
+        async calculateImageMetadata(imageSrc) {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.onload = function() {
+                    const metadata = {
+                        width: this.naturalWidth || 0,
+                        height: this.naturalHeight || 0,
+                        size: 0,
+                        format: 'Unknown'
+                    };
+                    
+                    // Calculate size and format from data URL
+                    if (imageSrc && imageSrc.startsWith('data:')) {
+                        const matches = imageSrc.match(/data:image\/(\w+);base64,(.+)/);
+                        if (matches) {
+                            metadata.format = matches[1].toUpperCase();
+                            const base64 = matches[2];
+                            // Calculate actual file size from base64 (accounting for padding)
+                            const padding = (base64.match(/=+$/) || [''])[0].length;
+                            metadata.size = Math.floor((base64.length * 3) / 4) - padding;
+                        }
+                    }
+                    
+                    resolve(metadata);
+                };
+                img.onerror = () => {
+                    resolve({ width: 0, height: 0, size: 0, format: 'Unknown' });
+                };
+                img.src = imageSrc;
+            });
+        },
+        
+        /**
+         * Format file size in human-readable format
+         * @param {number} bytes - Size in bytes
+         * @returns {string} - Formatted size string
+         */
+        formatFileSize(bytes) {
+            if (bytes === 0) return '0B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return Math.round(bytes / Math.pow(k, i)) + sizes[i];
+        },
+        
+        /**
+         * Display album art with metadata overlay
+         * @param {string} imageSrc - The image source
+         * @param {HTMLElement} artDisplay - The art display container
+         */
+        async displayAlbumArtWithMetadata(imageSrc, artDisplay) {
+            if (!artDisplay) return;
+            
+            const metadata = await this.calculateImageMetadata(imageSrc);
+            const metadataText = metadata.width && metadata.height 
+                ? `${metadata.width}x${metadata.height}, ${this.formatFileSize(metadata.size)}, ${metadata.format}`
+                : '';
+            
+            artDisplay.innerHTML = `
+                <img src="${imageSrc}" class="album-art" aria-describedby="art-metadata">
+                <div class="album-art-metadata" id="art-metadata">
+                    <span>${metadataText}</span>
+                </div>
+            `;
+        },
+        
+        /**
          * Handle album art file upload
          * @param {Event} event - File input change event
          */
@@ -43,7 +114,7 @@
                 State.pendingAlbumArt = e.target.result;
                 
                 const artDisplay = document.getElementById('art-display');
-                artDisplay.innerHTML = `<img src="${State.pendingAlbumArt}" class="album-art">`;
+                this.displayAlbumArtWithMetadata(State.pendingAlbumArt, artDisplay);
                 document.querySelector('.delete-art-btn').style.display = 'block';
                 document.querySelector('.save-image-btn').style.display = 'block';
                 document.querySelector('.apply-folder-btn').style.display = 'block';

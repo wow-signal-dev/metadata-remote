@@ -538,7 +538,15 @@
                     
                     if (data.hasArt && data.art) {
                         State.currentAlbumArt = data.art;
-                        artDisplay.innerHTML = `<img src="data:image/jpeg;base64,${data.art}" class="album-art">`;
+                        const albumArtSrc = `data:image/jpeg;base64,${data.art}`;
+                        // Calculate and display metadata
+                        const AlbumArt = window.MetadataRemote.Metadata.AlbumArt;
+                        if (AlbumArt && AlbumArt.displayAlbumArtWithMetadata) {
+                            AlbumArt.displayAlbumArtWithMetadata(albumArtSrc, artDisplay);
+                        } else {
+                            // Fallback if module not loaded
+                            artDisplay.innerHTML = `<img src="${albumArtSrc}" class="album-art">`;
+                        }
                         if (deleteBtn) deleteBtn.style.display = 'block';
                         if (saveImageBtn) saveImageBtn.style.display = 'none';
                         if (applyFolderBtn) applyFolderBtn.style.display = 'none';
