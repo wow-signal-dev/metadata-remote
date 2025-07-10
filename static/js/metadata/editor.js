@@ -310,7 +310,7 @@
             const previouslyFocused = document.activeElement;
             
             const button = document.querySelector('.clear-btn');
-            showButtonStatus(button, 'Resetting...', 'processing');
+            showButtonStatus(button, '', 'processing');
             
             try {
                 const data = await API.getMetadata(State.currentFile);
@@ -354,7 +354,7 @@
                     applyFolderBtn.style.display = 'none';
                 }
                 
-                showButtonStatus(button, 'Reset!', 'success', 2000);
+                showButtonStatus(button, '', 'success', 2000);
                 
                 // Restore focus to the previously focused element
                 if (previouslyFocused && previouslyFocused.id && document.getElementById(previouslyFocused.id)) {
@@ -367,7 +367,7 @@
                 }
             } catch (err) {
                 console.error('Error resetting form:', err);
-                showButtonStatus(button, 'Error', 'error');
+                showButtonStatus(button, '', 'error');
             }
         },
         
@@ -1182,27 +1182,54 @@
                 return;
             }
             
-            // Show inline confirmation
-            this.showDeleteConfirmation(fieldId, deleteBtn);
+            // Show inline confirmation with file/folder options directly
+            this.confirmDelete(fieldId);
         },
         
         /**
-         * Show inline confirmation UI for delete
+         * Confirm field deletion
          * @param {string} fieldId - Field ID to delete
-         * @param {HTMLElement} deleteBtn - Delete button element
          */
-        showDeleteConfirmation(fieldId, deleteBtn) {
-            // Hide the delete button
-            deleteBtn.style.display = 'none';
+        async confirmDelete(fieldId) {
+            // Cancel any existing delete confirmations
+            const existingConfirm = document.querySelector('.delete-confirmation');
+            if (existingConfirm) {
+                // Find the field ID of the existing confirmation
+                const existingBtn = document.querySelector('.delete-field-btn[style*="visibility: hidden"]');
+                if (existingBtn) {
+                    const existingFieldElement = existingBtn.closest('.dynamic-field[data-field-id]') || 
+                                                existingBtn.closest('.form-group-with-button');
+                    if (existingFieldElement) {
+                        const existingFieldId = existingFieldElement.dataset.fieldId || 
+                                              existingFieldElement.querySelector('input[data-field]')?.dataset.field;
+                        if (existingFieldId) {
+                            this.cancelDelete(existingFieldId);
+                        }
+                    }
+                }
+            }
+            
+            // Find the field element and delete button
+            let fieldElement = document.querySelector(`.dynamic-field[data-field-id="${fieldId}"]`);
+            
+            if (!fieldElement) {
+                const deleteBtn = document.querySelector(`button[onclick*="deleteField('${fieldId}')"]`);
+                if (deleteBtn) {
+                    fieldElement = deleteBtn.closest('.form-group-with-button, .form-group-wrapper');
+                }
+            }
+            
+            if (!fieldElement) return;
+            
+            const deleteBtn = fieldElement.querySelector('.delete-field-btn');
+            if (!deleteBtn) return;
+            
+            // Make delete button invisible but keep its space
+            deleteBtn.style.visibility = 'hidden';
             
             // Create confirmation UI
             const confirmUI = document.createElement('div');
             confirmUI.className = 'delete-confirmation';
-            confirmUI.innerHTML = `
-                <span class="confirm-text">Delete this field?</span>
-                <button type="button" class="confirm-yes" onclick="window.MetadataRemote.Metadata.Editor.confirmDelete('${fieldId}')">Yes</button>
-                <button type="button" class="confirm-no" onclick="window.MetadataRemote.Metadata.Editor.cancelDelete('${fieldId}')">No</button>
-            `;
             
             // Insert confirmation UI after the delete button
             deleteBtn.parentElement.appendChild(confirmUI);
@@ -1217,52 +1244,59 @@
             };
             document.addEventListener('keydown', handleEscape);
             
+            // Add click handler to cancel when clicking outside
+            const handleOutsideClick = (e) => {
+                // Check if click is outside the confirmation UI and its buttons
+                if (!confirmUI.contains(e.target) && !deleteBtn.contains(e.target)) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.cancelDelete(fieldId);
+                    document.removeEventListener('click', handleOutsideClick, true);
+                    document.removeEventListener('keydown', handleEscape);
+                }
+            };
+            // Use capture phase to handle before other click handlers
+            setTimeout(() => {
+                document.addEventListener('click', handleOutsideClick, true);
+            }, 0);
+            
             // Store the handler reference for cleanup
             confirmUI.dataset.escapeHandler = 'true';
+            confirmUI.dataset.clickHandler = 'true';
             
-            // Focus on the No button for safety
-            confirmUI.querySelector('.confirm-no').focus();
-        },
-        
-        /**
-         * Confirm field deletion
-         * @param {string} fieldId - Field ID to delete
-         */
-        async confirmDelete(fieldId) {
-            // Get field display name for success message
-            let displayName = fieldId;
-            
-            // Check if it's a dynamic field
+            // Get field display name
+            let fieldName = fieldId;
             const fieldInfo = dynamicFields.get(fieldId);
             if (fieldInfo) {
-                displayName = fieldInfo.display_name;
+                fieldName = fieldInfo.display_name;
+            } else if (standardFields.includes(fieldId)) {
+                // Use proper display name for standard fields
+                const fieldNames = {
+                    'title': 'Title',
+                    'artist': 'Artist',
+                    'album': 'Album',
+                    'albumartist': 'Album Artist',
+                    'date': 'Year',
+                    'genre': 'Genre',
+                    'composer': 'Composer',
+                    'track': 'Track #',
+                    'disc': 'Disc #'
+                };
+                fieldName = fieldNames[fieldId] || fieldId;
             }
             
-            try {
-                // Call API to delete the field
-                const result = await API.deleteMetadataField(State.currentFile, fieldId);
-                
-                if (result.status === 'success') {
-                    UIUtils.showStatus(`Field "${displayName}" deleted successfully`, 'success');
-                    
-                    // Reload current file to refresh metadata display
-                    if (window.MetadataRemote.Files && window.MetadataRemote.Files.Manager) {
-                        window.MetadataRemote.Files.Manager.loadFile(State.currentFile, State.selectedListItem);
-                    }
-                    
-                    // Refresh history to show the delete action
-                    if (loadHistoryCallback) {
-                        loadHistoryCallback();
-                    }
-                } else {
-                    UIUtils.showStatus(result.error || 'Failed to delete field', 'error');
-                    this.cancelDelete(fieldId);
-                }
-            } catch (err) {
-                console.error('Error deleting field:', err);
-                UIUtils.showStatus('Error deleting field', 'error');
-                this.cancelDelete(fieldId);
-            }
+            // Truncate long field names
+            const truncatedName = fieldName.length > 20 ? fieldName.substring(0, 20) + '...' : fieldName;
+            
+            // Update confirmation UI to show file/folder options
+            confirmUI.innerHTML = `
+                <span class="confirm-text">Delete field from:</span>
+                <button type="button" class="inline-choice-btn inline-choice-file" onclick="window.MetadataRemote.Metadata.Editor.deleteFromFile('${fieldId}')">file</button>
+                <button type="button" class="inline-choice-btn inline-choice-folder" onclick="window.MetadataRemote.Metadata.Editor.confirmBatchDelete('${fieldId}')">folder</button>
+            `;
+            
+            // Focus on safer option
+            confirmUI.querySelector('.inline-choice-file').focus();
         },
         
         /**
@@ -1295,7 +1329,139 @@
             }
             
             if (deleteBtn) {
-                deleteBtn.style.display = '';
+                deleteBtn.style.visibility = '';
+            }
+        },
+
+        /**
+         * Delete field from current file only
+         * @param {string} fieldId - Field ID to delete
+         */
+        async deleteFromFile(fieldId) {
+            const confirmUI = document.querySelector('.delete-confirmation');
+            const deleteBtn = document.querySelector(`button[onclick*="deleteField('${fieldId}')"]`) || 
+                              document.querySelector(`.dynamic-field[data-field-id="${fieldId}"] .delete-field-btn`);
+            
+            if (confirmUI) {
+                confirmUI.remove();
+            }
+            
+            if (deleteBtn) {
+                deleteBtn.style.visibility = '';
+            }
+            
+            try {
+                const result = await API.deleteMetadataField(State.currentFile, fieldId);
+                
+                if (result.status === 'success') {
+                    // Get field display name for success message
+                    let fieldName = fieldId;
+                    const fieldInfo = dynamicFields.get(fieldId);
+                    if (fieldInfo) {
+                        fieldName = fieldInfo.display_name;
+                    }
+                    
+                    UIUtils.showStatus(`${fieldName} deleted`, 'success');
+                    
+                    // Reload current file to refresh metadata display
+                    if (window.MetadataRemote.Files && window.MetadataRemote.Files.Manager) {
+                        window.MetadataRemote.Files.Manager.loadFile(State.currentFile, State.selectedListItem);
+                    }
+                    
+                    // Refresh history to show the delete action
+                    if (loadHistoryCallback) {
+                        loadHistoryCallback();
+                    }
+                } else {
+                    UIUtils.showStatus(result.error || 'Failed to delete field', 'error');
+                }
+            } catch (error) {
+                console.error('Error deleting field:', error);
+                UIUtils.showStatus('Failed to delete field', 'error');
+            }
+        },
+
+
+        /**
+         * Confirm batch field deletion for entire folder
+         * @param {string} fieldId - Field ID to delete
+         */
+        async confirmBatchDelete(fieldId) {
+            // Check if another batch operation is in progress
+            if (window.MetadataRemote.batchOperationInProgress) {
+                UIUtils.showStatus('Another batch operation is in progress', 'warning');
+                this.cancelDelete(fieldId);
+                return;
+            }
+            
+            // Set lock
+            window.MetadataRemote.batchOperationInProgress = true;
+            
+            const confirmUI = document.querySelector('.delete-confirmation');
+            const deleteBtn = document.querySelector(`button[onclick*="deleteField('${fieldId}')"]`) || 
+                              document.querySelector(`.dynamic-field[data-field-id="${fieldId}"] .delete-field-btn`);
+            
+            // Show spinner in place of delete button
+            if (deleteBtn) {
+                deleteBtn.innerHTML = '<span class="spinner"></span>';
+                deleteBtn.style.visibility = '';
+                deleteBtn.disabled = true;
+            }
+            
+            // Hide confirmation UI
+            if (confirmUI) confirmUI.remove();
+            
+            try {
+                const folderPath = State.currentPath || '';
+                const result = await API.deleteFieldFromFolder(folderPath, fieldId);
+                
+                if (result.status === 'success' || result.status === 'partial') {
+                    // Show success checkmark briefly
+                    if (deleteBtn) {
+                        deleteBtn.innerHTML = '<span class="status-icon success">✓</span>';
+                        deleteBtn.classList.add('success');
+                    }
+                    
+                    // Build detailed message
+                    let message = `Field deleted from ${result.filesUpdated} file(s)`;
+                    if (result.filesSkipped > 0) {
+                        message += ` (${result.filesSkipped} files didn't have this field)`;
+                    }
+                    if (result.errors && result.errors.length > 0) {
+                        message += ` - ${result.errors.length} errors`;
+                        // Log detailed errors to console for debugging
+                        console.error('Batch delete errors:', result.errors);
+                    }
+                    
+                    UIUtils.showStatus(message, result.status === 'partial' ? 'warning' : 'success');
+                    
+                    setTimeout(() => {
+                        // Reload to show updated state
+                        if (window.MetadataRemote.Files?.Manager) {
+                            window.MetadataRemote.Files.Manager.loadFile(State.currentFile, State.selectedListItem);
+                        }
+                        if (loadHistoryCallback) {
+                            loadHistoryCallback();
+                        }
+                    }, 1000);
+                    
+                } else {
+                    throw new Error(result.error || 'Failed to delete field from folder');
+                }
+                
+            } catch (err) {
+                console.error('Error in batch field deletion:', err);
+                UIUtils.showStatus(err.message || 'Error deleting field from folder', 'error');
+                
+                // Restore delete button
+                if (deleteBtn) {
+                    deleteBtn.innerHTML = '<span>⊖</span>';
+                    deleteBtn.disabled = false;
+                    deleteBtn.classList.remove('success');
+                }
+            } finally {
+                // Release lock
+                window.MetadataRemote.batchOperationInProgress = false;
             }
         },
 

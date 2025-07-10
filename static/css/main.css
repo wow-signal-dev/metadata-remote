@@ -1651,7 +1651,8 @@ input[type="file"] {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    margin-left: 0.5rem;
+    margin-left: auto;
+    margin-right: 0;
 }
 
 .confirm-text {
@@ -1692,6 +1693,39 @@ input[type="file"] {
 .confirm-no:hover {
     background: rgba(255, 255, 255, 0.1);
     border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* Inline confirmation specific styles */
+.delete-confirmation .inline-choice-btn {
+    padding: 0.1rem 0.4rem;
+    font-size: 0.65rem;
+    font-weight: 400;
+    border-radius: 3px;
+    border: 1px solid transparent;
+    background: linear-gradient(135deg, #2a2a2a 0%, #3a3a3a 100%);
+    color: var(--text-primary);
+    transition: all 0.15s ease;
+    cursor: pointer;
+    height: auto;
+    line-height: 1.2;
+}
+
+.delete-confirmation .inline-choice-btn:hover {
+    background: linear-gradient(135deg, #3a3a3a 0%, #4a4a4a 100%);
+    transform: translateY(-1px);
+}
+
+.delete-confirmation .inline-choice-btn:focus {
+    background: linear-gradient(135deg, #2a2a2a 0%, #3a3a3a 100%);
+    outline: 1px solid var(--accent-primary);
+    outline-offset: -1px;
+}
+
+/* File and folder buttons use same text color as other buttons */
+
+.delete-confirmation .confirm-text {
+    font-size: 0.65rem;
+    color: var(--text-primary);
 }
 
 /* Folder confirmation UI */
@@ -2194,6 +2228,7 @@ button:disabled {
     border: 2px solid rgba(255,255,255,.2);
     border-radius: 50%;
     border-top-color: white;
+    animation: spin 1s linear infinite;
 }
 
 /* Smaller spinner for apply-field buttons */

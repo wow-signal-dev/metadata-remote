@@ -49,7 +49,8 @@ from core.history import (
     history, ActionType, HistoryAction,
     create_metadata_action, create_batch_metadata_action,
     create_album_art_action, create_delete_field_action,
-    create_field_creation_action, create_batch_field_creation_action
+    create_field_creation_action, create_batch_field_creation_action,
+    create_batch_delete_field_action
 )
 
 from core.inference import inference_engine
@@ -848,17 +849,36 @@ def apply_field_to_folder():
     if not field:
         return jsonify({'error': 'No field specified'}), 400
     
-    # Collect current values before applying changes
+    # Collect current values and categorize files
     file_changes = []
+    files_to_create = []
+    create_values = {}
     abs_folder_path = validate_path(os.path.join(MUSIC_DIR, folder_path) if folder_path else MUSIC_DIR)
     
     for filename in os.listdir(abs_folder_path):
         file_path = os.path.join(abs_folder_path, filename)
         if os.path.isfile(file_path) and filename.lower().endswith(AUDIO_EXTENSIONS):
             try:
-                current_metadata = read_metadata(file_path)
-                old_value = current_metadata.get(field, '')
-                file_changes.append((file_path, old_value, value))
+                # Check if field exists using both methods
+                existing_metadata = mutagen_handler.read_existing_metadata(file_path)
+                all_discovered = mutagen_handler.discover_all_metadata(file_path)
+                
+                field_exists = (field in existing_metadata or 
+                              field.upper() in existing_metadata or
+                              field in all_discovered or
+                              field.upper() in all_discovered)
+                
+                if field_exists:
+                    # Get existing value for update tracking
+                    old_value = (existing_metadata.get(field) or 
+                               existing_metadata.get(field.upper()) or
+                               all_discovered.get(field, {}).get('value') or
+                               all_discovered.get(field.upper(), {}).get('value') or '')
+                    file_changes.append((file_path, old_value, value))
+                else:
+                    # Track for creation
+                    files_to_create.append(file_path)
+                    create_values[file_path] = value
             except:
                 pass
     
@@ -871,11 +891,85 @@ def apply_field_to_folder():
     if response.status_code == 200:
         response_data = response.get_json()
         if response_data.get('status') in ['success', 'partial']:
-            # Add to history if successful
-            action = create_batch_metadata_action(folder_path, field, value, file_changes)
-            history.add_action(action)
+            # Add appropriate history actions
+            if file_changes:
+                # Add batch metadata action for updates
+                action = create_batch_metadata_action(folder_path, field, value, file_changes)
+                history.add_action(action)
+            
+            if files_to_create:
+                # Add batch field creation action for new fields
+                batch_action = create_batch_field_creation_action(files_to_create, field, create_values)
+                history.add_action(batch_action)
     
     return response
+
+@app.route('/delete-field-from-folder', methods=['POST'])
+def delete_field_from_folder():
+    """Delete a metadata field from all audio files in a folder"""
+    data = request.json
+    folder_path = data.get('folderPath', '')
+    field_id = data.get('fieldId')
+    
+    if not field_id:
+        return jsonify({'error': 'No field specified'}), 400
+    
+    try:
+        # Collect current values for history
+        file_changes = []
+        files_skipped = 0
+        abs_folder_path = validate_path(os.path.join(MUSIC_DIR, folder_path) if folder_path else MUSIC_DIR)
+        
+        # Pre-scan files to check which have the field
+        for filename in os.listdir(abs_folder_path):
+            file_path = os.path.join(abs_folder_path, filename)
+            if os.path.isfile(file_path) and filename.lower().endswith(AUDIO_EXTENSIONS):
+                try:
+                    # Check file permissions first
+                    if not os.access(file_path, os.W_OK):
+                        raise PermissionError(f"No write permission for {filename}")
+                    
+                    all_fields = mutagen_handler.get_all_fields(file_path)
+                    metadata = mutagen_handler.read_metadata(file_path)
+                    
+                    # Check if field exists
+                    if field_id in all_fields or field_id in metadata:
+                        old_value = all_fields.get(field_id, {}).get('value', '') or metadata.get(field_id, '')
+                        file_changes.append((file_path, old_value))
+                    else:
+                        files_skipped += 1
+                except PermissionError:
+                    # Re-raise permission errors to be caught by process_folder_files
+                    raise
+                except Exception as e:
+                    logger.warning(f"Error pre-scanning {filename}: {str(e)}")
+                    continue
+        
+        # Process deletions
+        def delete_field_from_file(file_path):
+            return mutagen_handler.delete_field(file_path, field_id)
+        
+        response = process_folder_files(folder_path, delete_field_from_file, f"deleted field {field_id}")
+        
+        # Add skipped files count to response
+        if response.status_code == 200:
+            response_data = response.get_json()
+            response_data['filesSkipped'] = files_skipped
+            
+            # Record in history if successful
+            if response_data.get('status') in ['success', 'partial'] and file_changes:
+                action = create_batch_delete_field_action(folder_path, field_id, file_changes)
+                history.add_action(action)
+            
+            return jsonify(response_data)
+        
+        return response
+        
+    except ValueError:
+        return jsonify({'error': 'Invalid path'}), 403
+    except Exception as e:
+        logger.error(f"Error in batch field deletion: {e}")
+        return jsonify({'error': str(e)}), 500
 
 # =================
 # HISTORY ENDPOINTS
@@ -977,6 +1071,18 @@ def undo_action(action_id):
                 files_updated += 1
             except Exception as e:
                 errors.append(f"{os.path.basename(filepath)}: {str(e)}")
+        
+        elif action.action_type == ActionType.BATCH_DELETE_FIELD:
+            # Undo batch field deletion by restoring fields
+            for filepath in action.files:
+                try:
+                    old_value = action.old_values.get(filepath, '')
+                    if old_value:
+                        success = mutagen_handler.write_metadata(filepath, {action.field: old_value})
+                        if success:
+                            files_updated += 1
+                except Exception as e:
+                    errors.append(f"{os.path.basename(filepath)}: {str(e)}")
         
         elif action.action_type == ActionType.CREATE_FIELD:
             # Undo field creation by deleting the field
@@ -1111,6 +1217,16 @@ def redo_action(action_id):
                 files_updated += 1
             except Exception as e:
                 errors.append(f"{os.path.basename(filepath)}: {str(e)}")
+        
+        elif action.action_type == ActionType.BATCH_DELETE_FIELD:
+            # Redo batch field deletion
+            for filepath in action.files:
+                try:
+                    success = mutagen_handler.delete_field(filepath, action.field)
+                    if success:
+                        files_updated += 1
+                except Exception as e:
+                    errors.append(f"{os.path.basename(filepath)}: {str(e)}")
         
         elif action.action_type == ActionType.CREATE_FIELD:
             # Redo field creation

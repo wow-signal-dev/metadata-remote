@@ -28,6 +28,7 @@ class ActionType(Enum):
     BATCH_METADATA = "batch_metadata"
     BATCH_ALBUM_ART = "batch_album_art"
     DELETE_FIELD = "delete_field"
+    BATCH_DELETE_FIELD = "batch_delete_field"
     CREATE_FIELD = "create_field"
     BATCH_CREATE_FIELD = "batch_create_field"
 
@@ -395,6 +396,30 @@ def create_batch_field_creation_action(filepaths: List[str], field_name: str, fi
         field=field_name,
         old_values={fp: None for fp in filepaths},  # Fields didn't exist
         new_values=field_values,
+        description=description
+    )
+
+def create_batch_delete_field_action(folder_path: str, field_id: str, 
+                                   file_changes: List[Tuple[str, str]]) -> HistoryAction:
+    """Create history action for batch field deletion"""
+    folder_name = os.path.basename(folder_path) or "root"
+    description = f"Deleted field '{field_id}' from {len(file_changes)} files in \"{folder_name}\""
+    
+    old_values = {}
+    files = []
+    
+    for filepath, previous_value in file_changes:
+        files.append(filepath)
+        old_values[filepath] = previous_value
+    
+    return HistoryAction(
+        id=str(uuid.uuid4()),
+        timestamp=time.time(),
+        action_type=ActionType.BATCH_DELETE_FIELD,
+        files=files,
+        field=field_id,
+        old_values=old_values,
+        new_values={filepath: None for filepath in files},
         description=description
     )
 

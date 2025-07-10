@@ -28,6 +28,39 @@ from mutagen.id3 import PictureType
 from config import logger, FORMAT_METADATA_CONFIG
 
 
+class FieldNameMapper:
+    """Maps between semantic field names and format-specific representations"""
+    
+    @staticmethod
+    def semantic_to_format(field_name: str, format_type: str) -> str:
+        """Convert semantic name to format-specific representation"""
+        if format_type in ['mp3', 'wav']:
+            # Check if already in TXXX format
+            if not field_name.startswith('TXXX:'):
+                return f'TXXX:{field_name}'
+        elif format_type == 'asf':
+            # Check if already has WM/ prefix
+            if not field_name.startswith('WM/'):
+                return f'WM/{field_name}'
+        elif format_type == 'mp4':
+            # Check if already in freeform format
+            if not field_name.startswith('----:'):
+                return f'----:com.apple.iTunes:{field_name}'
+        # FLAC/OGG/WavPack use semantic name directly
+        return field_name
+    
+    @staticmethod
+    def format_to_semantic(field_id: str, format_type: str) -> str:
+        """Extract semantic name from format-specific representation"""
+        if format_type in ['mp3', 'wav'] and field_id.startswith('TXXX:'):
+            return field_id[5:]  # Remove 'TXXX:' prefix
+        elif format_type == 'asf' and field_id.startswith('WM/'):
+            return field_id[3:]  # Remove 'WM/' prefix
+        elif format_type == 'mp4' and field_id.startswith('----:com.apple.iTunes:'):
+            return field_id[22:]  # Remove '----:com.apple.iTunes:' prefix
+        return field_id
+
+
 class MutagenHandler:
     """Centralized handler for all Mutagen operations"""
     
@@ -341,7 +374,7 @@ class MutagenHandler:
         """Check if field should be sent to frontend"""
         
         # Field ID validation
-        if len(field_id) > 50:
+        if len(field_id) > 100:
             logger.warning(f"Skipping field with excessive ID length ({len(field_id)}): {field_id[:50]}...")
             return False
         
@@ -2050,7 +2083,7 @@ class MutagenHandler:
     
     def delete_field(self, filepath: str, field_id: str) -> bool:
         """
-        Delete a metadata field from an audio file
+        Delete a metadata field from an audio file with format-aware field name handling
         
         Args:
             filepath: Path to audio file
@@ -2065,6 +2098,21 @@ class MutagenHandler:
                 logger.error("Could not open file with Mutagen")
                 return False
             
+            # Extract semantic name from field_id
+            source_format = self._guess_source_format(field_id)
+            semantic_name = FieldNameMapper.format_to_semantic(field_id, source_format)
+            
+            # Get format-specific field name for this file
+            format_field_id = FieldNameMapper.semantic_to_format(semantic_name, format_type)
+            
+            # Try both the provided field_id and the format-specific version
+            fields_to_try = [field_id, format_field_id]
+            if semantic_name not in fields_to_try:
+                fields_to_try.append(semantic_name)
+            
+            # Remove duplicates while preserving order
+            fields_to_try = list(dict.fromkeys(fields_to_try))
+            
             # Get the appropriate tag mapping for standard fields
             tag_map = self.tag_mappings.get(format_type, {})
             
@@ -2074,56 +2122,105 @@ class MutagenHandler:
                 if normalized_frame:
                     field_id = normalized_frame
             
-            # Check if it's a standard field
-            if field_id in tag_map:
-                tag_name = tag_map[field_id]
-                
-                if isinstance(audio_file, MP3):
-                    if tag_name in audio_file.tags:
-                        del audio_file.tags[tag_name]
-                elif isinstance(audio_file, (OggVorbis, OggOpus, FLAC)):
-                    # For Vorbis comments
-                    if format_type == 'flac':
-                        tag_name = tag_name.lower()
-                    if tag_name in audio_file:
-                        del audio_file[tag_name]
-                elif isinstance(audio_file, MP4):
-                    if tag_name in audio_file:
-                        del audio_file[tag_name]
-                elif isinstance(audio_file, ASF):
-                    if tag_name in audio_file:
-                        del audio_file[tag_name]
-                elif isinstance(audio_file, WAVE):
-                    if hasattr(audio_file, 'tags') and audio_file.tags and tag_name in audio_file.tags:
-                        del audio_file.tags[tag_name]
-                elif isinstance(audio_file, WavPack):
-                    if tag_name in audio_file:
-                        del audio_file[tag_name]
-            else:
-                # Custom field - use the field_id directly
-                if isinstance(audio_file, MP3):
-                    if field_id in audio_file.tags:
-                        del audio_file.tags[field_id]
-                elif isinstance(audio_file, (OggVorbis, OggOpus, FLAC, WavPack)):
-                    if field_id in audio_file:
-                        del audio_file[field_id]
-                elif isinstance(audio_file, MP4):
-                    if field_id in audio_file:
-                        del audio_file[field_id]
-                elif isinstance(audio_file, ASF):
-                    if field_id in audio_file:
-                        del audio_file[field_id]
-                elif isinstance(audio_file, WAVE):
-                    if hasattr(audio_file, 'tags') and audio_file.tags and field_id in audio_file.tags:
-                        del audio_file.tags[field_id]
+            # Try deletion with each possible field representation
+            field_deleted = False
             
-            # Save the file
+            for try_field_id in fields_to_try:
+                # Check if it's a standard field
+                if try_field_id in tag_map:
+                    tag_name = tag_map[try_field_id]
+                    
+                    if isinstance(audio_file, MP3):
+                        if tag_name in audio_file.tags:
+                            del audio_file.tags[tag_name]
+                            field_deleted = True
+                            break
+                    elif isinstance(audio_file, (OggVorbis, OggOpus, FLAC)):
+                        # For Vorbis comments
+                        if format_type == 'flac':
+                            tag_name = tag_name.lower()
+                        if tag_name in audio_file:
+                            del audio_file[tag_name]
+                            field_deleted = True
+                            break
+                    elif isinstance(audio_file, MP4):
+                        if tag_name in audio_file:
+                            del audio_file[tag_name]
+                            field_deleted = True
+                            break
+                    elif isinstance(audio_file, ASF):
+                        if tag_name in audio_file:
+                            del audio_file[tag_name]
+                            field_deleted = True
+                            break
+                    elif isinstance(audio_file, WAVE):
+                        if hasattr(audio_file, 'tags') and audio_file.tags and tag_name in audio_file.tags:
+                            del audio_file.tags[tag_name]
+                            field_deleted = True
+                            break
+                    elif isinstance(audio_file, WavPack):
+                        if tag_name in audio_file:
+                            del audio_file[tag_name]
+                            field_deleted = True
+                            break
+                else:
+                    # Custom field - use the field_id directly
+                    if isinstance(audio_file, MP3):
+                        if try_field_id in audio_file.tags:
+                            del audio_file.tags[try_field_id]
+                            field_deleted = True
+                            break
+                    elif isinstance(audio_file, (OggVorbis, OggOpus, FLAC, WavPack)):
+                        if try_field_id in audio_file:
+                            del audio_file[try_field_id]
+                            field_deleted = True
+                            break
+                        # Also try uppercase for Vorbis formats
+                        elif try_field_id.upper() in audio_file:
+                            del audio_file[try_field_id.upper()]
+                            field_deleted = True
+                            break
+                    elif isinstance(audio_file, MP4):
+                        if try_field_id in audio_file:
+                            del audio_file[try_field_id]
+                            field_deleted = True
+                            break
+                    elif isinstance(audio_file, ASF):
+                        if try_field_id in audio_file:
+                            del audio_file[try_field_id]
+                            field_deleted = True
+                            break
+                        else:
+                            # Check with WM/ prefix if not already present
+                            wm_field_id = f"WM/{try_field_id}" if not try_field_id.startswith('WM/') else try_field_id
+                            if wm_field_id in audio_file:
+                                del audio_file[wm_field_id]
+                                field_deleted = True
+                                break
+                    elif isinstance(audio_file, WAVE):
+                        if hasattr(audio_file, 'tags') and audio_file.tags and try_field_id in audio_file.tags:
+                            del audio_file.tags[try_field_id]
+                            field_deleted = True
+                            break
+            
+            # Save the file regardless (even if no field was deleted, this is a no-op)
             audio_file.save()
             return True
             
         except Exception as e:
             logger.error(f"Error deleting field {field_id}: {e}")
             return False
+    
+    def _guess_source_format(self, field_id: str) -> str:
+        """Guess the source format based on field ID pattern"""
+        if field_id.startswith('TXXX:'):
+            return 'mp3'
+        elif field_id.startswith('WM/'):
+            return 'asf'
+        elif field_id.startswith('----:'):
+            return 'mp4'
+        else:
+            return 'flac'  # Default for plain field names
     
     def get_all_fields(self, filepath: str) -> Dict[str, Dict[str, Any]]:
         """Alias for discover_all_metadata for backward compatibility"""

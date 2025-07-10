@@ -141,6 +141,18 @@ window.MetadataRemote.API = {
         });
     },
     
+    // Delete metadata field from entire folder
+    async deleteFieldFromFolder(folderPath, fieldId) {
+        return this.call('/delete-field-from-folder', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                folderPath: folderPath,
+                fieldId: fieldId
+            })
+        });
+    },
+    
     // Create new metadata field
     async createField(filepath, fieldName, fieldValue) {
         return this.call('/metadata/create-field', {
