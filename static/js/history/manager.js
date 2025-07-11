@@ -187,10 +187,25 @@
                 fileValue.textContent = details.files[0];
                 filesSection.appendChild(fileValue);
             } else {
-                const filesList = document.createElement('div');
-                filesList.className = 'history-detail-value';
-                filesList.textContent = `${details.file_count} files in folder`;
-                filesSection.appendChild(filesList);
+                // Create a container for the file list
+                const filesListContainer = document.createElement('div');
+                filesListContainer.className = 'history-detail-value';
+                filesListContainer.style.maxHeight = '200px';
+                filesListContainer.style.overflowY = 'auto';
+                
+                // Add each file to the list (showing only filename, not full path)
+                details.files.forEach(file => {
+                    const fileItem = document.createElement('div');
+                    fileItem.className = 'history-change-file';
+                    // Extract just the filename from the full path
+                    const filename = file.split('/').pop();
+                    fileItem.textContent = filename;
+                    // Store full path as title for tooltip on hover
+                    fileItem.title = file;
+                    filesListContainer.appendChild(fileItem);
+                });
+                
+                filesSection.appendChild(filesListContainer);
             }
             detailsContainer.appendChild(filesSection);
             

@@ -1254,6 +1254,14 @@
             
             // Show inline confirmation with file/folder options directly
             this.confirmDelete(fieldId);
+            
+            setTimeout(() => {
+                const confirmUI = document.querySelector('.delete-confirmation');
+                if (confirmUI) {
+                    this.setupConfirmationNavigation(confirmUI, fieldId);
+                }
+            }, 0);
+            
         },
         
         /**
