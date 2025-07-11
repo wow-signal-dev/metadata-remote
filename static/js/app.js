@@ -49,6 +49,12 @@ const AudioMetadataEditor = {
         
         // Set up UI state
         this.setupInitialUIState();
+        
+        // Initialize theme toggle
+        if (window.MetadataRemote.UI.ThemeToggle) {
+            // ThemeToggle self-initializes, but we can ensure it's ready
+            window.MetadataRemote.UI.ThemeToggle.init();
+        }
         this.setupHelpBox();
     },
     

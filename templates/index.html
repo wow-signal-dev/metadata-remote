@@ -26,8 +26,17 @@
 </head>
 <body>
     <div class="header">
+        <div class="theme-toggle-wrapper">
+            <label class="theme-toggle" for="theme-switch" title="Toggle theme (Alt+T)" aria-label="Theme toggle" aria-keyshortcuts="Alt+T">
+                <input type="checkbox" id="theme-switch" class="theme-switch-checkbox" aria-checked="false">
+                <span class="theme-switch-slider">
+                    <span class="theme-icon moon">☽</span>
+                    <span class="theme-icon sun">☀</span>
+                </span>
+            </label>
+        </div>
         <h1 style="margin: 0; padding: 0; display: flex; align-items: center; justify-content: center; height: 1.5rem;">
-            <img src="{{ url_for('static', filename='logo.png') }}" alt="metadata remote" style="height: 1rem; width: auto;">
+            <img id="app-logo" src="{{ url_for('static', filename='mdrm-logo-dark-theme.png') }}" alt="metadata remote" style="height: 1rem; width: auto;">
         </h1>
         <button class="help-button" id="help-button" title="Show keyboard shortcuts" tabindex="0"><b>?</b></button>
     </div>
@@ -132,17 +141,17 @@
                                 <div class="album-art-placeholder">No album art</div>
                             </div>
                             <div class="album-art-controls">
-                                <button class="upload-btn" onclick="document.getElementById('art-upload').click()">Upload Image</button>
+                                <button class="upload-btn" onclick="document.getElementById('art-upload').click()">Upload</button>
                                 <button class="save-image-btn btn-status" onclick="saveAlbumArt()" style="display: none;">
-                                    <span class="btn-status-content">Save Image</span>
+                                    <span class="btn-status-content">Apply to file</span>
                                     <span class="btn-status-message"></span>
                                 </button>
                                 <button class="apply-folder-btn btn-status" onclick="applyArtToFolder()" style="display: none;">
-                                    <span class="btn-status-content">Apply to All in Folder</span>
+                                    <span class="btn-status-content">Apply to folder</span>
                                     <span class="btn-status-message"></span>
                                 </button>
                                 <button class="delete-art-btn btn-status" onclick="deleteAlbumArt()" style="display: none;">
-                                    <span class="btn-status-content">Delete Image</span>
+                                    <span class="btn-status-content">Delete</span>
                                     <span class="btn-status-message"></span>
                                 </button>
                                 <input type="file" id="art-upload" accept="image/*" onchange="handleArtUpload(event)">
@@ -351,6 +360,10 @@
                             <span class="help-description">Cancel / Close</span>
                             <span class="help-keys"><span class="help-key">Esc</span></span>
                         </div>
+                        <div class="help-shortcut-item">
+                            <span class="help-description">Toggle theme</span>
+                            <span class="help-keys"><span class="help-key">Alt</span><span class="help-key-plus">+</span><span class="help-key">T</span></span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -371,6 +384,7 @@
     <script src="{{ url_for('static', filename='js/ui/utilities.js') }}"></script>
     <script src="{{ url_for('static', filename='js/ui/pane-resize.js') }}"></script>
     <script src="{{ url_for('static', filename='js/ui/filter-sort.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/ui/theme-toggle.js') }}"></script>
 
     <!-- Audio modules -->
     <script src="{{ url_for('static', filename='js/audio/player.js') }}"></script>

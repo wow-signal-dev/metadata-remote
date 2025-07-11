@@ -26,10 +26,12 @@ ENV PYTHONPATH=/root/.local/lib/python3.11/site-packages:$PYTHONPATH
 # Copy application files
 COPY app.py .
 COPY config.py .
+COPY gunicorn_config.py .
 COPY core/ core/
 COPY templates/ templates/
 COPY static/ static/
 
 EXPOSE 8338
 
-CMD ["python", "app.py"]
+# Use Gunicorn instead of Flask's development server
+CMD ["gunicorn", "--config", "gunicorn_config.py", "app:app"]

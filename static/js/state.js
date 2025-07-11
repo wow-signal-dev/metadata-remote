@@ -19,6 +19,9 @@ window.MetadataRemote.State = {
     originalMetadata: {},
     currentFiles: [],
     
+    // Theme state
+    currentTheme: 'dark',
+    
     // Tree and folder state
     treeData: {},
     expandedFolders: new Set(),

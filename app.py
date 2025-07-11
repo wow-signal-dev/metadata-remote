@@ -36,6 +36,9 @@ import uuid
 from dataclasses import dataclass, asdict
 from enum import Enum
 import subprocess
+from werkzeug.middleware.proxy_fix import ProxyFix
+import signal
+import sys
 
 from config import (
     MUSIC_DIR, OWNER_UID, OWNER_GID, PORT, HOST,
@@ -68,6 +71,24 @@ from core.album_art.manager import (
 from core.batch.processor import process_folder_files
 
 app = Flask(__name__)
+
+# Configure for reverse proxy
+# This ensures Flask correctly interprets headers set by the reverse proxy
+app.wsgi_app = ProxyFix(
+    app.wsgi_app, 
+    x_for=1,      # Trust 1 proxy for X-Forwarded-For
+    x_proto=1,    # Trust 1 proxy for X-Forwarded-Proto  
+    x_host=1,     # Trust 1 proxy for X-Forwarded-Host
+    x_prefix=1    # Trust 1 proxy for X-Forwarded-Prefix
+)
+
+# Configure proper SIGTERM handling for graceful shutdown
+def signal_handler(sig, frame):
+    logger.info('Received shutdown signal, cleaning up...')
+    sys.exit(0)
+
+signal.signal(signal.SIGTERM, signal_handler)
+signal.signal(signal.SIGINT, signal_handler)
 
 @app.after_request
 def add_cache_headers(response):
@@ -105,6 +126,15 @@ def sanitize_log_data(data):
 def index():
     return render_template('index.html')
 
+@app.route('/health')
+def health_check():
+    """Health check endpoint for monitoring and load balancer checks"""
+    return jsonify({
+        'status': 'healthy',
+        'service': 'metadata-remote',
+        'version': '1.0.0',
+        'timestamp': datetime.now().isoformat()
+    }), 200
 
 @app.route('/stream/<path:filepath>')
 def stream_audio(filepath):
@@ -1353,5 +1383,9 @@ def infer_metadata_field(filename, field):
 # Enable template auto-reloading
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 
+# Application factory pattern for Gunicorn
 if __name__ == '__main__':
+    # This block will only run during development
+    # In production, Gunicorn will import 'app' directly
+    logger.warning("Running in development mode. Use Gunicorn for production!")
     app.run(host=HOST, port=PORT, debug=False)
