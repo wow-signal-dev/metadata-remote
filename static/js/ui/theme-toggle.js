@@ -15,14 +15,11 @@
         STORAGE_KEY: 'metadataRemote.theme',
         DARK_THEME: 'dark',
         LIGHT_THEME: 'light',
-        TRANSITION_CLASS: 'theme-transition',
-        TRANSITION_DURATION: 300,
         
         // State
         currentTheme: null,
         toggleElement: null,
         checkboxElement: null,
-        isTransitioning: false,
         isInitialized: false,
         
         /**
@@ -51,8 +48,8 @@
             // Set up event listeners
             this.setupEventListeners();
             
-            // Apply theme without transition on initial load
-            this.applyTheme(false);
+            // Apply theme
+            this.applyTheme();
         },
         
         /**
@@ -82,19 +79,10 @@
         
         /**
          * Apply the current theme to the document
-         * @param {boolean} withTransition - Whether to apply with transition effect
          */
-        applyTheme(withTransition = true) {
+        applyTheme() {
             const root = document.documentElement;
             
-            // Prevent multiple transitions
-            if (this.isTransitioning) return;
-            
-            // Add transition class if requested
-            if (withTransition) {
-                this.isTransitioning = true;
-                root.classList.add(this.TRANSITION_CLASS);
-            }
             
             // Apply theme
             if (this.currentTheme === this.LIGHT_THEME) {
@@ -121,23 +109,12 @@
                 window.MetadataRemote.State.currentTheme = this.currentTheme;
             }
             
-            // Remove transition class after animation completes
-            if (withTransition) {
-                setTimeout(() => {
-                    root.classList.remove(this.TRANSITION_CLASS);
-                    this.isTransitioning = false;
-                }, this.TRANSITION_DURATION);
-            }
         },
         
         /**
          * Toggle between dark and light themes
          */
         toggleTheme() {
-            // Debounce rapid toggling
-            if (this.isTransitioning) {
-                return;
-            }
             
             // Switch theme
             this.currentTheme = this.currentTheme === this.DARK_THEME ? 
@@ -145,7 +122,7 @@
             
             // Save and apply
             this.saveTheme();
-            this.applyTheme(true);
+            this.applyTheme();
             
             // Emit custom event
             const event = new CustomEvent('themeChanged', {
@@ -181,7 +158,7 @@
             window.addEventListener('storage', (e) => {
                 if (e.key === this.STORAGE_KEY && e.newValue) {
                     this.currentTheme = e.newValue;
-                    this.applyTheme(true);
+                    this.applyTheme();
                 }
             });
         }
