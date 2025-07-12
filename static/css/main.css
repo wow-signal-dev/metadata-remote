@@ -2665,6 +2665,7 @@ button:disabled {
 .help-sections-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
+    grid-auto-flow: dense;
     gap: 0.75rem;
     margin-bottom: 0.5rem;
 }
@@ -3165,6 +3166,11 @@ button:disabled {
     );
 }
 
+/* Fix for history header in collapsed state - use solid color instead of gradient */
+:root[data-theme="light"] .history-panel.collapsed .history-header {
+    background: #d4be81;
+}
+
 /* Enhanced input styling for light theme - only for filter inputs */
 :root[data-theme="light"] .filter-input {
     background: var(--bg-input);
@@ -3361,7 +3367,7 @@ button:disabled {
 
 :root[data-theme="light"] .help-github-link {
     background: rgba(208, 140, 96, 0.1);
-    color: var(--accent-primary);
+    color: #8b5a3c;
 }
 
 :root[data-theme="light"] .help-github-link:hover {
