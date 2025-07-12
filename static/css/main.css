@@ -44,8 +44,8 @@
 :root[data-theme="light"] {
     /* Core Theme Variables */
     --bg-primary: #f4f1de;
-    --bg-secondary: #e8e2c5;
-    --bg-tertiary: #ddd0a3;
+    --bg-secondary: #ddd0a3;
+    --bg-tertiary: #e8e2c5;
     --bg-card: #f9f6e7;
     --bg-hover: #d4be81;
     --border-color: #c1a55f;
@@ -1203,7 +1203,7 @@ input:autofill {
 .files {
     flex: 0 0 35%;
     min-width: 250px;
-    background: var(--bg-secondary);
+    background: var(--bg-tertiary);
     overflow: hidden;
     outline: none;
     height: 100%;
@@ -1401,7 +1401,7 @@ input:autofill {
 .metadata {
     flex: 1;
     min-width: 300px;
-    background: var(--bg-tertiary);
+    background: var(--bg-secondary);
     overflow-y: auto;
     height: 100%;
     display: flex;
