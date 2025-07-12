@@ -327,6 +327,19 @@
                     disc: data.disc || ''
                 };
                 
+                // Restore dynamic fields to originalMetadata
+                if (data.all_fields) {
+                    const standardFields = ['title', 'artist', 'album', 'albumartist', 'date', 'genre', 'composer', 'track', 'disc'];
+                    Object.entries(data.all_fields).forEach(([fieldId, fieldInfo]) => {
+                        if (fieldInfo.value !== undefined && fieldInfo.value !== null) {
+                            // Only store non-standard fields to avoid overwriting standard field values
+                            if (!standardFields.includes(fieldId)) {
+                                State.originalMetadata[fieldId] = fieldInfo.value;
+                            }
+                        }
+                    });
+                }
+                
                 // Re-render fields instead of just setting values
                 State.metadata = data;
                 this.renderMetadataFields(data);
@@ -715,11 +728,8 @@
         },
         
         renderMetadataFields(metadata) {
-            console.log('[METADATA_RENDERING] Starting renderMetadataFields');
-            
             // First render standard fields that exist
             this.renderStandardFields(metadata);
-            console.log('[METADATA_RENDERING] Standard fields rendered');
             
             const dynamicFieldsContainer = document.getElementById('dynamic-fields-container');
             
