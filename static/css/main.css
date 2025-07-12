@@ -256,7 +256,7 @@ input:autofill {
 }
 
 .theme-switch-checkbox:checked + .theme-switch-slider::before {
-    transform: translateX(19px) translateY(-50%);
+    transform: translateX(17px) translateY(-50%);
 }
 
 .theme-icon {
@@ -281,7 +281,7 @@ input:autofill {
 }
 
 .theme-icon.sun {
-    left: 29px;  /* Center of toggle when in right position (2px + 19px travel + 8px center) */
+    left: 28px;  /* Center of toggle when in right position (2px + 19px travel + 8px center) */
     transform: translate(-50%, -50%);
     opacity: 0.3;
     color: var(--text-muted);
