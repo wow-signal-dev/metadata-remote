@@ -134,7 +134,6 @@
             
             // Global keyboard handler with custom repeat
             document.addEventListener('keydown', (e) => {
-                
                 // Check for active sort dropdown
                 const activeSortDropdown = document.querySelector('.sort-dropdown.active');
 

@@ -1474,8 +1474,27 @@
             const confirmUI = document.createElement('div');
             confirmUI.className = 'delete-confirmation';
             
-            // Insert confirmation UI after the delete button
-            deleteBtn.parentElement.appendChild(confirmUI);
+            // Determine if this is a grouped field
+            const isGroupedField = ['track', 'disc', 'date'].includes(fieldId);
+            
+            if (isGroupedField) {
+                // GROUPED FIELDS: Insert after label-with-delete div (between label and input)
+                const labelDiv = fieldElement.querySelector('.label-with-delete');
+                if (labelDiv) {
+                    labelDiv.insertAdjacentElement('afterend', confirmUI);
+                    // Add class to parent container to push down all input fields
+                    const threeColumnContainer = fieldElement.closest('.form-group-three-column');
+                    if (threeColumnContainer) {
+                        threeColumnContainer.classList.add('has-confirmation-ui');
+                    }
+                } else {
+                    // Fallback to original behavior if structure is unexpected
+                    deleteBtn.parentElement.appendChild(confirmUI);
+                }
+            } else {
+                // REGULAR FIELDS: Keep existing behavior (append to delete button's parent)
+                deleteBtn.parentElement.appendChild(confirmUI);
+            }
             
             // Add keyboard event handler for Escape key
             const handleEscape = (e) => {
@@ -1531,9 +1550,12 @@
             // Truncate long field names
             const truncatedName = fieldName.length > 20 ? fieldName.substring(0, 20) + '...' : fieldName;
             
+            // Determine confirmation text based on field type
+            const confirmText = isGroupedField ? 'Delete from:' : 'Delete field from:';
+            
             // Update confirmation UI to show file/folder options
             confirmUI.innerHTML = `
-                <span class="confirm-text">Delete field from:</span>
+                <span class="confirm-text">${confirmText}</span>
                 <button type="button" class="inline-choice-btn inline-choice-file" onclick="window.MetadataRemote.Metadata.Editor.deleteFromFile('${fieldId}')">file</button>
                 <button type="button" class="inline-choice-btn inline-choice-folder" onclick="window.MetadataRemote.Metadata.Editor.confirmBatchDelete('${fieldId}')">folder</button>
             `;
@@ -1574,6 +1596,15 @@
             if (deleteBtn) {
                 deleteBtn.style.visibility = '';
             }
+            
+            // Remove class from parent container for grouped fields
+            const isGroupedField = ['track', 'disc', 'date'].includes(fieldId);
+            if (isGroupedField) {
+                const threeColumnContainer = fieldElement.closest('.form-group-three-column');
+                if (threeColumnContainer) {
+                    threeColumnContainer.classList.remove('has-confirmation-ui');
+                }
+            }
         },
 
         /**
@@ -1591,6 +1622,15 @@
             
             if (deleteBtn) {
                 deleteBtn.style.visibility = '';
+            }
+            
+            // Remove class from parent container for grouped fields
+            const isGroupedField = ['track', 'disc', 'date'].includes(fieldId);
+            if (isGroupedField) {
+                const threeColumnContainer = document.querySelector('.form-group-three-column');
+                if (threeColumnContainer) {
+                    threeColumnContainer.classList.remove('has-confirmation-ui');
+                }
             }
             
             try {
@@ -1750,6 +1790,15 @@
             
             // Hide confirmation UI
             if (confirmUI) confirmUI.remove();
+            
+            // Remove class from parent container for grouped fields
+            const isGroupedField = ['track', 'disc', 'date'].includes(fieldId);
+            if (isGroupedField) {
+                const threeColumnContainer = document.querySelector('.form-group-three-column');
+                if (threeColumnContainer) {
+                    threeColumnContainer.classList.remove('has-confirmation-ui');
+                }
+            }
             
             try {
                 const folderPath = State.currentPath || '';

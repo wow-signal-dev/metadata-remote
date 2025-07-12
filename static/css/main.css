@@ -1754,8 +1754,8 @@ input[type="file"] {
 /* Remove top margin from first form-group in each section */
 #standard-fields-container > .form-group-with-button:first-child,
 #standard-fields-container > .form-group-three-column:first-child,
-#dynamic-fields-container > .dynamic-field:first-child .form-group {
-    margin-top: 0;
+#dynamic-fields-container > .dynamic-field:first-child {
+    margin-top: -0.5rem;
 }
 
 .form-group-with-button {
@@ -1899,6 +1899,77 @@ input[type="file"] {
     gap: 0.5rem;
     margin-left: auto;
     margin-right: 0;
+}
+
+/* Grouped field confirmation positioning - ONLY for Track #, Disc #, Year */
+.form-group-three-column .form-group-wrapper .delete-confirmation {
+    /* Reset the auto margin that pushes to right in regular fields */
+    margin-left: 0;
+    margin-right: 0;
+    /* Add vertical spacing */
+    margin-top: -0.15rem;
+    margin-bottom: 0.15rem;
+    /* Allow natural width - no constraints */
+    width: auto;
+    /* Ensure minimum width for proper button display */
+    min-width: 200px;
+    /* Standard font size for readability */
+    font-size: 0.75rem;
+    /* Ensure it can overflow the column if needed */
+    position: relative;
+    z-index: 10;
+}
+
+/* Special positioning for Year field confirmation - centered in metadata pane */
+.form-group-three-column .form-group-wrapper:last-child .delete-confirmation {
+    /* Let it size naturally based on content */
+    width: max-content;
+    /* Override the 200px min-width from parent rule */
+    min-width: unset;
+    /* Use flexbox for layout */
+    display: flex;
+    /* Center horizontally using auto margins */
+    margin-left: auto;
+    margin-right: auto;
+    /* Transform to fine-tune centering relative to metadata pane */
+    transform: translateX(-33.33%);
+    /* Keep it in the normal flow to push input down */
+    position: relative;
+    /* Ensure it appears above other elements */
+    z-index: 20;
+}
+
+/* Ensure confirm text and buttons are properly sized in grouped fields */
+.form-group-three-column .delete-confirmation .confirm-text {
+    font-size: 0.75rem;
+    white-space: nowrap;
+}
+
+/* Ensure buttons in grouped fields have proper sizing */
+.form-group-three-column .delete-confirmation .inline-choice-btn {
+    /* Override any width constraints */
+    min-width: 35px;
+    padding: 0.2rem 0.5rem;
+    font-size: 0.7rem;
+    white-space: nowrap;
+}
+
+
+/* Ensure form group wrappers don't clip overflowing confirmation UI */
+.form-group-three-column .form-group-wrapper {
+    overflow: visible;
+}
+
+/* When any grouped field shows confirmation UI, push all input fields down together */
+.form-group-three-column.has-confirmation-ui .input-wrapper {
+    /* Add top margin to push all inputs down when confirmation UI is visible */
+    margin-top: 1.65rem;
+}
+
+/* Don't add extra margin to the input that already has confirmation UI above it */
+.form-group-three-column.has-confirmation-ui .delete-confirmation + .input-wrapper {
+    /* Reset margin since the confirmation UI already creates the space */
+    margin-top: 0.15rem;
 }
 
 .confirm-text {

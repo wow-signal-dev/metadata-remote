@@ -23,11 +23,19 @@
         toggleElement: null,
         checkboxElement: null,
         isTransitioning: false,
+        isInitialized: false,
         
         /**
          * Initialize the theme toggle module
          */
         init() {
+            // Prevent double initialization
+            if (this.isInitialized) {
+                return;
+            }
+            
+            this.isInitialized = true;
+            
             // Get DOM elements
             this.toggleElement = document.querySelector('.theme-toggle');
             this.checkboxElement = document.getElementById('theme-switch');
@@ -127,7 +135,9 @@
          */
         toggleTheme() {
             // Debounce rapid toggling
-            if (this.isTransitioning) return;
+            if (this.isTransitioning) {
+                return;
+            }
             
             // Switch theme
             this.currentTheme = this.currentTheme === this.DARK_THEME ? 
@@ -153,10 +163,15 @@
                 this.toggleTheme();
             });
             
-            // Keyboard shortcut (Alt+T)
+            // Debug logging removed - issue was identified as Mac using metaKey instead of altKey
+            
+            // Keyboard shortcut (Alt+T / Option+T on Mac)
             document.addEventListener('keydown', (e) => {
-                if (e.altKey && e.key.toLowerCase() === 't' && 
-                    !e.ctrlKey && !e.shiftKey && !e.metaKey) {
+                // On some systems (particularly Mac), the Option/Alt key might be reported as metaKey
+                const isAltT = (e.altKey || e.metaKey) && e.key.toLowerCase() === 't' && 
+                              !e.ctrlKey && !e.shiftKey;
+                
+                if (isAltT) {
                     e.preventDefault();
                     this.toggleTheme();
                 }
@@ -175,10 +190,6 @@
     // Export to namespace
     window.MetadataRemote.UI.ThemeToggle = ThemeToggle;
     
-    // Initialize when DOM is ready
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', () => ThemeToggle.init());
-    } else {
-        ThemeToggle.init();
-    }
+    // Remove self-initialization - let app.js handle it
+    // This was causing double initialization
 })();
