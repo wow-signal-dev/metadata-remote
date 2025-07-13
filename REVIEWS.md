@@ -60,6 +60,6 @@
 
 ---
 
-> "Thank you SO MUCH! I had to install Airsonic Advanced or Ampache for this sole purpose. I'll be following your project."
-> 
+"Thank you SO MUCH! I had to install Airsonic Advanced or Ampache for this sole purpose. I'll be following your project."
+
 > — u/Digital_Voodoo
