@@ -6,6 +6,12 @@
 
 ---
 
+> "Man, this is GREAT, just installed it and it works like a charm. I can finally remove the old MB Picard and use this from my phone without the need to rdp into my windows machine. Big thumbs up!!"
+>
+> @andyxpert
+
+---
+
 > "This is incredible, and fills a unique niche that no other tool accomplishes (or well, Ampache is the only headless server that writes tag changes to file, but it's incredibly clunky.) ...Awesome, thank you - this is a huge level up!"
 > 
 > — u/fistful_of_dollars
