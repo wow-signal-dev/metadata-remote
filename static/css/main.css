@@ -1525,6 +1525,13 @@ input:autofill {
     width: fit-content;
 }
 
+/* Light mode styling for album art container */
+:root[data-theme="light"] .album-art-container {
+    background: var(--bg-input);
+    border: 1px solid var(--border-color);
+    backdrop-filter: none;
+}
+
 
 .album-art {
     max-width: 120px;
