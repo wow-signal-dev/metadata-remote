@@ -1,7 +1,7 @@
 ## User Reviews of Metadata Remote
 
-> "This is perfect for my needs. Have been using beets but struggling to get the config perfect for auto-tagging so I don't have to go back in and correct stuff again after an import."
-> 
+"This is perfect for my needs. Have been using beets but struggling to get the config perfect for auto-tagging so I don't have to go back in and correct stuff again after an import."
+
 > — u/Big_Damage5834
 
 ---
