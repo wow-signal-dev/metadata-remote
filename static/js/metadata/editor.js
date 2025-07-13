@@ -806,7 +806,8 @@
                                    data-editing="false"
                                    value="${escapeHtml(fieldInfo.value || '')}"
                                    ${!fieldInfo.is_editable ? 'readonly' : ''}
-                                   ${fieldInfo.field_type === 'oversized' || fieldInfo.field_type === 'binary' ? 'disabled' : ''}>
+                                   ${fieldInfo.field_type === 'binary' ? 'disabled' : ''}
+                                   ${fieldInfo.field_type === 'oversized' ? 'readonly' : ''}>
                             <div class="inference-loading" id="dynamic-${safeId}-loading">
                                 <div class="inference-spinner"></div>
                             </div>
@@ -842,8 +843,35 @@
             
             container.insertAdjacentHTML('beforeend', fieldHtml);
             
-            // Handle oversized/binary content display
-            if (fieldInfo.field_type === 'oversized' || fieldInfo.field_type === 'binary') {
+            // If this is an oversized field, add special handling
+            if (fieldInfo.field_type === 'oversized') {
+                const input = container.querySelector(`#dynamic-${safeId}`);
+                if (input) {
+                    input.classList.add('oversized-field-input');
+                    input.dataset.originalValue = fieldInfo.original_value || '';
+                    
+                    // Add click handler
+                    input.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        if (window.MetadataRemote.Metadata.FieldEditModal) {
+                            window.MetadataRemote.Metadata.FieldEditModal.open(fieldId, fieldInfo, input);
+                        }
+                    });
+                    
+                    // Add keyboard handler
+                    input.addEventListener('keydown', (e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            if (window.MetadataRemote.Metadata.FieldEditModal) {
+                                window.MetadataRemote.Metadata.FieldEditModal.open(fieldId, fieldInfo, input);
+                            }
+                        }
+                    });
+                }
+            }
+            
+            // Handle binary content display
+            if (fieldInfo.field_type === 'binary') {
                 const input = document.getElementById(`dynamic-${safeId}`);
                 if (input) {
                     input.value = 'Unsupported Content type';
@@ -1949,6 +1977,11 @@
             
             // Then call the original applyFieldToFolder function
             this.applyFieldToFolder(field, ButtonStatus.showButtonStatus, UIUtils.setFormEnabled);
+        },
+        
+        // Expose dynamicFields for modal access
+        get dynamicFields() {
+            return dynamicFields;
         }
     };
 })();

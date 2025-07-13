@@ -96,7 +96,8 @@
             document.addEventListener('click', (e) => {
                 
                 if (e.target.tagName === 'INPUT' && e.target.type === 'text' && 
-                    e.target.closest('.metadata') && e.target.dataset.editing === 'false') {
+                    e.target.closest('.metadata') && e.target.dataset.editing === 'false' &&
+                    !e.target.classList.contains('oversized-field-input')) {
                     
                     
                     // Clear focus from any other metadata input fields first
@@ -211,6 +212,12 @@
                                 e.target.readOnly = true;
                                 // Keep the element focused for navigation without creating a focus cycle
                             } else {
+                                // Check if this is an oversized field - if so, don't enter edit mode
+                                if (e.target.classList.contains('oversized-field-input')) {
+                                    // Let the modal handler deal with it
+                                    return;
+                                }
+                                
                                 // Transition to form edit state
                                 StateMachine.transition(StateMachine.States.FORM_EDIT, {
                                     fieldId: e.target.id,

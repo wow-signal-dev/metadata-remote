@@ -105,6 +105,11 @@ const AudioMetadataEditor = {
             loadFile: this.loadFile.bind(this)
         });
         
+        // Initialize field edit modal
+        if (window.MetadataRemote.Metadata.FieldEditModal) {
+            window.MetadataRemote.Metadata.FieldEditModal.init();
+        }
+        
         // UI components
         PaneResize.initializePaneResize();
         PaneResize.initializeHistoryPanelResize(() => HistoryManager.toggleHistoryPanel());

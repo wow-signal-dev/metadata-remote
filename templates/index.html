@@ -392,6 +392,45 @@
             <a href="https://github.com/wow-signal-dev/metadata-remote" target="_blank" class="help-github-link">View on GitHub</a>
         </div>
     </div>
+
+    <!-- Field Edit Modal -->
+    <div class="field-edit-overlay" id="field-edit-overlay" role="presentation"></div>
+    <div class="field-edit-box" id="field-edit-box" role="dialog" aria-modal="true" aria-labelledby="field-edit-header">
+        <div class="field-edit-header" id="field-edit-header">
+            <span id="field-edit-filename" class="field-edit-filename"></span>
+            <span id="field-edit-fieldname" class="field-edit-fieldname"></span> field
+        </div>
+        
+        <div class="field-edit-content">
+            <textarea 
+                id="field-edit-textarea"
+                class="field-edit-textarea"
+                placeholder="Enter field content..."
+                spellcheck="false"
+                autocomplete="off"
+                autocorrect="off"
+                autocapitalize="off"
+                aria-label="Field content editor"
+            ></textarea>
+        </div>
+        
+        <div class="field-edit-actions">
+            <button class="field-edit-btn field-edit-apply-file btn-status" id="field-edit-apply-file" disabled aria-label="Apply changes to current file">
+                <span class="btn-status-content">Apply to file</span>
+                <span class="btn-status-message"></span>
+            </button>
+            <button class="field-edit-btn field-edit-apply-folder btn-status" id="field-edit-apply-folder" disabled aria-label="Apply changes to all files in folder">
+                <span class="btn-status-content">Apply to folder</span>
+                <span class="btn-status-message"></span>
+            </button>
+            <button class="field-edit-btn field-edit-reset" id="field-edit-reset" aria-label="Reset to original content">
+                Reset
+            </button>
+            <button class="field-edit-btn field-edit-cancel" id="field-edit-cancel" aria-label="Cancel and close">
+                Cancel
+            </button>
+        </div>
+    </div>
   
     <!-- Core modules -->
     <script src="{{ url_for('static', filename='js/state.js') }}"></script>
@@ -431,6 +470,7 @@
     <script src="{{ url_for('static', filename='js/metadata/editor.js') }}"></script>
     <script src="{{ url_for('static', filename='js/metadata/album-art.js') }}"></script>
     <script src="{{ url_for('static', filename='js/metadata/inference.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/metadata/field-edit-modal.js') }}"></script>
 
     <!-- History modules -->
     <script src="{{ url_for('static', filename='js/history/manager.js') }}"></script>

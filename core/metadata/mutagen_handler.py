@@ -1533,8 +1533,10 @@ class MutagenHandler:
             if hasattr(frame, 'text'):
                 text_value = str(frame.text[0]) if frame.text else ''
                 if len(text_value) > 200:
-                    field_info['value'] = 'Unsupported Content type'
-                    field_info['is_editable'] = False
+                    field_info['original_value'] = text_value  # Preserve full content
+                    field_info['display_value'] = 'Click to view/edit'
+                    field_info['value'] = 'Click to view/edit'  # For backward compatibility
+                    field_info['is_editable'] = True  # Change from False
                     field_info['field_type'] = 'oversized'
                 else:
                     field_info['value'] = text_value
@@ -1547,8 +1549,10 @@ class MutagenHandler:
                 if hasattr(frame, 'text'):
                     text_value = str(frame.text[0]) if frame.text else ''
                     if len(text_value) > 200:
-                        field_info['value'] = 'Unsupported Content type'
-                        field_info['is_editable'] = False
+                        field_info['original_value'] = text_value  # Preserve full content
+                        field_info['display_value'] = 'Click to view/edit'
+                        field_info['value'] = 'Click to view/edit'  # For backward compatibility
+                        field_info['is_editable'] = True  # Change from False
                         field_info['field_type'] = 'oversized'
                     else:
                         field_info['value'] = text_value
@@ -1611,8 +1615,10 @@ class MutagenHandler:
                 text_value = str(value)
             
             if len(text_value) > 200:
-                field_info['value'] = 'Unsupported Content type'
-                field_info['is_editable'] = False
+                field_info['original_value'] = text_value  # Preserve full content
+                field_info['display_value'] = 'Click to view/edit'
+                field_info['value'] = 'Click to view/edit'  # For backward compatibility
+                field_info['is_editable'] = True  # Change from False
                 field_info['field_type'] = 'oversized'
             else:
                 field_info['value'] = text_value
@@ -1660,8 +1666,10 @@ class MutagenHandler:
                     try:
                         text_value = value[0].decode('utf-8')
                         if len(text_value) > 200:
-                            field_info['value'] = 'Unsupported Content type'
-                            field_info['is_editable'] = False
+                            field_info['original_value'] = text_value  # Preserve full content
+                            field_info['display_value'] = 'Click to view/edit'
+                            field_info['value'] = 'Click to view/edit'  # For backward compatibility
+                            field_info['is_editable'] = True  # Change from False
                             field_info['field_type'] = 'oversized'
                         else:
                             field_info['value'] = text_value
@@ -1672,8 +1680,10 @@ class MutagenHandler:
                 else:
                     text_value = str(value[0])
                     if len(text_value) > 200:
-                        field_info['value'] = 'Unsupported Content type'
-                        field_info['is_editable'] = False
+                        field_info['original_value'] = text_value  # Preserve full content
+                        field_info['display_value'] = 'Click to view/edit'
+                        field_info['value'] = 'Click to view/edit'  # For backward compatibility
+                        field_info['is_editable'] = True  # Change from False
                         field_info['field_type'] = 'oversized'
                     else:
                         field_info['value'] = text_value
@@ -1721,8 +1731,10 @@ class MutagenHandler:
                 text_value = str(value.value) if hasattr(value, 'value') else str(value)
             
             if len(text_value) > 200:
-                field_info['value'] = 'Unsupported Content type'
-                field_info['is_editable'] = False
+                field_info['original_value'] = text_value  # Preserve full content
+                field_info['display_value'] = 'Click to view/edit'
+                field_info['value'] = 'Click to view/edit'  # For backward compatibility
+                field_info['is_editable'] = True  # Change from False
                 field_info['field_type'] = 'oversized'
             else:
                 field_info['value'] = text_value
@@ -1764,8 +1776,10 @@ class MutagenHandler:
                 text_value = str(value)
             
             if len(text_value) > 200:
-                field_info['value'] = 'Unsupported Content type'
-                field_info['is_editable'] = False
+                field_info['original_value'] = text_value  # Preserve full content
+                field_info['display_value'] = 'Click to view/edit'
+                field_info['value'] = 'Click to view/edit'  # For backward compatibility
+                field_info['is_editable'] = True  # Change from False
                 field_info['field_type'] = 'oversized'
             else:
                 field_info['value'] = text_value
