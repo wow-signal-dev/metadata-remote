@@ -311,8 +311,6 @@ def create_album_art_action(filepath: str, old_art: Optional[str], new_art: Opti
     """Create a history action for album art change"""
     filename = os.path.basename(filepath)
     
-    # Note: The history instance needs to be passed in or accessed globally
-    # This will be handled in the main app
     old_art_path = ''
     new_art_path = ''
     
@@ -339,7 +337,6 @@ def create_batch_album_art_action(folder_path: str, art_data: str, file_changes:
     folder_name = os.path.basename(folder_path) or "root"
     description = f"Applied album art to {len(file_changes)} files in \"{folder_name}\""
     
-    # Note: The history instance needs to be passed in or accessed globally
     new_art_path = ''
     
     old_values = {}

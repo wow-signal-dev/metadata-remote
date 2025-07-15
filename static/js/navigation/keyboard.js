@@ -94,6 +94,15 @@
             
             // Handle click events on metadata input fields to immediately activate editing
             document.addEventListener('click', (e) => {
+                // When clicking oversized button, properly handle fields in editing mode
+                if (e.target.classList.contains('oversized-field-button')) {
+                    const editingFields = document.querySelectorAll('.metadata input[type="text"][data-editing="true"]');
+                    editingFields.forEach(field => {
+                        field.blur();
+                        field.dataset.editing = 'false';
+                        field.readOnly = true;
+                    });
+                }
                 
                 if (e.target.tagName === 'INPUT' && e.target.type === 'text' && 
                     e.target.closest('.metadata') && e.target.dataset.editing === 'false' &&
@@ -121,6 +130,7 @@
                     // Immediately activate editing mode on click
                     e.target.dataset.editing = 'true';
                     e.target.readOnly = false;
+                    
                     
                     // Position cursor at the click location (default behavior)
                     // Show inference suggestions if field is empty and we have a current file
@@ -166,8 +176,6 @@
                 // Handle metadata pane navigation
                 if (State.focusedPane === 'metadata') {
                     
-                    // Tab key now handled by Router (removed from here)
-                    
                     // Handle Enter key on filename - MUST come before arrow key navigation
                     if (e.key === 'Enter' && e.target.id === 'current-filename') {
                         e.preventDefault();
@@ -212,9 +220,11 @@
                                 e.target.readOnly = true;
                                 // Keep the element focused for navigation without creating a focus cycle
                             } else {
-                                // Check if this is an oversized field - if so, don't enter edit mode
-                                if (e.target.classList.contains('oversized-field-input')) {
-                                    // Let the modal handler deal with it
+                                // Check if this is an oversized field button
+                                if (e.target.classList.contains('oversized-field-button')) {
+                                    // Click the button to open modal
+                                    e.preventDefault();
+                                    e.target.click();
                                     return;
                                 }
                                 
@@ -409,9 +419,6 @@
                     return;
                 }
 
-                // Filter shortcuts now handled by Router
-                // Removed: / and Ctrl+F shortcuts (see registerKeyboardRoutes)
-                
                 // Sort reverse: Ctrl+Shift+S
                 if (e.ctrlKey && e.shiftKey && e.key === 'S') {
                     e.preventDefault();
@@ -419,9 +426,9 @@
                     if (dirBtn) dirBtn.click();
                 }
                 
-                // Arrow keys, PageUp/PageDown, and Enter are now handled by ListNavigation module via Router
+                // Filter shortcuts, Arrow keys, PageUp/PageDown, and Enter are handled by ListNavigation module via Router
                 // No direct handling needed here - ListNavigation routes will take precedence
-                // Tab key now handled by Router (see registerKeyboardRoutes)
+                // Tab key also handled by Router (see registerKeyboardRoutes)
                 
             });
             
@@ -527,12 +534,9 @@
             
             // Tab key routing
             const tabState = window.NavigationStates?.NORMAL || 'normal';
-            // Tab routing now handled by PaneNavigation module
+            // Tab routing handled by PaneNavigation module
         },
         
-        
-        
-
         
         /**
          * Navigate within the metadata pane using arrow keys
@@ -578,11 +582,12 @@
             const dynamicFieldsContainer = document.getElementById('dynamic-fields-container');
             
             if (dynamicFieldsContainer) {
-                const dynamicInputs = dynamicFieldsContainer.querySelectorAll('input[data-dynamic="true"]');
+                // Select both inputs and oversized buttons for dynamic fields
+                const dynamicFields = dynamicFieldsContainer.querySelectorAll('input[data-dynamic="true"], button.oversized-field-button');
                 
-                dynamicInputs.forEach(input => {
-                    if (input.id) {
-                        navigableElements.push('#' + input.id);
+                dynamicFields.forEach(field => {
+                    if (field.id) {
+                        navigableElements.push('#' + field.id);
                     }
                 });
             }
@@ -609,7 +614,7 @@
                     elements = metadataSection.querySelectorAll(selector);
                 } else if (selector.startsWith('#')) {
                     // For ID selectors, use getElementById to avoid issues with special characters
-                    const id = selector.substring(1); // Remove the # prefix
+                    const id = selector.substring(1);
                     const el = document.getElementById(id);
                     elements = el ? [el] : [];
                 } else {
@@ -766,7 +771,7 @@
                 // Simple navigation - just go to next element in the list
                 nextIndex = currentIndex < focusableElements.length - 1 ? currentIndex + 1 : 0;
             } else if (key === 'ArrowLeft' || key === 'ArrowRight') {
-                // For left/right arrows, we'll keep some basic logic for navigating between grouped elements
+                // For left/right arrows, we have some basic logic for navigating between grouped elements
                 // This is less intrusive than vertical navigation and makes sense spatially
                 
                 // Handle horizontal navigation for grouped fields (Track, Disc, Year)
@@ -1099,7 +1104,7 @@
                 
                 // Clear header focus
                 this.clearHeaderFocus();
-                // Set state BEFORE clicking to avoid race condition (for backward compatibility)
+                // Set state BEFORE clicking to avoid race condition
                 State.filterInputActive = pane;
                 // Click the filter button to open it
                 filterBtn.click();

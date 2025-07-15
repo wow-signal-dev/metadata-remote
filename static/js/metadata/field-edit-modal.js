@@ -32,6 +32,8 @@
         originalContent: '',
         triggerElement: null,
         updateButtonStatesTimeout: null,
+        charCountTimeout: null,
+        onCharacterCountChange: null, // Callback for character count changes
         
         /**
          * Initialize the module
@@ -58,8 +60,8 @@
          * Set up event listeners
          */
         setupEventListeners() {
-            // Overlay click to close
-            this.overlay.addEventListener('click', () => this.close());
+            // Overlay click to close (counts as cancel)
+            this.overlay.addEventListener('click', () => this.close(true));
             
             // Prevent box clicks from closing
             this.box.addEventListener('click', (e) => e.stopPropagation());
@@ -68,21 +70,98 @@
             this.textarea.addEventListener('input', () => {
                 clearTimeout(this.updateButtonStatesTimeout);
                 this.updateButtonStatesTimeout = setTimeout(() => this.updateButtonStates(), 300);
+                
+                // Check character count for auto-closing
+                clearTimeout(this.charCountTimeout);
+                this.charCountTimeout = setTimeout(() => {
+                    const charCount = this.textarea.value.length;
+                    if (this.onCharacterCountChange && this.currentField) {
+                        this.onCharacterCountChange(this.currentField, charCount);
+                    }
+                }, 300);
             });
             
             // Button clicks
             this.applyFileBtn.addEventListener('click', () => this.applyToFile());
             this.applyFolderBtn.addEventListener('click', () => this.applyToFolder());
             this.resetBtn.addEventListener('click', () => this.reset());
-            this.cancelBtn.addEventListener('click', () => this.close());
+            this.cancelBtn.addEventListener('click', () => this.close(true));
             
-            // Escape key to close
+            // Comprehensive keyboard handler in capture phase
             document.addEventListener('keydown', (e) => {
-                if (e.key === 'Escape' && this.isOpen()) {
-                    e.preventDefault();
-                    this.close();
+                if (!this.isOpen()) return;
+                
+                // CRITICAL: Check if we're actually in the modal context
+                // This prevents any keyboard events from leaking to the main app
+                if (!this.box.contains(document.activeElement)) {
+                    return; // Focus is outside modal, don't intercept
                 }
-            });
+                
+                // Check what element has focus
+                const activeElement = document.activeElement;
+                const isTextarea = activeElement.tagName === 'TEXTAREA' || activeElement.id === 'field-edit-textarea';
+                const isButton = activeElement.tagName === 'BUTTON';
+                
+                // Define keys that should ALWAYS be intercepted
+                const alwaysInterceptKeys = [
+                    'Tab', 'Escape'
+                ];
+                
+                // Define keys that should be intercepted CONDITIONALLY
+                const conditionalKeys = [
+                    'Enter' // Only intercept on buttons
+                ];
+                
+                // Arrow keys and navigation keys - ALWAYS intercept when modal is open
+                // to prevent main app navigation, but handle differently based on focus
+                const navigationKeys = [
+                    'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
+                    'Home', 'End', 'PageUp', 'PageDown'
+                ];
+                
+                // Keys that might trigger app shortcuts
+                const shortcutKeys = [
+                    '/', '?', // Filter/Help shortcuts
+                    's', 'S'  // Potential save shortcuts when combined with Ctrl
+                ];
+                
+                // Determine if we should intercept this key
+                let shouldIntercept = false;
+                
+                if (alwaysInterceptKeys.includes(e.key)) {
+                    // Always intercept these keys
+                    shouldIntercept = true;
+                } else if (navigationKeys.includes(e.key)) {
+                    // ALWAYS intercept navigation keys to prevent main app from processing them
+                    shouldIntercept = true;
+                } else if (conditionalKeys.includes(e.key) && !isTextarea) {
+                    // Intercept these keys only when NOT in textarea
+                    shouldIntercept = true;
+                } else if (shortcutKeys.includes(e.key) && (e.ctrlKey || e.metaKey)) {
+                    // Intercept keyboard shortcuts
+                    shouldIntercept = true;
+                }
+                
+                if (shouldIntercept) {
+                    // ALWAYS stop propagation to prevent main app from seeing the event
+                    e.stopPropagation();
+                    e.stopImmediatePropagation();
+                    
+                    // For navigation keys in textarea, we stop propagation but NOT preventDefault
+                    // This allows cursor movement while preventing file navigation
+                    const inTextarea = activeElement.tagName === 'TEXTAREA' || activeElement.id === 'field-edit-textarea';
+                    if (navigationKeys.includes(e.key) && inTextarea) {
+                        // Don't call preventDefault - let cursor move naturally
+                        // Don't call handleModalKeyboard - no special handling needed
+                    } else {
+                        // For all other intercepted keys, prevent default and handle
+                        e.preventDefault();
+                        this.handleModalKeyboard(e);
+                    }
+                }
+            }, true); // true = use capture phase
+            
+            // Note: Escape key is handled by the comprehensive keyboard handler above
         },
         
         /**
@@ -96,7 +175,8 @@
             
             this.currentField = fieldId;
             this.currentFieldInfo = fieldInfo;
-            this.originalContent = fieldInfo.original_value || '';
+            // Get the TRUE original content from State.originalMetadata
+            this.originalContent = State.originalMetadata[fieldId] || '';
             this.triggerElement = triggerElement;
             
             // Start performance monitoring
@@ -109,7 +189,9 @@
             }
             
             // Update modal header with proper escaping
-            this.filenameEl.textContent = State.currentFile || 'Unknown file';
+            // Extract just the filename from the full path
+            const filename = State.currentFile ? State.currentFile.split('/').pop() : 'Unknown file';
+            this.filenameEl.textContent = filename;
             this.fieldnameEl.textContent = fieldInfo.display_name || fieldId;
             
             // Warn for very large content
@@ -117,8 +199,9 @@
                 console.warn(`Field ${fieldId} contains ${(this.originalContent.length / 1024 / 1024).toFixed(2)}MB of data`);
             }
             
-            // Load content
-            this.textarea.value = this.originalContent;
+            // Load content - use the current value (which may have been modified)
+            // fieldInfo.value contains what the user typed before modal opened
+            this.textarea.value = fieldInfo.value || '';
             
             // Reset button states
             this.updateButtonStates();
@@ -136,13 +219,78 @@
         
         /**
          * Close the modal
+         * @param {boolean} isCancel - Whether this is a cancel action (vs apply)
          */
-        close() {
+        close(isCancel = false) {
             this.overlay.classList.remove('active');
             this.box.classList.remove('active');
             
             // Clear any pending timeout
             clearTimeout(this.updateButtonStatesTimeout);
+            clearTimeout(this.charCountTimeout);
+            
+            // If canceling, restore original value
+            if (isCancel && this.currentField) {
+                const button = document.querySelector(`button[data-field="${this.currentField}"]`);
+                
+                if (button) {
+                    // originalContent already contains State.originalMetadata value
+                    const shouldBeInput = this.originalContent.length <= 100;
+                    
+                    if (shouldBeInput) {
+                        // Original value is NOT oversized - convert back to input
+                        const input = document.createElement('input');
+                        input.type = 'text';
+                        input.id = button.id;
+                        input.value = this.originalContent;
+                        input.setAttribute('data-field', this.currentField);
+                        input.setAttribute('readonly', '');
+                        input.setAttribute('data-editing', 'false');
+                        
+                        // Check if it's a dynamic field
+                        const isDynamic = button.id.startsWith('dynamic-');
+                        if (isDynamic) {
+                            input.setAttribute('data-dynamic', 'true');
+                        }
+                        
+                        // Get placeholder
+                        let placeholder = '';
+                        if (window.MetadataRemote.Metadata.Editor) {
+                            const standardFieldsInfo = window.MetadataRemote.Metadata.Editor.standardFieldsInfo;
+                            const fieldInfo = standardFieldsInfo[this.currentField];
+                            if (fieldInfo) {
+                                placeholder = fieldInfo.placeholder;
+                            } else if (this.currentFieldInfo) {
+                                // Dynamic field
+                                placeholder = `Enter ${this.currentFieldInfo.display_name || this.currentField}`;
+                            }
+                        }
+                        input.placeholder = placeholder;
+                        
+                        // Replace button with input
+                        button.parentNode.replaceChild(input, button);
+                        
+                        // Attach event listeners
+                        if (window.MetadataRemote.Metadata.Editor) {
+                            window.MetadataRemote.Metadata.Editor.attachFieldEventListeners(input, this.currentField);
+                        }
+                        
+                        // Store element for focus
+                        this.triggerElement = input;
+                    } else {
+                        // Original value WAS oversized - keep button but restore value
+                        button.setAttribute('data-value', this.originalContent);
+                    }
+                    
+                    // Update the dynamicFields map with original value
+                    const dynamicFields = window.MetadataRemote.Metadata.Editor.dynamicFields;
+                    if (dynamicFields && dynamicFields.has(this.currentField)) {
+                        const fieldInfo = dynamicFields.get(this.currentField);
+                        fieldInfo.value = this.originalContent;
+                        dynamicFields.set(this.currentField, fieldInfo);
+                    }
+                }
+            }
             
             // Clear state
             this.currentField = null;
@@ -163,6 +311,120 @@
          */
         isOpen() {
             return this.overlay.classList.contains('active');
+        },
+        
+        /**
+         * Handle keyboard events within the modal
+         */
+        handleModalKeyboard(e) {
+            // Check if we're in the textarea
+            const inTextarea = document.activeElement.tagName === 'TEXTAREA' || 
+                              document.activeElement.id === 'field-edit-textarea';
+            
+            switch(e.key) {
+                case 'Tab':
+                    this.handleTabNavigation(e);
+                    break;
+                    
+                case 'Enter':
+                    // If focus is on a button, activate it
+                    if (document.activeElement.tagName === 'BUTTON') {
+                        document.activeElement.click();
+                    }
+                    break;
+                    
+                case 'Escape':
+                    this.close(true);
+                    break;
+                    
+                // Navigation keys - handle based on context
+                case 'ArrowLeft':
+                case 'ArrowRight':
+                case 'ArrowUp':
+                case 'ArrowDown':
+                case 'Home':
+                case 'End':
+                case 'PageUp':
+                case 'PageDown':
+                    if (inTextarea) {
+                        // In textarea: We intercepted the event to prevent main app navigation,
+                        // but we DON'T call preventDefault so cursor can move naturally
+                        console.log('[Modal] Navigation key in textarea - letting default behavior happen');
+                        return; // Important: return without preventDefault!
+                    } else if (document.activeElement.tagName === 'BUTTON') {
+                        // On buttons: Navigate between buttons
+                        if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+                            this.navigateButtons(e.key === 'ArrowLeft' ? -1 : 1);
+                        }
+                    }
+                    break;
+            }
+        },
+        
+        /**
+         * Handle Tab navigation within modal
+         */
+        handleTabNavigation(e) {
+            // Get all focusable elements within the modal
+            const focusableElements = this.box.querySelectorAll(
+                'textarea, button:not([disabled]), [tabindex]:not([tabindex="-1"])'
+            );
+            
+            if (focusableElements.length === 0) return;
+            
+            const firstElement = focusableElements[0];
+            const lastElement = focusableElements[focusableElements.length - 1];
+            const activeElement = document.activeElement;
+            
+            if (e.shiftKey) {
+                // Shift+Tab: Move backwards
+                if (activeElement === firstElement) {
+                    // Wrap to last element
+                    lastElement.focus();
+                } else {
+                    // Find previous element
+                    const currentIndex = Array.from(focusableElements).indexOf(activeElement);
+                    if (currentIndex > 0) {
+                        focusableElements[currentIndex - 1].focus();
+                    }
+                }
+            } else {
+                // Tab: Move forwards
+                if (activeElement === lastElement) {
+                    // Wrap to first element
+                    firstElement.focus();
+                } else {
+                    // Find next element
+                    const currentIndex = Array.from(focusableElements).indexOf(activeElement);
+                    if (currentIndex < focusableElements.length - 1) {
+                        focusableElements[currentIndex + 1].focus();
+                    }
+                }
+            }
+        },
+        
+        /**
+         * Navigate between action buttons with arrow keys
+         */
+        navigateButtons(direction) {
+            const buttons = this.box.querySelectorAll('.field-edit-actions button:not([disabled])');
+            if (buttons.length === 0) return;
+            
+            const currentButton = document.activeElement;
+            const currentIndex = Array.from(buttons).indexOf(currentButton);
+            
+            let nextIndex;
+            if (currentIndex === -1) {
+                // No button focused, focus first
+                nextIndex = 0;
+            } else {
+                // Calculate next index with wrapping
+                nextIndex = currentIndex + direction;
+                if (nextIndex < 0) nextIndex = buttons.length - 1;
+                if (nextIndex >= buttons.length) nextIndex = 0;
+            }
+            
+            buttons[nextIndex].focus();
         },
         
         /**
@@ -223,7 +485,7 @@
                     const dynamicFields = window.MetadataRemote.Metadata.Editor.dynamicFields;
                     if (dynamicFields && dynamicFields.has(field)) {
                         const fieldInfo = dynamicFields.get(field);
-                        fieldInfo.original_value = value;
+                        fieldInfo.value = value;
                         dynamicFields.set(field, fieldInfo);
                     }
                     
@@ -289,7 +551,7 @@
                     const dynamicFields = window.MetadataRemote.Metadata.Editor.dynamicFields;
                     if (dynamicFields && dynamicFields.has(field)) {
                         const fieldInfo = dynamicFields.get(field);
-                        fieldInfo.original_value = value;
+                        fieldInfo.value = value;
                         dynamicFields.set(field, fieldInfo);
                     }
                     

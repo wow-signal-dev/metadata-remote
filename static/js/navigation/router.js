@@ -249,7 +249,7 @@ class KeyboardRouter {
     }
 
     /**
-     * Get all registered routes (for debugging)
+     * Get all registered routes
      */
     getRoutes() {
         const allRoutes = [];
@@ -267,5 +267,5 @@ class KeyboardRouter {
 // Export singleton instance
 const Router = new KeyboardRouter();
 
-// Make available globally for debugging
+// Make available globally
 window.KeyboardRouter = Router;

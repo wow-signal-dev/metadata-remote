@@ -140,8 +140,6 @@
                 this.toggleTheme();
             });
             
-            // Debug logging removed - issue was identified as Mac using metaKey instead of altKey
-            
             // Keyboard shortcut (Alt+T / Option+T on Mac)
             document.addEventListener('keydown', (e) => {
                 // On some systems (particularly Mac), the Option/Alt key might be reported as metaKey
@@ -166,7 +164,4 @@
     
     // Export to namespace
     window.MetadataRemote.UI.ThemeToggle = ThemeToggle;
-    
-    // Remove self-initialization - let app.js handle it
-    // This was causing double initialization
 })();

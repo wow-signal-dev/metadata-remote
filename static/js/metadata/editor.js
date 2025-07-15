@@ -18,9 +18,25 @@
     let loadHistoryCallback = null;
     let hideInferenceSuggestionsCallback = null;
     
+    // Import TransitionController (will be defined later)
+    let TransitionController = null;
+    
     // Dynamic fields tracking
     let dynamicFields = new Map();
     const standardFields = ['title', 'artist', 'album', 'albumartist', 'date', 'genre', 'composer', 'track', 'disc'];
+    
+    // Standard fields info for other modules to access
+    const standardFieldsInfo = {
+        'title': { display: 'Title', placeholder: 'Enter title' },
+        'artist': { display: 'Artist', placeholder: 'Enter artist' },
+        'album': { display: 'Album', placeholder: 'Enter album' },
+        'albumartist': { display: 'Album Artist', placeholder: 'Enter album artist' },
+        'composer': { display: 'Composer', placeholder: 'Enter composer' },
+        'genre': { display: 'Genre', placeholder: 'Enter genre' },
+        'track': { display: 'Track #', placeholder: 'Enter track number', group: 'numbers' },
+        'disc': { display: 'Disc #', placeholder: 'Enter CD number', group: 'numbers' },
+        'date': { display: 'Year', placeholder: 'Enter year', group: 'numbers' }
+    };
     
     // HTML escape function to prevent XSS and display issues
     function escapeHtml(unsafe) {
@@ -91,6 +107,17 @@
     };
     
     window.MetadataRemote.Metadata.Editor = {
+        // Expose dynamic fields map
+        dynamicFields: dynamicFields,
+        
+        // Expose standard fields info
+        standardFieldsInfo: standardFieldsInfo,
+        
+        // Check if a field is standard
+        isStandardField(fieldId) {
+            return standardFields.includes(fieldId);
+        },
+        
         /**
          * Initialize the metadata editor with required callbacks
          * @param {Object} callbacks - Object containing callback functions
@@ -136,9 +163,17 @@
             }
         },
         
+        // Clean up transition monitoring when fields are removed
+        cleanupFieldMonitoring(fieldId) {
+            if (TransitionController) {
+                TransitionController.stopMonitoring(fieldId);
+            }
+        },
+        
         /**
          * Setup metadata field change listeners
          */
+         
         /**
          * Hide apply controls for a specific field
          * @param {string} field - Field name
@@ -198,8 +233,7 @@
         },
 
         setupMetadataFieldListeners() {
-            // This function is now deprecated since we attach listeners when creating fields
-            // Keep it empty to avoid breaking existing calls
+            // Empty function for compatibility
         },
         
         /**
@@ -215,7 +249,6 @@
             const button = document.querySelector('.save-btn');
             const data = {};
             
-            
             // Collect standard fields (only those that exist)
             standardFields.forEach(field => {
                 const input = document.getElementById(field);
@@ -227,17 +260,30 @@
             
             // Collect dynamic fields
             dynamicFields.forEach((fieldInfo, fieldId) => {
-                const input = document.getElementById(`dynamic-${fieldId}`);
-                if (input && !input.disabled && fieldInfo.is_editable) {
-                    // Treat single space as empty to ensure consistency
-                    data[fieldId] = input.value === ' ' ? '' : input.value;
+                if (fieldInfo.is_editable) {
+                    // Try to find the input element
+                    const element = document.getElementById(`dynamic-${fieldId}`) || 
+                                   document.querySelector(`#dynamic-field_${fieldId}`) ||
+                                   document.querySelector(`[data-field="${fieldId}"]`);
+                    
+                    if (element) {
+                        if (element.tagName === 'INPUT' && !element.disabled) {
+                            // It's an input field - get the current value
+                            data[fieldId] = element.value === ' ' ? '' : element.value;
+                        } else if (element.tagName === 'BUTTON') {
+                            // It's an oversized field button - get the value from fieldInfo
+                            data[fieldId] = fieldInfo.value === ' ' ? '' : fieldInfo.value;
+                        }
+                    } else {
+                        // Element not found, but we have the value in fieldInfo
+                        data[fieldId] = fieldInfo.value === ' ' ? '' : fieldInfo.value;
+                    }
                 }
             });
             
             if (State.pendingAlbumArt) {
                 data.art = State.pendingAlbumArt;
             }
-            
             
             UIUtils.setFormEnabled(false);
             showButtonStatus(button, 'Saving...', 'processing');
@@ -340,7 +386,7 @@
                     });
                 }
                 
-                // Re-render fields instead of just setting values
+                // Render fields with updated metadata
                 State.metadata = data;
                 this.renderMetadataFields(data);
                 
@@ -355,7 +401,13 @@
                 
                 if (data.hasArt && data.art) {
                     State.currentAlbumArt = data.art;
-                    artDisplay.innerHTML = `<img src="data:image/jpeg;base64,${data.art}" class="album-art">`;
+                    const albumArtSrc = `data:image/jpeg;base64,${data.art}`;
+                    const AlbumArt = window.MetadataRemote.Metadata.AlbumArt;
+                    if (AlbumArt && AlbumArt.displayAlbumArtWithMetadata) {
+                        AlbumArt.displayAlbumArtWithMetadata(albumArtSrc, artDisplay);
+                    } else {
+                        artDisplay.innerHTML = `<img src="${albumArtSrc}" class="album-art">`;
+                    }
                     deleteBtn.style.display = 'block';
                     saveImageBtn.style.display = 'none';
                     applyFolderBtn.style.display = 'none';
@@ -390,17 +442,24 @@
          * @param {Function} showButtonStatus - Callback to show button status
          */
         async saveFieldToFile(field, showButtonStatus) {
-            if (!State.currentFile) return;
+            if (!State.currentFile) {
+                return;
+            }
             
             const button = document.querySelector(`.apply-file-btn[data-field="${field}"]`);
             
             // Find input by data-field attribute (works for both standard and dynamic fields)
             const input = document.querySelector(`input[data-field="${field}"]`);
             
-            if (!input) return;
+            if (!input) {
+                return;
+            }
             
             const value = input.value.trim();
-            if (!value && value !== '') return; // Allow empty string to clear field
+            
+            if (!value && value !== '') {
+                return; // Allow empty string to clear field
+            }
             
             button.disabled = true;
             showButtonStatus(button, 'Saving to file...', 'processing');
@@ -416,6 +475,13 @@
                 if (result.status === 'success') {
                     showButtonStatus(button, 'Saved to file!', 'success', 2000);
                     State.originalMetadata[field] = value;
+                    
+                    // Update dynamic fields map
+                    if (dynamicFields.has(field)) {
+                        const fieldInfo = dynamicFields.get(field);
+                        fieldInfo.value = value;
+                        dynamicFields.set(field, fieldInfo);
+                    }
                     
                     // Hide controls after successful save
                     setTimeout(() => {
@@ -531,23 +597,10 @@
             // Clear existing standard fields
             container.innerHTML = '';
             
-            // Define standard fields order and display names
-            const standardFieldsInfo = {
-                'title': { display: 'Title', placeholder: 'Enter title' },
-                'artist': { display: 'Artist', placeholder: 'Enter artist' },
-                'album': { display: 'Album', placeholder: 'Enter album' },
-                'albumartist': { display: 'Album Artist', placeholder: 'Enter album artist' },
-                'composer': { display: 'Composer', placeholder: 'Enter composer' },
-                'genre': { display: 'Genre', placeholder: 'Enter genre' },
-                'track': { display: 'Track #', placeholder: 'Enter track number', group: 'numbers' },
-                'disc': { display: 'Disc #', placeholder: 'Enter CD number', group: 'numbers' },
-                'date': { display: 'Year', placeholder: 'Enter year', group: 'numbers' }
-            };
-            
             // Get existing standard fields from the metadata
             const existingFields = metadata.existing_standard_fields || {};
             
-            // Also check standard_fields for backward compatibility
+            // Check standard_fields property
             const standardFields = metadata.standard_fields || {};
             
             // Group fields for special rendering
@@ -560,10 +613,8 @@
                 const hasValue = existingFields.hasOwnProperty(field) || 
                                (standardFields[field] !== undefined && standardFields[field] !== '');
                 
-                
                 if (hasValue || this.shouldAlwaysShowField(field)) {
                     const fieldValue = standardFields[field] || existingFields[field] || '';
-                    
                     
                     if (info.group === 'numbers') {
                         numberFields.push({ field, info, value: fieldValue });
@@ -572,7 +623,6 @@
                     }
                 }
             });
-            
             
             // Render regular fields
             regularFields.forEach(({ field, info, value }) => {
@@ -587,11 +637,23 @@
         
         shouldAlwaysShowField(field) {
             // Optionally always show certain fields even if empty
-            // For now, we'll only show fields that actually exist
+            // Only show fields that actually exist
             return false;
         },
         
         renderStandardField(container, field, info, value) {
+            const isOversized = value && value.length >= 100;
+            
+            // Create the field element (input or button based on size)
+            let fieldElement;
+            if (isOversized) {
+                fieldElement = `<button type="button" id="${field}" class="oversized-field-button" 
+                                       data-field="${field}" data-value="${escapeHtml(value || '')}">Click to view/edit</button>`;
+            } else {
+                fieldElement = `<input type="text" id="${field}" placeholder="${info.placeholder}" 
+                                      data-field="${field}" value="${escapeHtml(value || '')}" readonly data-editing="false">`;
+            }
+            
             const fieldHtml = `
                 <div class="form-group-with-button standard-field">
                     <div class="form-group-wrapper">
@@ -604,8 +666,7 @@
                             </button>
                         </div>
                         <div class="input-wrapper">
-                            <input type="text" id="${field}" placeholder="${info.placeholder}" 
-                                   data-field="${field}" value="${escapeHtml(value || '')}" readonly data-editing="false">
+                            ${fieldElement}
                             <div class="inference-loading" id="${field}-loading">
                                 <div class="inference-spinner"></div>
                             </div>
@@ -637,13 +698,37 @@
             
             container.insertAdjacentHTML('beforeend', fieldHtml);
             
-            // Attach event listeners
-            const input = document.getElementById(field);
-            if (input) {
-                this.attachFieldEventListeners(input, field);
-                // Also attach inference handlers
-                if (window.MetadataRemote.Metadata.Inference) {
-                    window.MetadataRemote.Metadata.Inference.attachInferenceHandlers(field);
+            // Handle based on element type
+            const element = document.getElementById(field);
+            if (element) {
+                if (isOversized) {
+                    // Button - only needs click handler
+                    element.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        if (window.MetadataRemote.Metadata.FieldEditModal) {
+                            const fieldInfo = {
+                                field_name: field,
+                                display_name: info.display,
+                                value: value,
+                                is_editable: true
+                            };
+                            window.MetadataRemote.Metadata.FieldEditModal.open(field, fieldInfo, element);
+                        }
+                    });
+                } else {
+                    // Input - needs event listeners and monitors
+                    this.attachFieldEventListeners(element, field);
+                    // Also attach inference handlers
+                    if (window.MetadataRemote.Metadata.Inference) {
+                        window.MetadataRemote.Metadata.Inference.attachInferenceHandlers(field);
+                    }
+                    // Monitor fields for transitions
+                    if (!TransitionController && window.MetadataRemote.Metadata.TransitionController) {
+                        TransitionController = window.MetadataRemote.Metadata.TransitionController;
+                    }
+                    if (TransitionController) {
+                        TransitionController.monitorField(element);
+                    }
                 }
             }
         },
@@ -762,7 +847,7 @@
                 });
             }
             
-            // No longer need to render the new field creator since it's in the template
+            // New field creator is handled in the template
             
             // Show extended fields toggle if there are any extended fields
             const hasExtendedFields = dynamicFields.size > 0;
@@ -773,7 +858,6 @@
             
             // Update keyboard navigation
             this.updateNavigableElements();
-            console.log('[METADATA_RENDERING] Completed renderMetadataFields');
         },
         
         /**
@@ -785,6 +869,27 @@
         renderDynamicField(fieldId, fieldInfo, container) {
             // Create a unique safe ID for use in HTML id attributes
             const safeId = 'field_' + Math.random().toString(36).substr(2, 9);
+            
+            // Determine if this field should be rendered as oversized
+            const isOversized = fieldInfo.value && fieldInfo.value.length >= 100;
+            
+            // Create the field element (input or button based on size)
+            let fieldElement;
+            if (isOversized) {
+                fieldElement = `<button type="button" id="dynamic-${safeId}" class="oversized-field-button" 
+                                       data-field="${escapeHtml(fieldId)}" data-value="${escapeHtml(fieldInfo.value || '')}">Click to view/edit</button>`;
+            } else {
+                fieldElement = `<input type="text" 
+                                     id="dynamic-${safeId}" 
+                                     placeholder="${fieldInfo.is_editable ? escapeHtml(`Enter ${fieldInfo.display_name}`) : ''}"
+                                     data-field="${escapeHtml(fieldId)}"
+                                     data-dynamic="true"
+                                     data-editing="false"
+                                     value="${escapeHtml(fieldInfo.value || '')}"
+                                     ${!fieldInfo.is_editable ? 'readonly' : ''}
+                                     ${fieldInfo.field_type === 'binary' ? 'disabled' : ''}>`;
+            }
+            
             const fieldHtml = `
                 <div class="form-group-with-button dynamic-field" data-field-id="${escapeHtml(fieldId)}" data-safe-id="${safeId}">
                     <div class="form-group-wrapper">
@@ -798,16 +903,7 @@
                             </button>
                         </div>
                         <div class="input-wrapper">
-                            <input type="text" 
-                                   id="dynamic-${safeId}" 
-                                   placeholder="${fieldInfo.is_editable ? escapeHtml(`Enter ${fieldInfo.display_name}`) : ''}"
-                                   data-field="${escapeHtml(fieldId)}"
-                                   data-dynamic="true"
-                                   data-editing="false"
-                                   value="${escapeHtml(fieldInfo.value || '')}"
-                                   ${!fieldInfo.is_editable ? 'readonly' : ''}
-                                   ${fieldInfo.field_type === 'binary' ? 'disabled' : ''}
-                                   ${fieldInfo.field_type === 'oversized' ? 'readonly' : ''}>
+                            ${fieldElement}
                             <div class="inference-loading" id="dynamic-${safeId}-loading">
                                 <div class="inference-spinner"></div>
                             </div>
@@ -843,51 +939,39 @@
             
             container.insertAdjacentHTML('beforeend', fieldHtml);
             
-            // If this is an oversized field, add special handling
-            if (fieldInfo.field_type === 'oversized') {
-                const input = container.querySelector(`#dynamic-${safeId}`);
-                if (input) {
-                    input.classList.add('oversized-field-input');
-                    input.dataset.originalValue = fieldInfo.original_value || '';
-                    
-                    // Add click handler
-                    input.addEventListener('click', (e) => {
+            // Handle based on element type
+            const element = document.getElementById(`dynamic-${safeId}`);
+            if (element) {
+                if (isOversized) {
+                    // Button - only needs click handler
+                    element.addEventListener('click', (e) => {
                         e.preventDefault();
                         if (window.MetadataRemote.Metadata.FieldEditModal) {
-                            window.MetadataRemote.Metadata.FieldEditModal.open(fieldId, fieldInfo, input);
+                            window.MetadataRemote.Metadata.FieldEditModal.open(fieldId, fieldInfo, element);
                         }
                     });
-                    
-                    // Add keyboard handler
-                    input.addEventListener('keydown', (e) => {
-                        if (e.key === 'Enter' && !e.shiftKey) {
-                            e.preventDefault();
-                            if (window.MetadataRemote.Metadata.FieldEditModal) {
-                                window.MetadataRemote.Metadata.FieldEditModal.open(fieldId, fieldInfo, input);
-                            }
+                } else {
+                    // Input - handle based on field type
+                    if (fieldInfo.field_type === 'binary') {
+                        element.value = 'Unsupported Content type';
+                        element.style.color = '#999';
+                        element.style.fontStyle = 'italic';
+                    } else if (fieldInfo.is_editable) {
+                        // Attach event listeners for editable fields
+                        this.attachFieldEventListeners(element, fieldId);
+                        // Monitor for transitions
+                        if (!TransitionController && window.MetadataRemote.Metadata.TransitionController) {
+                            TransitionController = window.MetadataRemote.Metadata.TransitionController;
                         }
-                    });
+                        if (TransitionController) {
+                            TransitionController.monitorField(element);
+                        }
+                    }
                 }
-            }
-            
-            // Handle binary content display
-            if (fieldInfo.field_type === 'binary') {
-                const input = document.getElementById(`dynamic-${safeId}`);
-                if (input) {
-                    input.value = 'Unsupported Content type';
-                    input.style.color = '#999';
-                    input.style.fontStyle = 'italic';
-                }
-            }
-            
-            // Attach event listeners
-            const input = document.getElementById(`dynamic-${safeId}`);
-            if (input && fieldInfo.is_editable && fieldInfo.field_type !== 'oversized' && fieldInfo.field_type !== 'binary') {
-                this.attachFieldEventListeners(input, fieldId);
             }
         },
         
-        // renderNewFieldCreator is no longer needed since the HTML is in the template
+        // renderNewFieldCreator handled in template
         
         /**
          * Attach event listeners to a dynamic field
@@ -895,7 +979,6 @@
          * @param {string} fieldId - Field ID
          */
         attachFieldEventListeners(input, fieldId) {
-            
             const groupedFields = ['track', 'disc', 'date'];
             
             const updateControlsVisibility = () => {
@@ -948,6 +1031,15 @@
             input.addEventListener('input', updateControlsVisibility);
             input.addEventListener('focus', updateControlsVisibility);
             
+            // Add transition monitoring for all editable text fields
+            if (!input.disabled && input.type === 'text') {
+                if (!TransitionController && window.MetadataRemote.Metadata.TransitionController) {
+                    TransitionController = window.MetadataRemote.Metadata.TransitionController;
+                }
+                if (TransitionController) {
+                    TransitionController.monitorField(input);
+                }
+            }
         },
         
         /**
@@ -1072,9 +1164,6 @@
             const fieldNameInput = document.getElementById('new-field-name').value.trim();
             const fieldValue = document.getElementById('new-field-value').value.trim();
             
-            console.log('[createNewField] State.currentFile:', State.currentFile);
-            console.log('[createNewField] applyToFolder:', applyToFolder);
-            
             if (!fieldNameInput) {
                 UIUtils.showStatus('Field name is required', 'error');
                 return;
@@ -1139,7 +1228,6 @@
                 const data = {};
                 data[fieldName] = fieldValue;
                 
-                
                 if (applyToFolder) {
                     const folderPath = State.currentFile.substring(0, State.currentFile.lastIndexOf('/'));
                     const result = await API.applyFieldToFolder(folderPath, fieldName, fieldValue);
@@ -1164,11 +1252,6 @@
                         UIUtils.showStatus(result.error || 'Failed to create field', 'error');
                     }
                 } else {
-                    console.log('[createNewField] Single file mode - calling API.createField with:', {
-                        filepath: State.currentFile,
-                        fieldName: fieldName,
-                        fieldValue: fieldValue
-                    });
                     const result = await API.createField(State.currentFile, fieldName, fieldValue);
                     
                     if (result.status === 'success') {
@@ -1526,7 +1609,7 @@
                         threeColumnContainer.classList.add('has-confirmation-ui');
                     }
                 } else {
-                    // Fallback to original behavior if structure is unexpected
+                    // Append to delete button's parent if structure is unexpected
                     deleteBtn.parentElement.appendChild(confirmUI);
                 }
             } else {
@@ -1701,7 +1784,7 @@
                     
                     UIUtils.showStatus(`${fieldName} deleted`, 'success');
                     
-                    // Remove from UI directly instead of reloading
+                    // Remove from UI
                     const isStandardField = standardFields.includes(fieldId);
                     let fieldElement = null;
                     
@@ -1710,7 +1793,7 @@
                         const input = document.getElementById(fieldId);
                         if (input) {
                             fieldElement = input.closest('.form-group-with-button');
-                            // Hide the field instead of removing it
+                            // Hide standard fields
                             if (fieldElement) {
                                 fieldElement.style.display = 'none';
                                 // Disable the input to prevent it from being collected during save
@@ -1721,6 +1804,8 @@
                     } else {
                         // For dynamic fields, remove the entire element
                         fieldElement = document.querySelector(`.dynamic-field[data-field-id="${fieldId}"]`);
+                        // Clean up monitoring for this field
+                        this.cleanupFieldMonitoring(fieldId);
                         if (fieldElement) {
                             fieldElement.remove();
                         }
@@ -1856,7 +1941,6 @@
                     }
                     if (result.errors && result.errors.length > 0) {
                         message += ` - ${result.errors.length} errors`;
-                        // Log detailed errors to console for debugging
                         console.error('Batch delete errors:', result.errors);
                     }
                     

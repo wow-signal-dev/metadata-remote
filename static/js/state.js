@@ -97,7 +97,7 @@ window.MetadataRemote.State = {
     
     // State management methods
     reset() {
-        // Reset to initial state (useful for testing or cleanup)
+        // Reset to initial state
         this.currentFile = null;
         this.currentPath = '';
         this.selectedListItem = null;
@@ -131,7 +131,7 @@ window.MetadataRemote.State = {
         }
     },
     
-    // Get a copy of the state (useful for debugging)
+    // Get a copy of the state
     getSnapshot() {
         return {
             currentFile: this.currentFile,

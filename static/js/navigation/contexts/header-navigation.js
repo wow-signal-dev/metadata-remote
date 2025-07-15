@@ -16,7 +16,6 @@
          * Initialize the module
          */
         init() {
-            // TODO: Implementation
         }
     };
 })();

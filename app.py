@@ -521,15 +521,12 @@ def set_metadata(filename):
             return jsonify({'error': 'File not found'}), 404
         
         data = request.json
-        logger.info(f"[set_metadata] Received data for {filename}: {sanitize_log_data(data)}")
         
         # Get current metadata before changes using the correct method for OGG/OPUS
         current_metadata = read_metadata(filepath)
-        logger.info(f"[set_metadata] Current metadata fields: {list(current_metadata.keys())}")
         
         # Separate metadata from special operations
         metadata_tags = {k: v for k, v in data.items() if k not in ['art', 'removeArt']}
-        logger.info(f"[set_metadata] Metadata tags to save: {metadata_tags}")
         
         # Process album art changes
         has_art_change, art_data, remove_art = process_album_art_change(filepath, data, current_metadata)
@@ -549,15 +546,12 @@ def set_metadata(filename):
         
         # Apply all changes
         if has_art_change:
-            logger.info(f"[set_metadata] Applying metadata with album art changes")
             # This will apply both metadata and album art, and track art history
             save_album_art_to_file(filepath, art_data, remove_art, metadata_tags, track_history=True)
         else:
-            logger.info(f"[set_metadata] Applying metadata only (no album art changes)")
             # Just apply metadata changes without album art
             apply_metadata_to_file(filepath, metadata_tags)
         
-        logger.info(f"[set_metadata] Successfully saved metadata for {filename}")
         return jsonify({'status': 'success'})
         
     except ValueError:
@@ -630,14 +624,12 @@ def delete_metadata_field(filename, field_id):
 def create_custom_field():
     """Create custom metadata fields with proper history tracking"""
     data = request.json
-    logger.info(f"[create_custom_field] Received request data: {data}")
     
     filepath = data.get('filepath')
     field_name = data.get('field_name')
     field_value = data.get('field_value', '')
     apply_to_folder = data.get('apply_to_folder', False)
     
-    logger.info(f"[create_custom_field] Parsed values - filepath: {filepath}, field_name: {field_name}, apply_to_folder: {apply_to_folder}")
     
     # Validate inputs
     if not field_name or not filepath:
@@ -685,12 +677,6 @@ def create_custom_field():
                     # Check if field exists (case-insensitive for some formats)
                     existing_metadata = mutagen_handler.read_existing_metadata(file_path)
                     all_discovered = mutagen_handler.discover_all_metadata(file_path)
-                    
-                    # Debug logging for batch
-                    if file_path == audio_files[0]:  # Log only for first file to avoid spam
-                        logger.info(f"[create_custom_field batch] Checking field '{field_name}'")
-                        logger.info(f"[create_custom_field batch] existing_metadata keys: {list(existing_metadata.keys())}")
-                        logger.info(f"[create_custom_field batch] all_discovered keys: {list(all_discovered.keys())}")
                     
                     field_exists = (field_name in existing_metadata or 
                                   field_name.upper() in existing_metadata or
@@ -760,17 +746,11 @@ def create_custom_field():
             existing_metadata = mutagen_handler.read_existing_metadata(full_path)
             all_discovered = mutagen_handler.discover_all_metadata(full_path)
             
-            # Debug logging
-            logger.info(f"[create_custom_field] Checking field '{field_name}'")
-            logger.info(f"[create_custom_field] existing_metadata keys: {list(existing_metadata.keys())}")
-            logger.info(f"[create_custom_field] all_discovered keys: {list(all_discovered.keys())}")
-            
             field_exists = (field_name in existing_metadata or 
                           field_name.upper() in existing_metadata or
                           field_name in all_discovered or
                           field_name.upper() in all_discovered)
             
-            logger.info(f"[create_custom_field] field_exists: {field_exists}")
             
             # Handle empty values appropriately
             value_to_write = field_value

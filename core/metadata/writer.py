@@ -43,10 +43,8 @@ def apply_metadata_to_file(filepath, new_tags, art_data=None, remove_art=False):
     try:
         # First, handle album art operations if needed
         if remove_art:
-            logger.debug(f"Removing album art from {os.path.basename(filepath)}")
             mutagen_handler.remove_album_art(filepath)
         elif art_data:
-            logger.debug(f"Adding album art to {os.path.basename(filepath)}")
             mutagen_handler.write_album_art(filepath, art_data)
         else:
             # For OGG/Opus files, we need to preserve existing album art
@@ -54,7 +52,6 @@ def apply_metadata_to_file(filepath, new_tags, art_data=None, remove_art=False):
             if base_format in ['ogg', 'opus']:
                 existing_art = mutagen_handler.get_album_art(filepath)
                 if existing_art:
-                    logger.debug(f"Preserving existing album art for {os.path.basename(filepath)}")
                     # We'll re-write it after updating metadata
                     art_data = existing_art
         
@@ -66,8 +63,6 @@ def apply_metadata_to_file(filepath, new_tags, art_data=None, remove_art=False):
         
         # Write metadata
         if metadata_to_write:
-            logger.debug(f"Applying metadata changes to {os.path.basename(filepath)}")
-            logger.debug(f"Changed fields: {', '.join(metadata_to_write.keys())}")
             mutagen_handler.write_metadata(filepath, metadata_to_write)
         
         # For OGG/Opus, re-write preserved album art if needed

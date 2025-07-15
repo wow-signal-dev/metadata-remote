@@ -28,11 +28,9 @@ def read_metadata(filepath):
         raise FileNotFoundError(f"File not found: {filepath}")
     
     try:
-        logger.debug(f"Reading metadata from {filepath}")
         
         # Get file format
         audio_format, format_key, base_format = get_file_format(filepath)
-        logger.debug(f"File format: {audio_format} (key: {format_key}, base: {base_format})")
         
         # Read metadata using mutagen
         metadata = mutagen_handler.read_metadata(filepath)
@@ -42,7 +40,6 @@ def read_metadata(filepath):
             metadata['format'] = audio_format
             metadata['format_key'] = format_key
             metadata['base_format'] = base_format
-            logger.debug(f"Successfully read metadata: {list(metadata.keys())}")
             return metadata
         else:
             logger.error(f"Could not read metadata from {filepath}")

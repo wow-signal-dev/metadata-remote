@@ -110,6 +110,11 @@ const AudioMetadataEditor = {
             window.MetadataRemote.Metadata.FieldEditModal.init();
         }
         
+        // Initialize transition controller
+        if (window.MetadataRemote.Metadata.TransitionController) {
+            window.MetadataRemote.Metadata.TransitionController.init();
+        }
+        
         // UI components
         PaneResize.initializePaneResize();
         PaneResize.initializeHistoryPanelResize(() => HistoryManager.toggleHistoryPanel());
@@ -379,6 +384,9 @@ function applyFieldToFolder(field) {
 }
 
 function saveFieldToFile(field) {
+    console.log('[app.js saveFieldToFile] Called with field:', field);
+    console.log('[app.js saveFieldToFile] Field type:', typeof field);
+    console.log('[app.js saveFieldToFile] Field length:', field ? field.length : 'null');
     MetadataEditor.saveFieldToFile(field, ButtonStatus.showButtonStatus);
 }
 

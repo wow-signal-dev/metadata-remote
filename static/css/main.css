@@ -2238,11 +2238,6 @@ input[type="text"]:focus {
     outline-offset: -2px;
 }
 
-/* Specific styling for filename display when focused */
-.filename-display:focus {
-    /* Removed padding and margin changes to prevent position shift */
-}
-
 input[type="text"]::placeholder {
     color: var(--text-muted);
     opacity: 0.6;
@@ -2810,7 +2805,6 @@ button:disabled {
     right: 0;
     bottom: 0;
     background: rgba(0, 0, 0, 0.7);
-    /* backdrop-filter removed for performance */
     z-index: 999;
     opacity: 0;
     pointer-events: none;
@@ -2831,7 +2825,6 @@ button:disabled {
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 16px;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
-    /* backdrop-filter removed for performance */
     width: 90%;
     max-width: 800px;
     max-height: 85vh;
@@ -2849,10 +2842,11 @@ button:disabled {
 }
 
 .field-edit-header {
-    padding: 1.5rem;
+    padding: 0.75rem 1.5rem;
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     font-size: 1rem;
     color: var(--text-secondary);
+    text-align: center;
 }
 
 .field-edit-filename {
@@ -2867,7 +2861,7 @@ button:disabled {
 
 .field-edit-content {
     flex: 1;
-    padding: 1.5rem;
+    padding: 0.75rem;
     overflow-y: auto;
     min-height: 200px;
     /* Create new stacking context */
@@ -2878,37 +2872,35 @@ button:disabled {
 .field-edit-textarea {
     width: 100%;
     height: 100%;
-    min-height: 300px;
-    padding: 1rem;
+    min-height: 250px;
+    padding: 0.75rem;
     border: 1px solid var(--border-color);
     border-radius: 8px;
     background: var(--bg-input);
     color: var(--text-primary);
     font-size: 0.95rem;
     font-family: inherit;
-    resize: vertical;
+    resize: none;
     /* Performance optimizations */
     transition: none !important;
-    /* will-change and transform removed - they were causing issues */
 }
 
 .field-edit-textarea:focus {
     outline: 1px solid var(--accent-primary);
     outline-offset: -2px;
-    /* Remove background change on focus for performance */
     transition: none !important;
 }
 
 .field-edit-actions {
-    padding: 1.5rem;
+    padding: 0.75rem 1.5rem;
     border-top: 1px solid rgba(255, 255, 255, 0.1);
     display: flex;
     gap: 0.75rem;
-    justify-content: flex-end;
+    justify-content: center;
 }
 
 .field-edit-btn {
-    padding: 0.5rem 1rem;
+    padding: 0.4rem 0.9rem;
     border: 1px solid var(--border-color);
     border-radius: 8px;
     background: var(--bg-secondary);
@@ -2951,7 +2943,46 @@ button:disabled {
     background: rgba(255, 107, 107, 0.2);
 }
 
-/* Oversized field input styling */
+/* Reset button to match metadata pane reset button */
+.field-edit-reset {
+    background: linear-gradient(135deg, #3a3a3a 0%, #4a4a4a 100%);
+    color: var(--text-primary);
+    border-color: #4a4a4a;
+}
+
+.field-edit-reset:hover:not(:disabled) {
+    background: linear-gradient(135deg, #4a4a4a 0%, #5a5a5a 100%);
+    box-shadow: 0 4px 12px rgba(58, 58, 58, 0.3);
+}
+
+/* Oversized field button styling */
+.oversized-field-button {
+    width: 100%;
+    padding: 0.55rem 0.85rem;
+    background: linear-gradient(135deg, rgba(74, 127, 255, 0.08) 0%, rgba(74, 127, 255, 0.04) 100%);
+    border: 1px solid rgba(74, 127, 255, 0.3);
+    border-radius: 6px;
+    color: var(--accent-primary);
+    cursor: pointer;
+    font-size: 0.8rem;
+    font-family: inherit;
+    text-align: center;
+    transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.oversized-field-button:hover {
+    background: linear-gradient(135deg, rgba(74, 127, 255, 0.12) 0%, rgba(74, 127, 255, 0.06) 100%);
+    border-color: var(--accent-primary);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(74, 127, 255, 0.2);
+}
+
+.oversized-field-button:focus {
+    outline: 2px solid var(--accent-primary);
+    outline-offset: -1px;
+}
+
+/* Remove old oversized field input styling */
 .oversized-field-input {
     background: linear-gradient(135deg, rgba(74, 127, 255, 0.08) 0%, rgba(74, 127, 255, 0.04) 100%);
     border: 1px solid rgba(74, 127, 255, 0.3);
@@ -2987,6 +3018,31 @@ button:disabled {
 :root[data-theme="light"] .field-edit-header,
 :root[data-theme="light"] .field-edit-actions {
     border-color: rgba(193, 165, 95, 0.3);
+}
+
+:root[data-theme="light"] .field-edit-reset {
+    background: linear-gradient(135deg, #7a6a4f 0%, #6a5a3f 100%);
+    color: #f9f6e7;
+    border-color: #6a5a3f;
+}
+
+:root[data-theme="light"] .field-edit-reset:hover:not(:disabled) {
+    background: linear-gradient(135deg, #6a5a3f 0%, #5a4a2f 100%);
+    box-shadow: 0 4px 12px rgba(122, 106, 79, 0.3);
+}
+
+/* Oversized field button light theme */
+:root[data-theme="light"] .oversized-field-button {
+    background: linear-gradient(135deg, rgba(208, 140, 96, 0.12) 0%, rgba(208, 140, 96, 0.06) 100%);
+    border: 1px solid rgba(208, 140, 96, 0.5);
+    color: #3a3222;
+    font-weight: 600;
+}
+
+:root[data-theme="light"] .oversized-field-button:hover {
+    background: linear-gradient(135deg, rgba(208, 140, 96, 0.18) 0%, rgba(208, 140, 96, 0.08) 100%);
+    border-color: #d08c60;
+    box-shadow: 0 2px 8px rgba(208, 140, 96, 0.2);
 }
 
 /* Mobile responsive */

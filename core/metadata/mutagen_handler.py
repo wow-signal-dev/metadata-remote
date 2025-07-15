@@ -395,7 +395,6 @@ class MutagenHandler:
             return True
             
         except Exception as e:
-            logger.debug(f"Skipping field {field_id}: binary data that cannot be decoded as text")
             return False
     
     def normalize_composer_text(self, composer_text: str) -> str:
@@ -760,16 +759,12 @@ class MutagenHandler:
             bool: True if successful, False otherwise
         """
         try:
-            logger.info(f"[write_metadata] Writing metadata to {filepath}")
-            logger.info(f"[write_metadata] Metadata to write: {metadata}")
             
             audio_file, format_type = self.detect_format(filepath)
             if audio_file is None:
                 logger.error("Could not open file with Mutagen")
                 return False
             
-            logger.info(f"[write_metadata] File format: {format_type}")
-            logger.info(f"[write_metadata] Existing tags: {list(audio_file.tags.keys()) if audio_file.tags else 'No tags'}")
             
             # Get the appropriate tag mapping
             tag_map = self.tag_mappings.get(format_type, {})
@@ -806,8 +801,6 @@ class MutagenHandler:
                     # Non-ID3 format custom field
                     custom_fields[field] = value
             
-            logger.info(f"[write_metadata] Standard fields: {standard_fields}")
-            logger.info(f"[write_metadata] Custom fields: {custom_fields}")
             
             # Special handling for different formats
             if isinstance(audio_file, MP3):
@@ -824,7 +817,6 @@ class MutagenHandler:
                     if not tag_name:
                         continue
                     
-                    logger.info(f"[write_metadata] Processing standard field '{field}' -> tag '{tag_name}' with value: '{value}'")
                     
                     # Normalize composer text
                     if field == 'composer' and value:
@@ -832,11 +824,9 @@ class MutagenHandler:
                     
                     # Handle empty values by using space placeholder instead of deletion
                     if not value:
-                        logger.info(f"[write_metadata] Field '{field}' has empty value, preserving with space placeholder")
                         value = ' '  # Use space placeholder for empty fields
                     
                     # Create appropriate ID3 frames
-                    logger.info(f"[write_metadata] Creating/updating tag '{tag_name}' for field '{field}'")
                     if tag_name == 'TPE1':
                         audio_file.tags[tag_name] = TPE1(encoding=3, text=value)
                     elif tag_name == 'TPE2':
@@ -877,7 +867,6 @@ class MutagenHandler:
                             
                             try:
                                 audio_file.tags[frame_id] = frame_class(encoding=3, text=value)
-                                logger.info(f"[write_metadata] Created {frame_id} frame with value: '{value}'")
                             except Exception as e:
                                 logger.warning(f"Failed to create frame {frame_id}: {e}")
                         else:
@@ -926,7 +915,6 @@ class MutagenHandler:
                     # Mutagen still removes them on save. Use space placeholder.
                     if not value:
                         audio_file[tag_name] = ' '
-                        logger.info(f"[write_metadata] Preserving empty field '{field}' with space placeholder")
                     else:
                         audio_file[tag_name] = value
                 
@@ -941,7 +929,6 @@ class MutagenHandler:
                     # Use space placeholder for empty custom fields too
                     if not value:
                         audio_file[field_key] = ' '
-                        logger.info(f"[write_metadata] Preserving empty custom field '{field}' with space placeholder")
                     else:
                         audio_file[field_key] = value
             
@@ -962,7 +949,6 @@ class MutagenHandler:
                     # Handle empty values with space placeholder
                     if not value:
                         value = ' '
-                        logger.info(f"[write_metadata] Preserving empty MP4 field '{field}' with space")
                     
                     # Special handling for track/disc
                     if field == 'track':
@@ -988,12 +974,14 @@ class MutagenHandler:
                         continue
                     
                     # Use freeform atoms for custom fields
-                    key = f"----:com.apple.iTunes:{field}"
+                    if field.startswith('----:'):
+                        key = field  # Already has the prefix
+                    else:
+                        key = f"----:com.apple.iTunes:{field}"
                     
                     if not value:
                         # Use space placeholder for empty custom fields
                         value = ' '
-                        logger.info(f"[write_metadata] Preserving empty MP4 custom field '{field}' with space")
                     
                     # MP4 freeform atoms store bytes
                     audio_file[key] = [value.encode('utf-8')]
@@ -1014,7 +1002,6 @@ class MutagenHandler:
                     
                     if not value:
                         value = ' '
-                        logger.info(f"[write_metadata] Preserving empty ASF field '{field}' with space")
                     
                     audio_file[tag_name] = value
                 
@@ -1028,7 +1015,6 @@ class MutagenHandler:
                     
                     if not value:
                         value = ' '
-                        logger.info(f"[write_metadata] Preserving empty ASF custom field '{field}' with space")
                     
                     audio_file[field_key] = value
             
@@ -1053,7 +1039,6 @@ class MutagenHandler:
                     # Handle empty values with space placeholder (same as MP3)
                     if not value:
                         value = ' '
-                        logger.info(f"[write_metadata] Preserving empty WAV field '{field}' with space")
                     
                     # Create appropriate ID3 frames (same as MP3)
                     if tag_name == 'TPE1':
@@ -1096,7 +1081,6 @@ class MutagenHandler:
                             
                             try:
                                 audio_file.tags[frame_id] = frame_class(encoding=3, text=value)
-                                logger.info(f"[write_metadata] Created {frame_id} frame with value: '{value}'")
                             except Exception as e:
                                 logger.warning(f"Failed to create frame {frame_id}: {e}")
                         else:
@@ -1115,7 +1099,6 @@ class MutagenHandler:
                     if not value:
                         # Use space placeholder for empty custom fields
                         value = ' '
-                        logger.info(f"[write_metadata] Preserving empty WAV custom field '{field}' with space")
                     
                     # Add or update TXXX frame
                     audio_file.tags[txxx_key] = TXXX(
@@ -1140,7 +1123,6 @@ class MutagenHandler:
                     
                     if not value:
                         value = ' '
-                        logger.info(f"[write_metadata] Preserving empty WavPack field '{field}' with space")
                     
                     audio_file[tag_name] = value
                 
@@ -1151,14 +1133,11 @@ class MutagenHandler:
                     
                     if not value:
                         value = ' '
-                        logger.info(f"[write_metadata] Preserving empty WavPack custom field '{field}' with space")
                     
                     audio_file[field] = value
             
             # Save the file
-            logger.info(f"[write_metadata] Saving file with updated metadata")
             audio_file.save()
-            logger.info(f"[write_metadata] File saved successfully")
             return True
         except Exception as e:
             logger.error(f"Error writing metadata to {filepath}: {e}")
@@ -1532,14 +1511,7 @@ class MutagenHandler:
             # Handle different frame types
             if hasattr(frame, 'text'):
                 text_value = str(frame.text[0]) if frame.text else ''
-                if len(text_value) > 200:
-                    field_info['original_value'] = text_value  # Preserve full content
-                    field_info['display_value'] = 'Click to view/edit'
-                    field_info['value'] = 'Click to view/edit'  # For backward compatibility
-                    field_info['is_editable'] = True  # Change from False
-                    field_info['field_type'] = 'oversized'
-                else:
-                    field_info['value'] = text_value
+                field_info['value'] = text_value
             elif frame_id.startswith('APIC') or hasattr(frame, 'data'):
                 field_info['value'] = 'Unsupported Content type'
                 field_info['is_editable'] = False
@@ -1548,14 +1520,7 @@ class MutagenHandler:
                 # Handle TXXX frames specially
                 if hasattr(frame, 'text'):
                     text_value = str(frame.text[0]) if frame.text else ''
-                    if len(text_value) > 200:
-                        field_info['original_value'] = text_value  # Preserve full content
-                        field_info['display_value'] = 'Click to view/edit'
-                        field_info['value'] = 'Click to view/edit'  # For backward compatibility
-                        field_info['is_editable'] = True  # Change from False
-                        field_info['field_type'] = 'oversized'
-                    else:
-                        field_info['value'] = text_value
+                    field_info['value'] = text_value
                 else:
                     field_info['value'] = str(frame)
             else:
@@ -1583,22 +1548,16 @@ class MutagenHandler:
         }
         
         for field_name, value in audio_file.items():
-            # Debug logging
-            logger.debug(f"Processing Vorbis field: {field_name!r} (type: {type(field_name).__name__})")
-            
             # Skip standard fields to avoid duplicates
             if field_name in standard_field_names:
-                logger.debug(f"  -> Skipping standard field: {field_name}")
                 continue
             
             # Skip album art field
             if field_name == 'METADATA_BLOCK_PICTURE':
-                logger.debug(f"  -> Skipping METADATA_BLOCK_PICTURE field")
                 continue
             
             # Additional check for case variations
             if field_name.upper() == 'METADATA_BLOCK_PICTURE':
-                logger.debug(f"  -> Skipping field {field_name} (case variation of METADATA_BLOCK_PICTURE)")
                 continue
                 
             field_info = {
@@ -1614,23 +1573,14 @@ class MutagenHandler:
             else:
                 text_value = str(value)
             
-            if len(text_value) > 200:
-                field_info['original_value'] = text_value  # Preserve full content
-                field_info['display_value'] = 'Click to view/edit'
-                field_info['value'] = 'Click to view/edit'  # For backward compatibility
-                field_info['is_editable'] = True  # Change from False
-                field_info['field_type'] = 'oversized'
-            else:
-                field_info['value'] = text_value
+            field_info['value'] = text_value
             
             # Validate before adding
             if not self._is_valid_field(field_name, field_info.get('value', '')):
                 continue
             
             fields[field_name] = field_info
-            logger.debug(f"  -> Added field {field_name} to extended fields")
         
-        logger.debug(f"Total Vorbis extended fields discovered: {list(fields.keys())}")
         return fields
     
     def _discover_mp4_fields(self, audio_file) -> Dict[str, Dict[str, Any]]:
@@ -1665,28 +1615,14 @@ class MutagenHandler:
                     # Binary data or text
                     try:
                         text_value = value[0].decode('utf-8')
-                        if len(text_value) > 200:
-                            field_info['original_value'] = text_value  # Preserve full content
-                            field_info['display_value'] = 'Click to view/edit'
-                            field_info['value'] = 'Click to view/edit'  # For backward compatibility
-                            field_info['is_editable'] = True  # Change from False
-                            field_info['field_type'] = 'oversized'
-                        else:
-                            field_info['value'] = text_value
+                        field_info['value'] = text_value
                     except:
                         field_info['value'] = 'Unsupported Content type'
                         field_info['is_editable'] = False
                         field_info['field_type'] = 'binary'
                 else:
                     text_value = str(value[0])
-                    if len(text_value) > 200:
-                        field_info['original_value'] = text_value  # Preserve full content
-                        field_info['display_value'] = 'Click to view/edit'
-                        field_info['value'] = 'Click to view/edit'  # For backward compatibility
-                        field_info['is_editable'] = True  # Change from False
-                        field_info['field_type'] = 'oversized'
-                    else:
-                        field_info['value'] = text_value
+                    field_info['value'] = text_value
             else:
                 field_info['value'] = str(value)
             
@@ -1730,14 +1666,7 @@ class MutagenHandler:
             else:
                 text_value = str(value.value) if hasattr(value, 'value') else str(value)
             
-            if len(text_value) > 200:
-                field_info['original_value'] = text_value  # Preserve full content
-                field_info['display_value'] = 'Click to view/edit'
-                field_info['value'] = 'Click to view/edit'  # For backward compatibility
-                field_info['is_editable'] = True  # Change from False
-                field_info['field_type'] = 'oversized'
-            else:
-                field_info['value'] = text_value
+            field_info['value'] = text_value
             
             # Validate before adding
             if not self._is_valid_field(field_name, field_info.get('value', '')):
@@ -1775,14 +1704,7 @@ class MutagenHandler:
             else:
                 text_value = str(value)
             
-            if len(text_value) > 200:
-                field_info['original_value'] = text_value  # Preserve full content
-                field_info['display_value'] = 'Click to view/edit'
-                field_info['value'] = 'Click to view/edit'  # For backward compatibility
-                field_info['is_editable'] = True  # Change from False
-                field_info['field_type'] = 'oversized'
-            else:
-                field_info['value'] = text_value
+            field_info['value'] = text_value
             
             # Validate before adding
             if not self._is_valid_field(field_name, field_info.get('value', '')):

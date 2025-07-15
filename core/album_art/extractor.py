@@ -21,7 +21,6 @@ def extract_album_art(filepath):
     # Check if format supports album art
     _, _, base_format = get_file_format(filepath)
     if base_format in FORMAT_METADATA_CONFIG.get('no_embedded_art', []):
-        logger.debug(f"Format {base_format} does not support embedded album art")
         return None
     
     try:
