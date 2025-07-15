@@ -57,7 +57,7 @@ Multi-architecture Docker images available for x86_64, ARM64, and ARMv7.
 - **Smart shortcuts** - Double-tap Enter to rename folders, single Enter to edit fields
 
 ### Modern, Lightweight Architecture
-- **Compact** - Just 81.5 MB container size using optimized Mutagen library
+- **Compact** - Just 81.6 MB container size using optimized Mutagen library
 - **Production-ready** - Gunicorn server with reverse proxy support
 - **Theme switching** - Toggle between light and dark modes
 - **Multi-platform** - Native support for x86_64, ARM64, and ARMv7
