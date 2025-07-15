@@ -32,27 +32,38 @@ Multi-architecture Docker images available for x86_64, ARM64, and ARMv7.
 
 ## Key Features
 
-### 🧠 Smart Metadata Suggestions
-Advanced inference engine that goes beyond simple MusicBrainz queries. Analyzes local context (filenames, folder patterns, siblings), performs confidence-weighted evidence synthesis, and iteratively refines suggestions. Handles edge cases like classical music, compilations, and live recordings with specialized strategies.
+### Complete Metadata Control
+- **Full field access** - View and edit ALL metadata fields, organized into Standard and Extended categories
+- **Field management** - Create new custom fields or delete existing ones, with full undo/redo support
+- **Bulk operations** - Apply any changes to individual files or entire folders with one click
+- **Long-form editor** - Automatically-appearing dedicated editor for lyrics and metadata content over 100 characters
 
-### 🔄 Fully Reversible Editing History
-Full undo/redo system tracks up to 1000 edits. Revert mistakes and even undo bulk operations across entire folders. Edit fearlessly.
+### Intelligent Metadata Suggestions
+- **Smart inference** - Analyzes filenames, folder patterns, and sibling files to suggest metadata
+- **MusicBrainz integration** - Combines local context with online database queries
+- **Confidence scoring** - Presents suggestions ranked by confidence percentage
+- **Edge case handling** - Specialized strategies for classical music, compilations, and live recordings
 
-### ⚡ Powerful Bulk Operations
-Apply metadata or album art to entire folders instantly. Save individual fields or update everything at once.
+### Powerful File Management
+- **In-browser playback** - Stream files directly in the UI
+- **Direct editing** - Rename files and folders without leaving the interface
+- **Format support** - MP3, FLAC, OGG, OPUS, M4A, WMA, WAV, and WavPack
+- **Album art control** - Upload, preview, delete, and bulk apply artwork with automatic corruption repair
+- **Editing history** - Full undo/redo for up to 1000 operations, including bulk changes
 
-### 🎨 Advanced Album Art Management
-Upload, preview, delete, and bulk apply album art. Metadata Remote automatically detects and repairs corrupted embedded images when editing.
+### Keyboard-First Design
+- **Complete keyboard control** - Every feature accessible without a mouse
+- **Efficient navigation** - Arrow keys, Tab switching, Enter to play/edit, Escape to save
+- **Smart shortcuts** - Double-tap Enter to rename folders, single Enter to edit fields
 
-### 🔧 Efficient Server Workflow
-- **Keyboard-first navigation**: Arrow keys with smart repeat, Tab switching, Enter to expand
-- **Real-time filtering**: Instant search within large folders
-- **In-browser playback**: Stream files directly (supports most formats)
-- **Direct file renaming**: Update filenames with automatic history tracking
-- **Resizable panels**: Customize your workspace by dragging dividers
+### Modern, Lightweight Architecture
+- **Compact** - Just 81.5 MB container size using optimized Mutagen library
+- **Production-ready** - Gunicorn server with reverse proxy support
+- **Theme switching** - Toggle between light and dark modes
+- **Multi-platform** - Native support for x86_64, ARM64, and ARMv7
 
-### ✨ Modern Interface
-Clean dark theme with smooth animations, loading states, and clear visual feedback for every action.
+### Additional Capabilities
+Real-time search filtering • Resizable workspace panels • History tracking through renames • Extended metadata viewer • Automatic image repair • No external dependencies • Clean visual feedback • Responsive design
 
 ## Comparison with Other Tools
 
@@ -70,11 +81,21 @@ Clean dark theme with smooth animations, loading states, and clear visual feedba
 ## Usage Guide
 
 ### Navigation
-- **↑↓ Arrow keys**: Navigate folders and files with smart key repeat
-- **Enter**: Expand/collapse folders  
-- **Tab**: Switch between folder and file panes
-- **Click filename header**: Rename files directly
-- **Click empty field**: Get automatic intelligent suggestions
+
+**Essential Controls**
+- **↑↓** Navigate files/folders
+- **PgUp/PgDn** Jump by pages
+- **Tab** Switch between panes
+- **Enter** Expand folders / Play files / Edit fields • **Esc** Cancel edits / Close dialogs
+- **Double Enter** Rename folders • **Shift+Delete** Delete metadata fields
+- **Alt+T** Toggle theme • **?** Show help
+
+**Editing Workflow**
+1. Navigate to any metadata field and press Enter to edit
+2. Make your changes, then Enter to save or Esc to cancel
+3. Navigate to "File" or "Folder" buttons to save changes to one file or all files in the folder
+
+All functionality is keyboard accessible - mouse optional. See the in-app help guide (?) for complete keyboard shortcuts.
 
 ### Smart Metadata Inference
 When you click on an empty metadata field, Metadata Remote will:
@@ -276,8 +297,7 @@ AGPL-3.0 License - see [LICENSE](LICENSE) file for details.
 ## Acknowledgments
 
 - [Mutagen](https://github.com/quodlibet/mutagen) - Python multimedia tagging library (LGPL-2.1+)
-- MusicBrainz for their amazing open music database
-- FFmpeg team for reliable audio processing
+- [MusicBrainz](https://musicbrainz.org) for their amazing open music database
 - All our users and contributors
 
 ---
