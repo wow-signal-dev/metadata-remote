@@ -71,6 +71,11 @@
             const loading = document.getElementById(`${field}-loading`);
             const suggestions = document.getElementById(`${field}-suggestions`);
             
+            // Skip if loading/suggestions elements don't exist (e.g., for new field form)
+            if (!loading || !suggestions) {
+                return;
+            }
+            
             // Cancel any existing request
             if (State.inferenceAbortControllers[field]) {
                 State.inferenceAbortControllers[field].abort();

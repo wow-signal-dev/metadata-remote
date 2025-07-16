@@ -17,8 +17,15 @@
         showStatus(message, type) {
             // Legacy function - kept for compatibility but hidden - status is now hidden by CSS
             const status = document.getElementById('status');
-            status.textContent = message;
-            status.className = `status ${type}`;
+            if (status) {
+                status.textContent = message;
+                status.className = `status ${type}`;
+            }
+            
+            // For errors, also show an alert since the status element is hidden
+            if (type === 'error') {
+                alert(`Error: ${message}`);
+            }
         },
     
         /**

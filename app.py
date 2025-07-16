@@ -91,13 +91,36 @@ signal.signal(signal.SIGTERM, signal_handler)
 signal.signal(signal.SIGINT, signal_handler)
 
 @app.after_request
-def add_cache_headers(response):
-    """Add cache-control headers to prevent reverse proxy caching of dynamic content"""
-    # Only add cache-control headers to JSON responses (our API endpoints)
+def add_security_headers(response):
+    """Add security headers and cache-control headers"""
+    # Security headers for all responses
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+    
+    # Content Security Policy
+    csp = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline'; "  # unsafe-inline needed for onclick handlers
+        "style-src 'self' 'unsafe-inline'; "   # unsafe-inline needed for inline styles
+        "img-src 'self' data: blob:; "         # data: for base64 images, blob: for album art
+        "font-src 'self'; "
+        "connect-src 'self'; "
+        "media-src 'self'; "                    # For audio streaming
+        "object-src 'none'; "
+        "base-uri 'self'; "
+        "form-action 'self'; "
+        "frame-ancestors 'none';"
+    )
+    response.headers['Content-Security-Policy'] = csp
+    
+    # Cache-control headers for JSON responses
     if response.mimetype == 'application/json':
         response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, private'
         response.headers['Pragma'] = 'no-cache'
         response.headers['Expires'] = '0'
+    
     return response
 
 # =============
@@ -644,9 +667,9 @@ def create_custom_field():
     if '\x00' in field_name:
         return jsonify({'status': 'error', 'message': 'Field name contains invalid characters'}), 400
     
-    # Sanitize field name (alphanumeric and underscore only)
-    if not re.match(r'^[A-Za-z0-9_]+$', field_name):
-        return jsonify({'status': 'error', 'message': 'Invalid field name. Only alphanumeric characters and underscores are allowed.'}), 400
+    # Sanitize field name (alphanumeric, underscore, and spaces)
+    if not re.match(r'^[A-Za-z0-9_ ]+$', field_name):
+        return jsonify({'status': 'error', 'message': 'Invalid field name. Only alphanumeric characters, underscores, and spaces are allowed.'}), 400
     
     try:
         if apply_to_folder:
@@ -1249,6 +1272,15 @@ def redo_action(action_id):
             field = action.field
             value = action.new_values[filepath]
             
+            # For MP3/WAV files, reverse-map frame IDs to semantic names
+            from core.file_utils import get_file_format
+            _, _, base_format = get_file_format(filepath)
+            
+            if base_format in ['mp3', 'wav']:
+                # Check if this is a frame ID that needs to be converted back
+                if field in mutagen_handler.frame_to_field:
+                    field = mutagen_handler.frame_to_field[field]
+            
             try:
                 success = mutagen_handler.write_custom_field(filepath, field, value)
                 if success:
@@ -1263,7 +1295,17 @@ def redo_action(action_id):
             for filepath in action.files:
                 try:
                     value = action.new_values.get(filepath, '')
-                    success = mutagen_handler.write_custom_field(filepath, action.field, value)
+                    field = action.field
+                    
+                    # Apply same reverse mapping for MP3/WAV files
+                    from core.file_utils import get_file_format
+                    _, _, base_format = get_file_format(filepath)
+                    
+                    if base_format in ['mp3', 'wav']:
+                        if field in mutagen_handler.frame_to_field:
+                            field = mutagen_handler.frame_to_field[field]
+                    
+                    success = mutagen_handler.write_custom_field(filepath, field, value)
                     if success:
                         files_updated += 1
                     else:

@@ -660,8 +660,8 @@
                         <div class="label-with-delete">
                             <label for="${field}">${info.display}</label>
                             <button type="button" class="delete-field-btn" 
-                                    onclick="window.MetadataRemote.Metadata.Editor.deleteField('${field}')" 
-                                    title="Delete ${field} metadata">
+                                    onclick="window.MetadataRemote.Metadata.Editor.deleteField('${field.replace(/'/g, "\\'").replace(/"/g, "&quot;")}')" 
+                                    title="Delete ${escapeHtml(field)} metadata">
                                 <span>⊖</span>
                             </button>
                         </div>
@@ -676,21 +676,21 @@
                     <div class="apply-field-controls" data-field="${field}">
                         <span class="apply-field-label">Apply to</span>
                         <button type="button" class="apply-field-btn apply-file-btn btn-status" 
-                                data-field="${field}" onclick="saveFieldToFile('${field}')">
+                                data-field="${field}" onclick="saveFieldToFile('${field.replace(/'/g, "\\'")}')">
                             <span class="btn-status-content">File</span>
                             <span class="btn-status-message"></span>
                         </button>
                         <button type="button" class="apply-field-btn apply-folder-btn-new btn-status" 
-                                data-field="${field}" onclick="window.MetadataRemote.Metadata.Editor.showFolderConfirmation('${field}');">
+                                data-field="${field}" onclick="window.MetadataRemote.Metadata.Editor.showFolderConfirmation('${field.replace(/'/g, "\\'")}');">
                             <span class="btn-status-content">Folder</span>
                             <span class="btn-status-message"></span>
                         </button>
                         <div class="folder-confirmation" data-field="${field}" style="display: none;">
                             <span class="confirm-text">Apply to folder?</span>
                             <button type="button" class="confirm-yes" 
-                                    onclick="window.MetadataRemote.Metadata.Editor.confirmFolderApply('${field}');">Yes</button>
+                                    onclick="window.MetadataRemote.Metadata.Editor.confirmFolderApply('${field.replace(/'/g, "\\'")}');">Yes</button>
                             <button type="button" class="confirm-no" 
-                                    onclick="window.MetadataRemote.Metadata.Editor.cancelFolderApply('${field}');">No</button>
+                                    onclick="window.MetadataRemote.Metadata.Editor.cancelFolderApply('${field.replace(/'/g, "\\'")}');">No</button>
                         </div>
                     </div>
                 </div>
@@ -1144,8 +1144,8 @@
                 }
             }
             
-            // If no spaces, validate alphanumeric + underscore (existing behavior)
-            if (!/^[A-Za-z0-9_]+$/.test(fieldName)) {
+            // Validate alphanumeric + underscore + spaces
+            if (!/^[A-Za-z0-9_ ]+$/.test(fieldName)) {
                 return { 
                     valid: false, 
                     error: 'Field names must contain only letters, numbers, underscores, or spaces' 
@@ -1215,7 +1215,7 @@
             if (standardFieldId) {
                 // For standard fields, check if they're actually present in the current file
                 const fieldElement = document.getElementById(fieldName);
-                if (fieldElement) {
+                if (fieldElement && fieldElement.closest('.form-group-with-button')?.style.display !== 'none') {
                     UIUtils.showStatus('Field already exists', 'error');
                     return;
                 }
@@ -1262,14 +1262,29 @@
                         
                         // For standard fields that were hidden, show them
                         if (standardFieldId) {
-                            const fieldElement = document.getElementById(fieldName).closest('.form-group-with-button');
-                            if (fieldElement && fieldElement.style.display === 'none') {
-                                fieldElement.style.display = '';
-                                const input = document.getElementById(fieldName);
-                                if (input) {
-                                    input.disabled = false;
-                                    input.value = fieldValue;
+                            const fieldElement = document.getElementById(standardFieldId);
+                            if (fieldElement) {
+                                const fieldContainer = fieldElement.closest('.form-group-with-button');
+                                if (fieldContainer && fieldContainer.style.display === 'none') {
+                                    fieldContainer.style.display = '';
+                                    fieldElement.disabled = false;
+                                    fieldElement.value = fieldValue;
                                 }
+                            } else {
+                                // Standard field doesn't exist in DOM yet, need to refresh metadata
+                                // Clear and close the creation form first
+                                this.cancelNewField();
+                                
+                                if (window.MetadataRemote.Files && window.MetadataRemote.Files.Manager) {
+                                    await window.MetadataRemote.Files.Manager.loadFile(State.currentFile, State.selectedListItem);
+                                }
+                                
+                                // Refresh history
+                                if (loadHistoryCallback) {
+                                    loadHistoryCallback();
+                                }
+                                
+                                return;
                             }
                         } else {
                             // For dynamic fields, render the new field
@@ -1310,7 +1325,7 @@
                         // Focus the new field
                         let newFieldElement = null;
                         if (standardFieldId) {
-                            newFieldElement = document.getElementById(fieldName);
+                            newFieldElement = document.getElementById(standardFieldId);
                         } else {
                             newFieldElement = document.querySelector(`[data-field="${fieldName}"]`);
                         }
@@ -1333,7 +1348,9 @@
                 }
             } catch (err) {
                 console.error('Error creating field:', err);
-                UIUtils.showStatus('Error creating field', 'error');
+                // Extract the actual error message if available
+                const errorMessage = err.message || 'Error creating field';
+                UIUtils.showStatus(errorMessage, 'error');
             }
         },
         
@@ -1677,8 +1694,8 @@
             // Update confirmation UI to show file/folder options
             confirmUI.innerHTML = `
                 <span class="confirm-text">${confirmText}</span>
-                <button type="button" class="inline-choice-btn inline-choice-file" onclick="window.MetadataRemote.Metadata.Editor.deleteFromFile('${fieldId}')">file</button>
-                <button type="button" class="inline-choice-btn inline-choice-folder" onclick="window.MetadataRemote.Metadata.Editor.confirmBatchDelete('${fieldId}')">folder</button>
+                <button type="button" class="inline-choice-btn inline-choice-file" onclick="window.MetadataRemote.Metadata.Editor.deleteFromFile('${fieldId.replace(/'/g, "\\'").replace(/"/g, "&quot;")}')">file</button>
+                <button type="button" class="inline-choice-btn inline-choice-folder" onclick="window.MetadataRemote.Metadata.Editor.confirmBatchDelete('${fieldId.replace(/'/g, "\\'").replace(/"/g, "&quot;")}')">folder</button>
             `;
             
             // Focus on safer option
@@ -1900,7 +1917,6 @@
             // Set lock
             window.MetadataRemote.batchOperationInProgress = true;
             
-            const confirmUI = document.querySelector('.delete-confirmation');
             const deleteBtn = document.querySelector(`button[onclick*="deleteField('${fieldId}')"]`) || 
                               document.querySelector(`.dynamic-field[data-field-id="${fieldId}"] .delete-field-btn`);
             
@@ -1912,6 +1928,7 @@
             }
             
             // Hide confirmation UI
+            const confirmUI = document.querySelector('.delete-confirmation');
             if (confirmUI) confirmUI.remove();
             
             // Remove class from parent container for grouped fields

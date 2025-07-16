@@ -94,6 +94,16 @@
             
             // Handle click events on metadata input fields to immediately activate editing
             document.addEventListener('click', (e) => {
+                // First, check if there's any field currently in editing mode
+                const currentlyEditingField = document.querySelector('.metadata input[type="text"][data-editing="true"]');
+                
+                // If clicking anywhere outside the currently editing field, exit edit mode
+                if (currentlyEditingField && e.target !== currentlyEditingField) {
+                    currentlyEditingField.dataset.editing = 'false';
+                    currentlyEditingField.readOnly = true;
+                    // Note: We don't blur() here to avoid focus jumping issues
+                }
+                
                 // When clicking oversized button, properly handle fields in editing mode
                 if (e.target.classList.contains('oversized-field-button')) {
                     const editingFields = document.querySelectorAll('.metadata input[type="text"][data-editing="true"]');
@@ -118,11 +128,23 @@
                         }
                     });
                     
+                    // Clear any keyboard focus indicators from other panes
+                    FocusManager.clearAllKeyboardFocus();
+                    
                     // Transition to form edit state
-                    StateMachine.transition(StateMachine.States.FORM_EDIT, {
-                        fieldId: e.target.id,
-                        fieldType: 'metadata'
-                    });
+                    if (StateMachine.getState() === StateMachine.States.FORM_EDIT) {
+                        // Already in form edit state, just update context
+                        StateMachine.updateContext({
+                            fieldId: e.target.id,
+                            fieldType: 'metadata'
+                        });
+                    } else {
+                        // Transition to form edit state
+                        StateMachine.transition(StateMachine.States.FORM_EDIT, {
+                            fieldId: e.target.id,
+                            fieldType: 'metadata'
+                        });
+                    }
                     
                     // Set focusedPane to metadata when clicking metadata fields
                     State.focusedPane = 'metadata';

@@ -3328,6 +3328,17 @@ button:disabled {
     color: white;
 }
 
+/* Save to Folder button in new field form */
+:root[data-theme="light"] .new-field-actions .btn-secondary {
+    background: linear-gradient(135deg, #8b956d 0%, #7b855d 100%);
+    color: white;
+}
+
+:root[data-theme="light"] .new-field-actions .btn-secondary:hover {
+    background: linear-gradient(135deg, #7b855d 0%, #6b754d 100%);
+    box-shadow: 0 4px 12px rgba(139, 149, 109, 0.4);
+}
+
 /* Help button light theme styling */
 :root[data-theme="light"] .help-button {
     background: rgba(176, 141, 87, 0.15);
