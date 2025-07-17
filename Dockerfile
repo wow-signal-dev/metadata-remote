@@ -33,5 +33,4 @@ COPY static/ static/
 
 EXPOSE 8338
 
-# Use Gunicorn instead of Flask's development server
 CMD ["gunicorn", "--config", "gunicorn_config.py", "app:app"]
