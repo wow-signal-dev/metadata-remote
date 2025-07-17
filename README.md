@@ -33,7 +33,7 @@ Multi-architecture Docker images available for x86_64, ARM64, and ARMv7.
 ## Key Features
 
 ### Complete Metadata Control
-- **Full field access** - View and edit ALL metadata fields, organized into Standard and Extended categories
+- **Full field access** - View and edit ALL text metadata fields, organized into Standard and Extended categories
 - **Field management** - Create new custom fields or delete existing ones, with full undo/redo support
 - **Bulk operations** - Apply any changes to individual files or entire folders with one click
 - **Long-form editor** - Automatically-appearing dedicated editor for lyrics and metadata content over 100 characters
