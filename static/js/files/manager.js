@@ -404,6 +404,11 @@
                 }
             });
             
+            // Clean up TransitionController monitoring for all fields
+            if (window.MetadataRemote.Metadata.TransitionController) {
+                window.MetadataRemote.Metadata.TransitionController.stopAllMonitoring();
+            }
+            
             if (State.loadFileDebounceTimer) {
                 clearTimeout(State.loadFileDebounceTimer);
                 State.loadFileDebounceTimer = null;

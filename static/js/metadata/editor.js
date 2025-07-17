@@ -831,6 +831,11 @@
         },
         
         renderMetadataFields(metadata) {
+            // Clean up TransitionController monitoring before rendering new fields
+            if (window.MetadataRemote.Metadata.TransitionController) {
+                window.MetadataRemote.Metadata.TransitionController.stopAllMonitoring();
+            }
+            
             // First render standard fields that exist
             this.renderStandardFields(metadata);
             
