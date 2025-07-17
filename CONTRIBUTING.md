@@ -2,7 +2,7 @@
 
 Thanks for your interest in contributing! This project aims to be a simple, lightweight solution for editing audio metadata on headless servers.
 
-## 🐛 Reporting Issues
+## Reporting Issues
 
 **Before submitting an issue:**
 - Check if the issue already exists in [GitHub Issues](https://github.com/wow-signal-dev/metadata-remote/issues)
@@ -15,7 +15,7 @@ Thanks for your interest in contributing! This project aims to be a simple, ligh
 - Any error messages or logs
 - Audio file format (MP3/FLAC) if relevant
 
-## 💡 Suggesting Features
+## Suggesting Features
 
 Feature requests are welcome! Please:
 - Check existing issues first to avoid duplicates
@@ -23,7 +23,7 @@ Feature requests are welcome! Please:
 - Keep in mind the project's goal of being lightweight and simple
 - Consider if the feature aligns with headless server workflows
 
-## 🔧 Development Setup
+## Development Setup
 
 ### Prerequisites
 - Python 3.11+
@@ -61,7 +61,7 @@ Feature requests are welcome! Please:
 docker-compose up --build
 ```
 
-## 📝 Code Guidelines
+## Code Guidelines
 
 ### Python (Backend)
 - Follow PEP 8 style guidelines
@@ -83,7 +83,7 @@ docker-compose up --build
 - Ensure accessibility (focus indicators, semantic markup)
 - Keep CSS organized and well-commented
 
-## 🚀 Submitting Changes
+## Submitting Changes
 
 ### Pull Request Process
 1. **Fork the repository** and create a feature branch:
@@ -115,29 +115,26 @@ docker-compose up --build
 - **Compatibility:** Works with existing Docker setup?
 - **User Experience:** Maintains intuitive interface?
 
-## 🎯 Priority Areas
+## Priority Areas
 
 Help is especially welcome in these areas:
 
 ### High Priority
-- **Additional audio formats** (M4A, OGG support)
+- **Additional audio formats** (AIFF, APE support)
 - **Performance improvements** for large libraries
 - **Better error handling** and user feedback
 - **Mobile interface** improvements
 
 ### Medium Priority
-- **MusicBrainz integration** for metadata lookup
-- **Batch operations** (multiple folders at once)
-- **Search functionality** across music library
 - **Folder monitoring** for new files
 
 ### Nice to Have
 - **Multi-user support** with permissions
-- **Themes** beyond the current dark theme
+- **Themes** beyond the current light and dark theme
 - **Integration examples** with popular tools
 - **API endpoints** for automation
 
-## 🤝 Community Guidelines
+## Community Guidelines
 
 - Be respectful and welcoming to all contributors
 - Focus on constructive feedback in code reviews
@@ -145,7 +142,7 @@ Help is especially welcome in these areas:
 - Keep discussions relevant to the project goals
 - Remember this is volunteer work - be patient and kind
 
-## 📋 Testing
+## Testing
 
 Currently testing is manual. Help setting up automated testing would be appreciated!
 
@@ -159,7 +156,7 @@ Currently testing is manual. Help setting up automated testing would be apprecia
 - [ ] Keyboard navigation
 - [ ] Docker deployment
 
-## 🙋‍♀️ Questions?
+## Questions?
 
 Feel free to:
 - Open an issue for questions about contributing
