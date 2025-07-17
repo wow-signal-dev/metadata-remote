@@ -323,6 +323,7 @@ input:autofill {
     flex: 1;
     overflow: hidden;
     position: relative;
+    z-index: 1;
 }
 /* Dividers between file, folder, and metadata panes */
 .divider {
@@ -1396,6 +1397,7 @@ input:autofill {
     flex-direction: column;
     position: relative;
     outline: none;
+    z-index: 1;
 }
 
 
@@ -1516,12 +1518,13 @@ input:autofill {
     background: linear-gradient(135deg, rgba(255,255,255,0.02) 0%, rgba(255,255,255,0.04) 100%);
     border-radius: 8px;
     border: 1px solid rgba(255, 255, 255, 0.05);
-    backdrop-filter: blur(5px);
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 0.75rem;
     width: fit-content;
+    position: relative;
+    z-index: 1;
 }
 
 /* Light mode styling for album art container */
@@ -1546,7 +1549,7 @@ input:autofill {
 .album-art:hover {
     transform: scale(2.0);
     box-shadow: 0 8px 24px rgba(0,0,0,0.9);
-    z-index: 950;
+    z-index: 110;
     position: relative;
 }
 
@@ -1572,7 +1575,7 @@ input:autofill {
     color: rgba(255, 255, 255, 0.9);
     white-space: nowrap;
     pointer-events: none;
-    z-index: 951; /* Above hovered album art (950) */
+    z-index: 111; /* Above hovered album art (110) */
     opacity: 0;
     transition: opacity 0s ease;
     max-width: 200px;
@@ -1607,7 +1610,7 @@ input:autofill {
 /* Ensure the album art section has proper stacking context but stays below help overlay */
 .album-art-section {
     position: relative;
-    z-index: 900;
+    z-index: 50;
 }
 
 .album-art-placeholder {
@@ -3398,6 +3401,30 @@ button:disabled {
         transparent 2px,
         transparent 6px
     );
+}
+
+/* Selected items in folders and files panes for light theme */
+:root[data-theme="light"] .tree-item.selected > .tree-item-content {
+    background: linear-gradient(90deg, rgba(208, 140, 96, 0.35) 0%, rgba(208, 140, 96, 0.2) 100%);
+}
+
+:root[data-theme="light"] .tree-item.selected.keyboard-focus > .tree-item-content {
+    background: linear-gradient(90deg, rgba(208, 140, 96, 0.45) 0%, rgba(208, 140, 96, 0.25) 100%);
+    outline: 1px solid #d08c60;
+}
+
+:root[data-theme="light"] #file-list li.selected {
+    background: linear-gradient(90deg, rgba(208, 140, 96, 0.35) 0%, rgba(208, 140, 96, 0.2) 100%);
+}
+
+:root[data-theme="light"] #file-list li.selected.keyboard-focus {
+    background: linear-gradient(90deg, rgba(208, 140, 96, 0.45) 0%, rgba(208, 140, 96, 0.25) 100%);
+    outline: 1px solid #d08c60;
+}
+
+:root[data-theme="light"] .tree-item.keyboard-focus > .tree-item-content,
+:root[data-theme="light"] #file-list li.keyboard-focus {
+    outline: 1px solid #d08c60;
 }
 
 /* History panel resize zone for light theme */

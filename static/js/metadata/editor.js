@@ -1651,13 +1651,13 @@
                     e.preventDefault();
                     e.stopPropagation();
                     this.cancelDelete(fieldId);
-                    document.removeEventListener('click', handleOutsideClick, true);
+                    document.removeEventListener('click', handleOutsideClick);
                     document.removeEventListener('keydown', handleEscape);
                 }
             };
-            // Use capture phase to handle before other click handlers
+            // Use bubble phase to avoid intercepting clicks on other elements
             setTimeout(() => {
-                document.addEventListener('click', handleOutsideClick, true);
+                document.addEventListener('click', handleOutsideClick);
             }, 0);
             
             // Store the handler reference for cleanup
