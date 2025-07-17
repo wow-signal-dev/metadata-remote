@@ -1246,7 +1246,6 @@ input:autofill {
 #file-list li:hover {
     background: var(--bg-hover);
     color: var(--text-primary);
-    padding-left: 1.5rem;
 }
 
 #file-list li.selected {
