@@ -110,17 +110,27 @@
             }, true);
             
             
+            // Track where mousedown occurs to properly handle text selection
+            let mousedownTarget = null;
+            document.addEventListener('mousedown', (e) => {
+                mousedownTarget = e.target;
+            });
+            
             // Handle click events on metadata input fields to immediately activate editing
             document.addEventListener('click', (e) => {
                 // First, check if there's any field currently in editing mode
                 const currentlyEditingField = document.querySelector('.metadata input[type="text"][data-editing="true"]');
                 
                 // If clicking anywhere outside the currently editing field, exit edit mode
-                if (currentlyEditingField && e.target !== currentlyEditingField) {
+                // BUT only if the mousedown also started outside the field (to handle text selection)
+                if (currentlyEditingField && e.target !== currentlyEditingField && mousedownTarget !== currentlyEditingField) {
                     currentlyEditingField.dataset.editing = 'false';
                     currentlyEditingField.readOnly = true;
                     // Note: We don't blur() here to avoid focus jumping issues
                 }
+                
+                // Reset mousedown target
+                mousedownTarget = null;
                 
                 // When clicking oversized button, properly handle fields in editing mode
                 if (e.target.classList.contains('oversized-field-button')) {

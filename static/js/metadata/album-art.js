@@ -238,10 +238,6 @@
             
             const folderPath = State.currentFile.substring(0, State.currentFile.lastIndexOf('/'));
             
-            if (!confirm(`Apply this album art to all files in the folder "${folderPath || 'root'}"? This will replace any existing album art.`)) {
-                return;
-            }
-            
             button.disabled = true;
             setFormEnabledCallback(false);
             ButtonStatus.showButtonStatus(button, 'Applying...', 'processing');

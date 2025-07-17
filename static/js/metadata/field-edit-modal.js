@@ -534,10 +534,6 @@
          * Apply changes to folder
          */
         async applyToFolder() {
-            if (!confirm(`Apply this value to all files in the folder? This will update the "${this.currentFieldInfo.display_name}" field for all audio files.`)) {
-                return;
-            }
-            
             const button = this.applyFolderBtn;
             const field = this.currentField;
             const value = this.textarea.value;
