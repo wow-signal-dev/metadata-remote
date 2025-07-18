@@ -1151,6 +1151,28 @@ class MutagenHandler:
                     
                     audio_file[field] = value
             
+            # M4B Audiobook Format Handling
+            # M4B files require special treatment:
+            # - stik=2 identifies the file as an audiobook (required for iTunes/Apple Books)
+            # - pgap=True enables gapless playback (important for continuous narration)
+            # - aART field is conventionally used for narrator (not album artist)
+            # - TV show atoms (tvsh, tves, tvnn) are repurposed for book series metadata
+            if isinstance(audio_file, MP4) and filepath.lower().endswith('.m4b'):
+                try:
+                    changes_made = []
+                    current_stik = audio_file.get('stik', [0])[0]
+                    if current_stik != 2:
+                        audio_file['stik'] = [2]  # Media type: Audiobook
+                        changes_made.append(f'set stik=2 (was {current_stik})')
+                    if not audio_file.get('pgap'):
+                        audio_file['pgap'] = True  # Enable gapless playback
+                        changes_made.append('enabled gapless playback')
+                    if changes_made:
+                        logger.info(f"M4B audiobook adjustments for {filepath}: {', '.join(changes_made)}")
+                except Exception as e:
+                    logger.warning(f"Failed to set audiobook properties: {e}")
+                    # Continue with save anyway
+            
             # Save the file
             audio_file.save()
             return True

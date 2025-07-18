@@ -91,6 +91,7 @@
                 'mp3': '🎵',
                 'flac': '💿',
                 'm4a': '🎶',
+                'm4b': '📚',
                 'wav': '🌊',
                 'wma': '🪟',
                 'wv': '📦',
@@ -114,12 +115,15 @@
             const isLossless = lossless.includes(ext);
             const hasLimitations = limitedMetadata.includes(ext) || noAlbumArt.includes(ext);
             
+            // Check for audiobook format
+            const isAudiobook = ext === 'M4B';
+            
             let badgeHtml = `<span style="
                 font-size: 0.7rem;
                 padding: 0.2rem 0.4rem;
                 border-radius: 4px;
-                background: ${isLossless ? 'rgba(74, 222, 128, 0.2)' : 'rgba(255, 169, 77, 0.2)'};
-                color: ${isLossless ? '#4ade80' : '#ffa94d'};
+                background: ${isAudiobook ? 'rgba(139, 92, 246, 0.2)' : (isLossless ? 'rgba(74, 222, 128, 0.2)' : 'rgba(255, 169, 77, 0.2)')};
+                color: ${isAudiobook ? '#8b5cf6' : (isLossless ? '#4ade80' : '#ffa94d')};
                 margin-left: 0.5rem;
                 font-weight: 500;
             ">${ext}</span>`;

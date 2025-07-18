@@ -32,7 +32,7 @@ HOST = '0.0.0.0'
 
 # Supported audio formats
 AUDIO_EXTENSIONS = (
-    '.mp3', '.flac', '.wav', '.m4a', '.wma', '.wv', '.ogg', '.opus'
+    '.mp3', '.flac', '.wav', '.m4a', '.m4b', '.wma', '.wv', '.ogg', '.opus'  # MODIFIED: Added M4B to array
 )
 
 # MIME type mapping for streaming
@@ -41,6 +41,7 @@ MIME_TYPES = {
     '.flac': 'audio/flac',
     '.wav': 'audio/wav',
     '.m4a': 'audio/mp4',
+    '.m4b': 'audio/mp4',
     '.wma': 'audio/x-ms-wma',
     '.wv': 'audio/x-wavpack',
     '.ogg': 'audio/ogg',
@@ -54,7 +55,7 @@ FORMAT_METADATA_CONFIG = {
     # Formats that typically use lowercase tags
     'lowercase': ['flac'],
     # Formats that use specific tag systems
-    'itunes': ['m4a'],
+    'itunes': ['m4a', 'm4b'],
     # Formats with limited metadata support
     'limited': ['wav'],
     # Formats that don't support embedded album art

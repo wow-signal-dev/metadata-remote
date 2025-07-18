@@ -47,6 +47,8 @@ def get_file_format(filepath):
     # Determine the container format for output
     if ext == '.m4a':
         output_format = 'mp4'
+    elif ext == '.m4b':
+        output_format = 'mp4'
     elif ext == '.wav':
         output_format = 'wav'
     elif ext == '.wma':

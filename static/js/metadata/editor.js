@@ -607,6 +607,10 @@
          * @param {Object} metadata - Metadata object with all_fields property
          */
         renderStandardFields(metadata) {
+            // Check if this is an M4B file for narrator label
+            const isM4B = State.currentFile && State.currentFile.toLowerCase().endsWith('.m4b');
+            const albumArtistLabel = isM4B ? 'Narrator' : 'Album Artist';
+            
             const container = document.getElementById('standard-fields-container');
             if (!container) {
                 return;
@@ -627,6 +631,11 @@
             
             // Render fields in the defined order, but only if they exist
             Object.entries(standardFieldsInfo).forEach(([field, info]) => {
+                // Override display name for albumartist field in M4B files
+                if (field === 'albumartist' && isM4B) {
+                    info = { ...info, display: albumArtistLabel };
+                }
+                
                 // Check if field exists (either has a value or is in existing_standard_fields)
                 const hasValue = existingFields.hasOwnProperty(field) || 
                                (standardFields[field] !== undefined && standardFields[field] !== '');
