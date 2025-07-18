@@ -287,7 +287,7 @@ input:autofill {
     user-select: none;
     z-index: 2;
     font-family: Arial, sans-serif;
-    font-weight: 900;
+    font-weight: 1000;
     text-shadow: 0 0 1px currentColor;
 }
 
@@ -300,7 +300,7 @@ input:autofill {
 
 .theme-icon.sun {
     left: 28px;  /* Center of toggle when in right position (2px + 19px travel + 8px center) */
-    transform: translate(-50%, -50%);
+    transform: translate(-50%, -60%);
     opacity: 0.3;
     color: var(--text-muted);
 }
