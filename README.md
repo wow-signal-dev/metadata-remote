@@ -47,7 +47,7 @@ Multi-architecture Docker images available for x86_64, ARM64, and ARMv7.
 ### Powerful File Management
 - **In-browser playback** - Stream files directly in the UI
 - **Direct editing** - Rename files and folders without leaving the interface
-- **Format support** - MP3, FLAC, OGG, OPUS, M4A, WMA, WAV, and WavPack
+- **Format support** - MP3, FLAC, OGG, OPUS, M4A, M4B, WMA, WAV, and WavPack
 - **Album art control** - Upload, preview, delete, and bulk apply artwork with automatic corruption repair
 - **Editing history** - Full undo/redo for up to 1000 operations, including bulk changes
 
@@ -86,9 +86,12 @@ Real-time search filtering • Resizable workspace panels • History tracking t
 - **↑↓** Navigate files/folders
 - **PgUp/PgDn** Jump by pages
 - **Tab** Switch between panes
-- **Enter** Expand folders / Play files / Edit fields • **Esc** Cancel edits / Close dialogs
-- **Double Enter** Rename folders • **Shift+Delete** Delete metadata fields
-- **Alt+T** Toggle theme • **?** Show help
+- **Enter** Expand folders / Play files / Edit fields
+- **Esc** Cancel edits / Close dialogs
+- **Double Enter** Rename folders
+- **Shift+Delete** Delete metadata fields
+- **Alt+T** Toggle theme
+- **?** Show help
 
 **Editing Workflow**
 1. Navigate to any metadata field and press Enter to edit
@@ -222,7 +225,7 @@ docker run -d \
 
 ### Container
 - **Base**: Alpine Linux (ultra-lightweight)
-- **Size**: Only 189MB (75% smaller than desktop alternatives)
+- **Size**: Only 81.6MB
 - **Architecture**: Multi-arch support (x86_64, ARM64, ARMv7)
 - **Dependencies**: Self-contained, no external requirements
 
