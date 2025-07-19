@@ -2,7 +2,7 @@
 FROM python:3.11-alpine as builder
 
 # Install build dependencies
-RUN apk add --no-cache gcc musl-dev linux-headers
+RUN apk add --no-cache gcc musl-dev linux-headers zlib-dev jpeg-dev
 
 WORKDIR /app
 COPY requirements.txt .
