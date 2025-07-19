@@ -1,7 +1,7 @@
 version: '3.8'
 services:
   metadata-remote:
-    image: ghcr.io/wow-signal-dev/metadata-remote:main
+    image: ghcr.io/wow-signal-dev/metadata-remote:latest
     container_name: metadata-remote
     ports:
       - "8338:8338"
