@@ -901,10 +901,35 @@ def apply_field_to_folder():
                 existing_metadata = mutagen_handler.read_existing_metadata(file_path)
                 all_discovered = mutagen_handler.discover_all_metadata(file_path)
                 
+                # Check all case variations
+                field_lower = field.lower()
+                field_upper = field.upper()
+                
+                # For standard fields, check exact match
                 field_exists = (field in existing_metadata or 
-                              field.upper() in existing_metadata or
+                              field_lower in existing_metadata or
+                              field_upper in existing_metadata or
                               field in all_discovered or
-                              field.upper() in all_discovered)
+                              field_lower in all_discovered or
+                              field_upper in all_discovered)
+                
+                # For custom fields, also check format-specific representations with case variations
+                if not field_exists and field.lower() not in ['title', 'artist', 'album', 'albumartist', 'date', 'genre', 'track', 'disc', 'composer']:
+                    # Check if any discovered field matches case-insensitively
+                    for discovered_field in all_discovered.keys():
+                        # For format-specific fields, extract the actual field name
+                        actual_field_name = discovered_field
+                        if discovered_field.startswith('TXXX:'):
+                            actual_field_name = discovered_field[5:]
+                        elif discovered_field.startswith('WM/'):
+                            actual_field_name = discovered_field[3:]
+                        elif discovered_field.startswith('----:com.apple.iTunes:'):
+                            actual_field_name = discovered_field[22:]
+                        
+                        # Case-insensitive comparison
+                        if actual_field_name.lower() == field.lower():
+                            field_exists = True
+                            break
                 
                 if field_exists:
                     # Get existing value for update tracking
