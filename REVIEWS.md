@@ -18,6 +18,12 @@
 
 ---
 
+"This is an amazing metadata editor that it's almost making me stop using TagScanner and fully delete Windows on my PC."
+
+> — @2IkHLHB
+
+---
+
 "It was an application I was thinking of making because I really needed it... I thought it would use a lot of resources because it was written only in python, but I did not encounter any problems while running it on raspberry pi 2. You made a very nice application."
 
 > — u/senior-intern
