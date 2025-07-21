@@ -281,7 +281,7 @@ const AudioMetadataEditor = {
         if (folderPath !== undefined) {
             State.loadFileDebounceTimer = setTimeout(() => {
                 this.loadFiles(folderPath);
-            }, 300);
+            }, 150);
         }
     },
 
