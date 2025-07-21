@@ -6,7 +6,7 @@ services:
     ports:
       - "8338:8338"
     volumes:
-      - /PATH/TO/YOUR/MUSIC:/music  # Users must change this
+      - /PATH/TO/YOUR/FILES:/music  # Users must change this
       # To add multiple music folders, mount them as subdirectories:
       # - /path/to/music1:/music/Library1
       # - /path/to/music2:/music/Library2
@@ -14,6 +14,8 @@ services:
     environment:
       - PUID=1000
       - PGID=1000
+      # Uncomment the line below to show hidden files (files starting with .)
+      # - SHOW_HIDDEN_FILES=true
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8338/health"]

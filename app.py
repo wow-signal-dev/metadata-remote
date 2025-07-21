@@ -43,6 +43,7 @@ import sys
 from config import (
     MUSIC_DIR, OWNER_UID, OWNER_GID, PORT, HOST,
     AUDIO_EXTENSIONS, MIME_TYPES, FORMAT_METADATA_CONFIG,
+    SHOW_HIDDEN_FILES,
     MAX_HISTORY_ITEMS, INFERENCE_CACHE_DURATION, 
     MUSICBRAINZ_RATE_LIMIT, MUSICBRAINZ_USER_AGENT,
     FIELD_THRESHOLDS, logger
@@ -321,7 +322,7 @@ def get_tree(subpath=''):
 
 @app.route('/files/<path:folder_path>')
 def get_files(folder_path):
-    """Get all audio files in folder and subfolders"""
+    """Get audio files in the specified folder only"""
     try:
         current_path = validate_path(os.path.join(MUSIC_DIR, folder_path))
         
@@ -330,30 +331,33 @@ def get_files(folder_path):
         
         files = []
         
-        # Walk through directory and subdirectories
-        for root, dirs, filenames in os.walk(current_path):
-            for filename in sorted(filenames):
-                if filename.lower().endswith(AUDIO_EXTENSIONS):
-                    file_path = os.path.join(root, filename)
-                    rel_path = os.path.relpath(file_path, MUSIC_DIR)
-                    
-                    # Get file stats for date and size
-                    try:
-                        file_stats = os.stat(file_path)
-                        file_date = int(file_stats.st_mtime)  # Modification time as Unix timestamp
-                        file_size = file_stats.st_size         # Size in bytes
-                    except OSError:
-                        # If we can't get stats, use defaults
-                        file_date = 0
-                        file_size = 0
-                    
-                    files.append({
-                        'name': filename,
-                        'path': rel_path,
-                        'folder': os.path.relpath(root, current_path),
-                        'date': file_date,
-                        'size': file_size
-                    })
+        # List files in the directory (not subdirectories)
+        for filename in sorted(os.listdir(current_path)):
+            # Skip hidden files unless configured to show them
+            if not SHOW_HIDDEN_FILES and filename.startswith('.'):
+                continue
+                
+            file_path = os.path.join(current_path, filename)
+            if os.path.isfile(file_path) and filename.lower().endswith(AUDIO_EXTENSIONS):
+                rel_path = os.path.relpath(file_path, MUSIC_DIR)
+                
+                # Get file stats for date and size
+                try:
+                    file_stats = os.stat(file_path)
+                    file_date = int(file_stats.st_mtime)  # Modification time as Unix timestamp
+                    file_size = file_stats.st_size         # Size in bytes
+                except OSError:
+                    # If we can't get stats, use defaults
+                    file_date = 0
+                    file_size = 0
+                
+                files.append({
+                    'name': filename,
+                    'path': rel_path,
+                    'folder': '.',  # All files are in the current folder
+                    'date': file_date,
+                    'size': file_size
+                })
         
         return jsonify({'files': files})
         

@@ -321,9 +321,6 @@
                     State.expandedFolders.delete(item.path);
                     icon.innerHTML = '📁';
                 }
-                
-                // Always load files regardless of whether folder has subfolders
-                loadFilesCallback(item.path);
             };
             
             // Add double-click handler for rename
