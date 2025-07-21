@@ -35,6 +35,9 @@ AUDIO_EXTENSIONS = (
     '.mp3', '.flac', '.wav', '.m4a', '.m4b', '.wma', '.wv', '.ogg', '.opus'  # MODIFIED: Added M4B to array
 )
 
+# File display configuration
+SHOW_HIDDEN_FILES = os.environ.get('SHOW_HIDDEN_FILES', 'false').lower() in ['true', '1', 'yes']
+
 # MIME type mapping for streaming
 MIME_TYPES = {
     '.mp3': 'audio/mpeg',
@@ -93,3 +96,4 @@ logger = logging.getLogger(__name__)
 # Log startup configuration
 logger.info(f"Starting with PUID={OWNER_UID}, PGID={OWNER_GID}")
 logger.info(f"Supporting {len(AUDIO_EXTENSIONS)} audio formats: {', '.join(AUDIO_EXTENSIONS)}")
+logger.info(f"Show hidden files: {SHOW_HIDDEN_FILES}")

@@ -43,6 +43,7 @@ import sys
 from config import (
     MUSIC_DIR, OWNER_UID, OWNER_GID, PORT, HOST,
     AUDIO_EXTENSIONS, MIME_TYPES, FORMAT_METADATA_CONFIG,
+    SHOW_HIDDEN_FILES,
     MAX_HISTORY_ITEMS, INFERENCE_CACHE_DURATION, 
     MUSICBRAINZ_RATE_LIMIT, MUSICBRAINZ_USER_AGENT,
     FIELD_THRESHOLDS, logger
@@ -332,6 +333,10 @@ def get_files(folder_path):
         
         # List files in the directory (not subdirectories)
         for filename in sorted(os.listdir(current_path)):
+            # Skip hidden files unless configured to show them
+            if not SHOW_HIDDEN_FILES and filename.startswith('.'):
+                continue
+                
             file_path = os.path.join(current_path, filename)
             if os.path.isfile(file_path) and filename.lower().endswith(AUDIO_EXTENSIONS):
                 rel_path = os.path.relpath(file_path, MUSIC_DIR)
