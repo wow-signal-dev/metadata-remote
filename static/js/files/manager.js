@@ -49,8 +49,130 @@
             
             // Set up the new file controls instead of the old filter box
             this.setupFileControls();
+            this.setupTagFilters();
         },
-        
+         
+        /**
+         * Set up tag filtering controls
+         */
+        setupTagFilters() {
+            const tagFilterBtn = document.getElementById('files-tag-filter-btn');
+            const tagFilterContainer = document.getElementById('files-tag-filter-container');
+
+            if (tagFilterBtn && tagFilterContainer) {
+                this.setupTagFilterListeners(tagFilterContainer, tagFilterBtn);
+            }
+        },
+
+        setupTagFilterListeners(container, button) {
+            const tagNameInput = container.querySelector('#tag-filter-name');
+            const tagValueInput = container.querySelector('#tag-filter-value');
+            const addBtn = container.querySelector('#add-tag-filter-btn');
+            const clearBtn = container.querySelector('#clear-tag-filters-btn');
+
+            button.addEventListener('click', () => {
+                const isActive = container.classList.contains('active');
+                
+                // Close other panes for clean UI state
+                document.getElementById('files-filter').classList.remove('active');
+                document.getElementById('files-filter-btn').classList.remove('active');
+                document.getElementById('files-sort-dropdown').classList.remove('active');
+                State.activeSortDropdown = null;
+
+                container.classList.toggle('active');
+                button.classList.toggle('active');
+                
+                if (!isActive) {
+                    tagNameInput.focus();
+                }
+            });
+
+            // Prevent Enter key from doing anything in the inputs
+            const preventEnter = (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
+            };
+            tagNameInput.addEventListener('keydown', preventEnter);
+            tagValueInput.addEventListener('keydown', preventEnter);
+
+            addBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                const tagName = tagNameInput.value.trim();
+                let tagValue = tagValueInput.value.trim();
+                
+                if (!tagName) {
+                    tagNameInput.focus();
+                    return;
+                }
+
+                if (tagValue === '') {
+                    tagValue = '/null';
+                }
+                
+                State.tagFilters = State.tagFilters || {};
+                State.tagFilters[tagName.toLowerCase()] = tagValue;
+                this.updateActiveTagFiltersUI();
+                this.queryFiles();
+                
+                // Clear inputs after adding
+                tagNameInput.value = '';
+                tagValueInput.value = '';
+                tagNameInput.focus();
+            });
+
+            clearBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                State.tagFilters = {};
+                this.updateActiveTagFiltersUI();
+                // When clearing filters, revert to the folder view if a folder is selected
+                if (State.currentPath) {
+                    this.loadFiles(State.currentPath);
+                } else {
+                    this.queryFiles();
+                }
+            });
+        },
+
+        updateActiveTagFiltersUI() {
+            const container = document.getElementById('active-tag-filters');
+            if (!container) return;
+            container.innerHTML = '';
+            State.tagFilters = State.tagFilters || {};
+            for (const [tag, value] of Object.entries(State.tagFilters)) {
+                const pill = document.createElement('div');
+                pill.className = 'tag-filter-pill';
+                const displayValue = value === '/null' ? '(empty)' : value;
+                const textNode = document.createTextNode(`${tag.charAt(0).toUpperCase() + tag.slice(1)}: ${displayValue}`);
+                pill.appendChild(textNode);
+                const removeBtn = document.createElement('span');
+                removeBtn.className = 'remove-tag-filter';
+                removeBtn.textContent = '✕';
+                removeBtn.title = 'Remove filter';
+                removeBtn.onclick = () => {
+                    delete State.tagFilters[tag];
+                    this.updateActiveTagFiltersUI();
+                    if (Object.keys(State.tagFilters).length === 0) {
+                        // No filters left, either revert to folder view or clear list
+                        if (State.currentPath) {
+                            this.loadFiles(State.currentPath);
+                        } else {
+                            this.queryFiles(); // This will clear the list
+                        }
+                    } else {
+                        this.queryFiles();
+                    }
+                };
+                pill.appendChild(removeBtn);
+                container.appendChild(pill);
+            }
+        },
+
         /**
          * Set up filter and sort controls for files pane
          */
@@ -81,8 +203,12 @@
                 // Filter input handler
                 filterInput.addEventListener('input', (e) => {
                     State.filesFilter = e.target.value;
-                    // Re-render the file list with the new filter
-                    this.renderFileList();
+                    const hasTagFilters = State.tagFilters && Object.keys(State.tagFilters).length > 0;
+                    if (hasTagFilters) {
+                        this.queryFiles(); // Server-side filtering when tags are active
+                    } else {
+                        this.renderFileList(); // Client-side filtering otherwise
+                    }
                 });
             }
             
@@ -174,6 +300,80 @@
         },
 
         /**
+         * Load and display files in a folder.
+         * @param {string} folderPath - Path to the folder
+         */
+        async loadFiles(folderPath) {
+            // When a folder is selected, reset all filters to show the folder's contents.
+            State.currentPath = folderPath;
+            State.tagFilters = {};
+            this.updateActiveTagFiltersUI();
+            State.filesFilter = '';
+            const filterInput = document.getElementById('files-filter-input');
+            if (filterInput) filterInput.value = '';
+ 
+            document.getElementById('file-count').textContent = '(loading...)';
+            AudioPlayer.stopPlayback();
+ 
+            try {
+                // This uses the original API endpoint for listing files from the filesystem.
+                const data = await API.loadFiles(folderPath);
+ 
+                State.currentFiles = data.files;
+                this.renderFileList(); // This will also update the file count
+                this.updateSortUI();
+ 
+            } catch (err) {
+                console.error('Error loading files:', err);
+                UIUtils.showStatus('Error loading files', 'error');
+                document.getElementById('file-count').textContent = '(error)';
+            }
+        },
+ 
+        /**
+         * Query files from the database with active filters.
+         */
+        async queryFiles() {
+            const filters = { ...(State.tagFilters || {}) };
+            
+            if (State.filesFilter) {
+                filters.name = State.filesFilter;
+            }
+
+            // Add folder context to the filter if a folder is selected.
+            if (State.currentPath) {
+                filters.folder = State.currentPath;
+            }
+ 
+            // If no filters are active, don't query. Show empty or revert to folder view.
+            if (Object.keys(filters).length === 0) {
+                State.currentFiles = [];
+                this.renderFileList();
+                document.getElementById('file-count').textContent = '(0)';
+                return;
+            }
+ 
+            document.getElementById('file-count').textContent = '(loading...)';
+            AudioPlayer.stopPlayback();
+ 
+            try {
+                const params = new URLSearchParams(filters);
+                const response = await fetch(`/files?${params.toString()}`);
+                if (!response.ok) throw new Error(`HTTP error ${response.status}`);
+                const data = await response.json();
+ 
+                State.currentFiles = data.files;
+                document.getElementById('file-count').textContent = `(${data.pagination.total})`;
+                this.renderFileList();
+                this.updateSortUI();
+            } catch (err) {
+                console.error('Error querying files:', err);
+                UIUtils.showStatus('Error querying files', 'error');
+                document.getElementById('file-count').textContent = '(error)';
+            }
+        },
+
+        /**
          * Format file size in human-readable format
          * @param {number} bytes - Size in bytes
          * @returns {string} Formatted size
@@ -195,38 +395,6 @@
             if (!timestamp) return 'Unknown';
             const date = new Date(timestamp * 1000);
             return date.toLocaleDateString();
-        },
-        
-        /**
-         * Load and display files in a folder
-         * @param {string} folderPath - Path to the folder
-         */
-        async loadFiles(folderPath) {
-            State.currentPath = folderPath;
-            document.getElementById('file-count').textContent = '(loading...)';
-            
-            AudioPlayer.stopPlayback();
-            
-            try {
-                const data = await API.loadFiles(folderPath);
-                
-                // Store the raw file data
-                State.currentFiles = data.files;
-                
-                // Update count before filtering
-                document.getElementById('file-count').textContent = `(${data.files.length})`;
-                
-                // Render the file list (which will apply filtering and sorting)
-                this.renderFileList();
-                
-                // Update sort UI to reflect current state
-                this.updateSortUI();
-                
-            } catch (err) {
-                console.error('Error loading files:', err);
-                UIUtils.showStatus('Error loading files', 'error');
-                document.getElementById('file-count').textContent = '(error)';
-            }
         },
         
         /**
@@ -287,8 +455,25 @@
         renderFileList() {
             const list = document.getElementById('file-list');
             list.innerHTML = '';
+
+            let filesToRender = State.currentFiles || [];
             
-            if (!State.currentFiles || State.currentFiles.length === 0) {
+            // Only apply client-side text filter if no tag filters are active.
+            const hasTagFilters = State.tagFilters && Object.keys(State.tagFilters).length > 0;
+            if (!hasTagFilters && State.filesFilter) {
+                const filterValue = State.filesFilter.toLowerCase().trim();
+                if (filterValue) {
+                    filesToRender = filesToRender.filter(file =>
+                        file.name.toLowerCase().includes(filterValue)
+                    );
+                }
+            }
+
+            if (!hasTagFilters) { // Only update count if we're not in a query view
+                document.getElementById('file-count').textContent = `(${filesToRender.length})`;
+            }
+            
+            if (filesToRender.length === 0) {
                 const li = document.createElement('li');
                 li.textContent = 'No audio files found';
                 li.style.color = '#999';
@@ -296,24 +481,9 @@
                 list.appendChild(li);
                 return;
             }
-            
-            // Apply filter
-            const filterValue = State.filesFilter.toLowerCase().trim();
-            let filteredFiles = State.currentFiles;
-            
-            if (filterValue.length > 0) {
-                filteredFiles = State.currentFiles.filter(file => 
-                    file.name.toLowerCase().includes(filterValue)
-                );
-            }
-            
-            // Update file count to show filtered count
-            document.getElementById('file-count').textContent = `(${filteredFiles.length})`;
-            
-            // Apply sorting
-            const sortedFiles = this.sortFiles(filteredFiles);
-            
-            // Render each file
+             
+            const sortedFiles = this.sortFiles(filesToRender);
+
             sortedFiles.forEach(file => {
                 const li = document.createElement('li');
                 li.dataset.filepath = file.path;
@@ -452,6 +622,7 @@
                     // A newer request has been made, discard this response
                     return;
                 }
+                
                     State.originalMetadata = {
                         title: data.title || '',
                         artist: data.artist || '',
@@ -463,7 +634,6 @@
                         track: data.track || '',
                         disc: data.disc || ''
                     };
-                    
                     
                     // Store all fields data if available, but don't overwrite standard fields
                     if (data.all_fields) {
@@ -540,7 +710,6 @@
                 if (!artDisplay) {
                     console.error('Album art display element not found!');
                 } else {
-                
                 // Check if format supports album art
                 if (!formatLimitations.supportsAlbumArt) {
                     artDisplay.innerHTML = `<div class="album-art-placeholder" style="opacity: 0.5;">Album art not supported for ${format.toUpperCase()}</div>`;

@@ -926,6 +926,12 @@ input:autofill {
     transform: scale(1.05);
 }
 
+.control-icon svg {
+    display: block;
+    width: 14px;
+    height: 14px;
+}
+
 .sort-direction-btn:focus,
 .sort-direction-btn:active {
     background: none !important;
@@ -989,8 +995,13 @@ input:autofill {
 
 .filter-container.active {
     display: block;
-    max-height: 60px; /* Enough for the input */
+    max-height: 60px;
     padding: 10px 12px;
+}
+
+
+#files-tag-filter-container.active {
+    max-height: 300px;
 }
 
 .filter-input {
@@ -1007,6 +1018,59 @@ input:autofill {
     outline: 1px solid var(--accent-primary);
     outline-offset: -2px;
     border-color: var(--border-color);
+}
+
+/* Tag filter container */
+#files-tag-filter-container .tag-filter-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.tag-filter-row {
+    display: flex;
+    gap: 0.5rem;
+}
+
+#active-tag-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    min-height: 24px; /* to prevent layout shift */
+}
+
+.tag-filter-pill {
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    padding: 0.2rem 0.6rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid var(--border-color);
+}
+
+.tag-filter-pill .remove-tag-filter {
+    cursor: pointer;
+    margin-left: 0.4rem;
+    font-weight: bold;
+    font-size: 0.85rem;
+    line-height: 1;
+}
+
+.tag-filter-pill .remove-tag-filter:hover {
+    color: var(--error);
+}
+
+.tag-filter-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.tag-filter-actions button {
+    flex: 1;
+    padding: 0.4rem 0.8rem;
+    font-size: 0.8rem;
 }
 
 /* Sort dropdown */
@@ -3594,6 +3658,12 @@ button:disabled {
 
 :root[data-theme="light"] .filter-container.active {
     box-shadow: 0 4px 8px rgba(58, 50, 34, 0.1);
+}
+
+/* Tag filter pills in light theme */
+:root[data-theme="light"] .tag-filter-pill {
+    background: var(--bg-input-readonly);
+    border-color: var(--border-light);
 }
 
 /* Control icons in header */

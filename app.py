@@ -40,6 +40,12 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 import signal
 import sys
 
+# Database and scanner imports
+import core.database as db
+from core.scanner import scanner_status, scan_directory_in_background
+from core.watcher import start_watcher
+
+
 from config import (
     MUSIC_DIR, OWNER_UID, OWNER_GID, PORT, HOST,
     AUDIO_EXTENSIONS, MIME_TYPES, FORMAT_METADATA_CONFIG,
@@ -70,8 +76,23 @@ from core.album_art.manager import (
     prepare_batch_album_art_change, record_batch_album_art_history
 )
 from core.batch.processor import process_folder_files
-
+ 
 app = Flask(__name__)
+
+# ==================
+# STARTUP PROCEDURES
+# ==================
+
+def initialize_app():
+    """Initialize database and start background services."""
+    logger.info("Initializing application...")
+    db.init_db()
+    start_watcher()
+    if db.get_file_count() == 0:
+        logger.info("Database is empty. Starting initial library scan in background.")
+        scan_directory_in_background()
+
+initialize_app()
 
 # Configure for reverse proxy
 # This ensures Flask correctly interprets headers set by the reverse proxy
@@ -318,6 +339,25 @@ def get_tree(subpath=''):
         return jsonify({'error': 'Invalid path'}), 403
     except Exception as e:
         logger.error(f"Error building tree: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/files')
+def query_files():
+    """Query files from the database with filters and pagination."""
+    try:
+        page = int(request.args.get('page', 1))
+        limit = int(request.args.get('limit', 1000))
+        
+        filters = {}
+        for key, value in request.args.items():
+            if key.lower() not in ['page', 'limit']:
+                filters[key] = value
+        result = db.query_files(filters, page, limit)
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        logger.error(f"Error querying files: {e}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/files/<path:folder_path>')
@@ -1036,7 +1076,46 @@ def delete_field_from_folder():
         return jsonify({'error': 'Invalid path'}), 403
     except Exception as e:
         logger.error(f"Error in batch field deletion: {e}")
+        return jsonify({{'error': str(e)}}), 500
+
+# =================
+# SCANNING & TAGS API
+# =================
+
+@app.route('/admin/scan', methods=['POST'])
+def trigger_scan():
+    """Trigger a full library scan."""
+    if scanner_status['status'] == 'scanning':
+        return jsonify({'status': 'error', 'message': 'Scan already in progress'}), 409
+    
+    scan_directory_in_background()
+    return jsonify({'status': 'success', 'message': 'Scan started in background'})
+
+@app.route('/admin/scan/status')
+def get_scan_status():
+    """Get the current status of the library scanner."""
+    return jsonify(scanner_status)
+
+@app.route('/tags')
+def get_all_tags():
+    """Get a list of all available tag types."""
+    try:
+        tags = db.get_tags()
+        return jsonify({'tags': tags})
+    except Exception as e:
+        logger.error(f"Error getting tags: {e}")
         return jsonify({'error': str(e)}), 500
+
+@app.route('/tags/<tag_name>/values')
+def get_tag_values(tag_name):
+    """Get all unique values for a specific tag."""
+    try:
+        values = db.get_tag_values(tag_name)
+        return jsonify({'tag': tag_name, 'values': values})
+    except Exception as e:
+        logger.error(f"Error getting tag values for {tag_name}: {e}")
+        return jsonify({'error': str(e)}), 500
+
 
 # =================
 # HISTORY ENDPOINTS

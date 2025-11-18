@@ -83,6 +83,9 @@
                     <button class="control-icon" id="files-filter-btn" title="Filter files (/)" tabindex="0">
                         🔍
                     </button>
+                    <button class="control-icon" id="files-tag-filter-btn" title="Filter by tags" tabindex="0">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M21.41 11.58l-9-9A2 2 0 0011 2H4a2 2 0 00-2 2v7a2 2 0 00.59 1.42l9 9a2 2 0 002.82 0l7-7a2 2 0 000-2.82zM6.5 8A1.5 1.5 0 118 6.5 1.5 1.5 0 016.5 8z"></path></svg>
+                    </button>
                     <div class="sort-controls">
                         <button class="control-icon sort-field-btn" id="files-sort-btn" title="Sort by: Name" tabindex="0">
                             ↕️
@@ -101,6 +104,21 @@
                 <div class="sort-option" data-sort="date">Date Modified</div>
                 <div class="sort-option" data-sort="type">Type</div>
                 <div class="sort-option" data-sort="size">Size</div>
+            </div>
+            <div class="filter-container" id="files-tag-filter-container">
+                <div class="tag-filter-content">
+                    <div class="tag-filter-row">
+                        <input type="text" id="tag-filter-name" class="filter-input" placeholder="Tag name">
+                        <input type="text" id="tag-filter-value" class="filter-input" placeholder="Value (empty for missing)">
+                    </div>
+                    <div id="active-tag-filters">
+                        <!-- Active filter pills will be added here by JS -->
+                    </div>
+                    <div class="tag-filter-actions">
+                        <button id="add-tag-filter-btn" class="apply-file-btn">Add Filter</button>
+                        <button id="clear-tag-filters-btn" class="clear-btn">Clear All</button>
+                    </div>
+                </div>
             </div>
             <div class="files-scroll-area">
                 <ul id="file-list"></ul>
