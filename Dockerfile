@@ -12,7 +12,7 @@ RUN pip install --user --no-cache-dir -r requirements.txt
 FROM python:3.11-alpine
 
 # Install only runtime dependencies
-RUN apk add --no-cache wavpack
+RUN apk add --no-cache wavpack sqlite
 
 WORKDIR /app
 
@@ -30,6 +30,7 @@ COPY gunicorn_config.py .
 COPY core/ core/
 COPY templates/ templates/
 COPY static/ static/
+COPY migrations/ /migrations/
 
 EXPOSE 8338
 

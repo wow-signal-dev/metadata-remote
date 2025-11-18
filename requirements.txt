@@ -8,3 +8,4 @@ MarkupSafe==3.0.2
 mutagen==1.47.0
 Pillow>=10.0.0
 Werkzeug==3.0.1
+watchdog>=3.0.0
