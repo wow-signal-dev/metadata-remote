@@ -39,6 +39,8 @@ import subprocess
 from werkzeug.middleware.proxy_fix import ProxyFix
 import signal
 import sys
+import requests
+import base64
 
 from config import (
     MUSIC_DIR, OWNER_UID, OWNER_GID, PORT, HOST,
@@ -843,6 +845,33 @@ def create_custom_field():
     except Exception as e:
         logger.error(f"Error creating custom field: {e}")
         return jsonify({'error': str(e)}), 500
+    
+@app.route('/image-from-url', methods=['POST'])
+def image_from_url():
+    data = request.get_json()
+    image_url = data.get('url')
+
+    if not image_url:
+        return jsonify({'status': 'error', 'error': 'No URL provided'}), 400
+
+    try:
+        headers = {'User-Agent': 'MetadataRemote/1.0'}
+        response = requests.get(image_url, stream=True, timeout=10, headers=headers)
+        response.raise_for_status() 
+
+        content_type = response.headers.get('content-type', 'image/jpeg')
+        image_data = response.content
+        base64_encoded_data = base64.b64encode(image_data).decode('utf-8')
+        
+        data_url = f"data:{content_type};base64,{base64_encoded_data}"
+
+        return jsonify({'status': 'success', 'image_data': data_url})
+
+    except requests.exceptions.RequestException as e:
+        # Handle network errors, bad URLs, etc.
+        return jsonify({'status': 'error', 'error': f"Failed to fetch image: {e}"}), 500
+    except Exception as e:
+        return jsonify({'status': 'error', 'error': f"An unexpected error occurred: {e}"}), 500
 
 @app.route('/apply-art-to-folder', methods=['POST'])
 def apply_art_to_folder():

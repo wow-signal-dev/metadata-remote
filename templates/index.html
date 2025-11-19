@@ -144,6 +144,7 @@
                             </div>
                             <div class="album-art-controls">
                                 <button class="upload-btn" onclick="document.getElementById('art-upload').click()">Upload</button>
+                                <button class="image-link-btn" onclick="window.MetadataRemote.Metadata.AlbumArt.showArtUrlInput()">Image Link</button>
                                 <button class="save-image-btn btn-status" onclick="saveAlbumArt()" style="display: none;">
                                     <span class="btn-status-content">Apply to file</span>
                                     <span class="btn-status-message"></span>
@@ -157,6 +158,14 @@
                                     <span class="btn-status-message"></span>
                                 </button>
                                 <input type="file" id="art-upload" accept="image/*" onchange="handleArtUpload(event)">
+                            </div>
+                            <div class="art-url-input-container" id="art-url-input-container" style="display: none;">
+                                <input type="url" id="art-url-input" placeholder="Paste image URL here">
+                                <button class="art-url-submit-btn btn-status" onclick="window.MetadataRemote.Metadata.AlbumArt.submitArtUrl()">
+                                    <span class="btn-status-content">Submit</span>
+                                    <span class="btn-status-message"></span>
+                                </button>
+                                <button class="art-url-cancel-btn" onclick="window.MetadataRemote.Metadata.AlbumArt.hideArtUrlInput()">Cancel</button>
                             </div>
                         </div>
                     </div>

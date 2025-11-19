@@ -136,10 +136,12 @@
                 document.querySelector('.delete-art-btn').style.display = 'block';
                 document.querySelector('.save-image-btn').style.display = 'block';
                 document.querySelector('.apply-folder-btn').style.display = 'block';
+                document.querySelector('.image-link-btn').style.display = 'none';
                 
                 showStatusCallback('Image loaded. Click "Save Image" to save only the image, or "Save" to save all changes.', 'success');
             };
             reader.readAsDataURL(file);
+            
             
             event.target.value = '';
         },
@@ -166,6 +168,7 @@
                     document.querySelector('.delete-art-btn').style.display = 'none';
                     document.querySelector('.save-image-btn').style.display = 'none';
                     document.querySelector('.apply-folder-btn').style.display = 'none';
+                    document.querySelector('.image-link-btn').style.display = 'block';
                     
                     ButtonStatus.showButtonStatus(button, 'Deleted!', 'success', 2000);
                     loadHistoryCallback();
@@ -205,6 +208,7 @@
                     setTimeout(() => {
                         document.querySelector('.save-image-btn').style.display = 'none';
                         document.querySelector('.apply-folder-btn').style.display = 'none';
+                        document.querySelector('.image-link-btn').style.display = 'block';
                         
                         // Return focus to upload button after buttons are hidden
                         const uploadBtn = document.querySelector('.upload-btn');
@@ -272,6 +276,74 @@
             
             button.disabled = false;
             setFormEnabledCallback(true);
+        },
+
+        /**
+         * Show the album art URL input field
+         */
+        showArtUrlInput() {
+            document.querySelector('.album-art-controls').style.display = 'none';
+            const container = document.getElementById('art-url-input-container');
+            if (container) {
+                container.style.display = 'flex';
+                document.getElementById('art-url-input').focus();
+            }
+        },
+
+        /**
+         * Hide the album art URL input field
+         */
+        hideArtUrlInput() {
+            document.querySelector('.album-art-controls').style.display = 'flex';
+            const container = document.getElementById('art-url-input-container');
+            if (container) {
+                container.style.display = 'none';
+                document.getElementById('art-url-input').value = '';
+            }
+        },
+
+        /**
+         * Submit album art from a URL
+         */
+        async submitArtUrl() {
+            const urlInput = document.getElementById('art-url-input');
+            const artUrl = urlInput.value.trim();
+            if (!artUrl) {
+                showStatusCallback('Please enter an image URL.', 'error');
+                return;
+            }
+            
+            const button = document.querySelector('.art-url-submit-btn');
+            button.disabled = true;
+            ButtonStatus.showButtonStatus(button, 'Fetching...', 'processing');
+            
+            try {
+                const result = await API.getImageFromUrl(artUrl);
+                
+                if (result.status === 'success' && result.image_data) {
+                    State.pendingAlbumArt = result.image_data;
+                    
+                    const artDisplay = document.getElementById('art-display');
+                    this.displayAlbumArtWithMetadata(State.pendingAlbumArt, artDisplay);
+                    
+                    // Hide URL input and show regular controls, mimicking local upload
+                    this.hideArtUrlInput();
+                    document.querySelector('.delete-art-btn').style.display = 'block';
+                    document.querySelector('.save-image-btn').style.display = 'block';
+                    document.querySelector('.apply-folder-btn').style.display = 'block';
+                    document.querySelector('.image-link-btn').style.display = 'none';
+                    
+                    showStatusCallback('Image loaded. Click "Apply to file" to save only the image, or "Save all fields" to save all changes.', 'success');
+                    ButtonStatus.showButtonStatus(button, 'Loaded!', 'success', 1500);
+                } else {
+                    ButtonStatus.showButtonStatus(button, result.error || 'Fetch failed', 'error');
+                }
+            } catch (err) {
+                console.error('Error fetching album art from URL:', err);
+                ButtonStatus.showButtonStatus(button, 'Fetch Error', 'error');
+            }
+            
+            button.disabled = false;
         }
     };
 })();
