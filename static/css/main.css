@@ -1706,28 +1706,20 @@ input:autofill {
     height: 300px;
 }
 
-.upload-btn {
+.upload-btn,
+.image-link-btn {
     background: linear-gradient(135deg, #3a3a3a 0%, #4a4a4a 100%);
     color: var(--text-primary);
 }
 
-.upload-btn:hover:not(:disabled):not(.processing):not(.success):not(.error):not(.warning) {
+.upload-btn:hover:not(:disabled):not(.processing):not(.success):not(.error):not(.warning),
+.image-link-btn:hover:not(:disabled):not(.processing):not(.success):not(.error):not(.warning) {
     transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(58, 58, 58, 0.4);
 }
 
 .album-art-controls .upload-btn:disabled {
     cursor: not-allowed;
-}
-
-.save-image-btn {
-    background: linear-gradient(135deg, #2d5a2d 0%, #3a7a3a 100%);
-    color: white;
-}
-
-.save-image-btn:hover:not(.processing):not(.success):not(.error):not(.warning) {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(45, 90, 45, 0.4);
 }
 
 .apply-folder-btn {
@@ -1752,6 +1744,60 @@ input:autofill {
 
 input[type="file"] {
     display: none;
+}
+
+.art-url-input-container {
+    display: none; /* Hidden by default, shown by JS */
+    flex-direction: column;
+    gap: 0.35rem;
+    align-items: stretch;
+    min-width: 90px;
+}
+ 
+#art-url-input {
+    width: 100%;
+    background: var(--bg-input);
+    border: 1px solid var(--border-color);
+    padding: 0.4rem 0.75rem;
+    color: var(--text-primary);
+    border-radius: 6px;
+    font-size: 0.75rem;
+}
+ 
+#art-url-input:focus {
+    outline: 1px solid var(--accent-primary);
+    outline-offset: -2px;
+    border-color: var(--border-color);
+}
+ 
+.art-url-input-container button {
+    padding: 0.4rem 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+ 
+.art-url-submit-btn {
+    background: linear-gradient(135deg, #2d5a2d 0%, #3a7a3a 100%);
+    color: white;
+}
+ 
+.art-url-submit-btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(45, 90, 45, 0.4);
+}
+ 
+.art-url-cancel-btn {
+    background: linear-gradient(135deg, #5a2a2a 0%, #7a3a3a 100%);
+    color: white;
+}
+ 
+.art-url-cancel-btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(90, 45, 45, 0.4);
 }
 
 #metadata-form {
@@ -3175,12 +3221,14 @@ button:disabled {
 }
 
 /* Album art buttons */
-:root[data-theme="light"] .upload-btn {
+:root[data-theme="light"] .upload-btn,
+:root[data-theme="light"] .image-link-btn {
     background: linear-gradient(135deg, #b08d57 0%, #a07d47 100%);
     color: white;
 }
 
-:root[data-theme="light"] .upload-btn:hover:not(.processing):not(.success):not(.error):not(.warning) {
+:root[data-theme="light"] .upload-btn:hover:not(.processing):not(.success):not(.error):not(.warning),
+:root[data-theme="light"] .image-link-btn:hover:not(.processing):not(.success):not(.error):not(.warning) {
     background: linear-gradient(135deg, #a07d47 0%, #906d37 100%);
     box-shadow: 0 4px 12px rgba(176, 141, 87, 0.4);
 }

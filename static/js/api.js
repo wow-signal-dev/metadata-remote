@@ -182,5 +182,14 @@ window.MetadataRemote.API = {
                 field_value: fieldValue
             })
         });
+    },
+    
+    // Fetch image from URL via backend proxy
+    async getImageFromUrl(imageUrl) {
+        return this.call('/image-from-url', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ url: imageUrl })
+        });
     }
 };
