@@ -40,7 +40,7 @@ from mutagen.wavpack import WavPack
 from mutagen.wave import WAVE
 from mutagen.id3 import PictureType
 
-from config import logger, FORMAT_METADATA_CONFIG
+from config import logger, FORMAT_METADATA_CONFIG, KEEP_FILE_MODIFIED_TIMESTAMP
 
 
 class FieldNameMapper:
@@ -1174,7 +1174,7 @@ class MutagenHandler:
                     # Continue with save anyway
             
             # Save the file
-            audio_file.save()
+            self._save_file(audio_file)
             return True
         except Exception as e:
             logger.error(f"Error writing metadata to {filepath}: {e}")
@@ -1357,7 +1357,7 @@ class MutagenHandler:
             return
         
         # Save the file
-        audio_file.save()
+        self._save_file(audio_file)
     
     def remove_album_art(self, filepath: str) -> None:
         """Remove all album art from audio file"""
@@ -1394,7 +1394,7 @@ class MutagenHandler:
             pass
         
         # Save the file
-        audio_file.save()
+        self._save_file(audio_file)
     
     def _detect_mime_type(self, image_data: bytes) -> str:
         """Detect MIME type from image data"""
@@ -1931,7 +1931,7 @@ class MutagenHandler:
                     if txxx_key in audio_file.tags:
                         del audio_file.tags[txxx_key]
                 
-                audio_file.save()
+                self._save_file(audio_file)
                 return True
             else:
                 logger.error(f"Unsupported format for custom fields: {type(audio_file)}")
@@ -1966,7 +1966,7 @@ class MutagenHandler:
                 if txxx_key in tags:
                     del tags[txxx_key]
             
-            tags.save(filepath)
+            self._save_file_ID3(tags, filepath)
             return True
             
         except Exception as e:
@@ -1987,7 +1987,7 @@ class MutagenHandler:
                 if field_key in audio_file:
                     del audio_file[field_key]
             
-            audio_file.save()
+            self._save_file(audio_file)
             return True
             
         except Exception as e:
@@ -2009,7 +2009,7 @@ class MutagenHandler:
                 if key in audio_file:
                     del audio_file[key]
             
-            audio_file.save()
+            self._save_file(audio_file)
             return True
             
         except Exception as e:
@@ -2029,7 +2029,7 @@ class MutagenHandler:
                 if field_key in audio_file:
                     del audio_file[field_key]
             
-            audio_file.save()
+            self._save_file(audio_file)
             return True
             
         except Exception as e:
@@ -2047,7 +2047,7 @@ class MutagenHandler:
                 if field_name in audio_file:
                     del audio_file[field_name]
             
-            audio_file.save()
+            self._save_file(audio_file)
             return True
             
         except Exception as e:
@@ -2177,7 +2177,7 @@ class MutagenHandler:
                             break
             
             # Save the file regardless (even if no field was deleted, this is a no-op)
-            audio_file.save()
+            self._save_file(audio_file)
             return True
             
         except Exception as e:
@@ -2199,6 +2199,36 @@ class MutagenHandler:
         """Alias for discover_all_metadata for backward compatibility"""
         return self.discover_all_metadata(filepath)
 
+    def _save_file(self, audio_file):
+        # Get filepath, needed for getting and setting timestamp
+        filepath = audio_file.filename
+
+        # Get file timestamp
+        stat = os.stat(filepath)
+        file_timestamps = (stat.st_atime_ns, stat.st_mtime_ns)
+
+        # Save file metadata. This will modify the timestamp of the file
+        # and set it to current time and date
+        audio_file.save()
+
+        # If we set the ENV variable to keep the old timestamp,
+        # then set the timestamp back to the time it was before editing the metadata
+        if (KEEP_FILE_MODIFIED_TIMESTAMP):
+            os.utime(filepath, ns=file_timestamps)
+
+    def _save_file_ID3(self, tags: ID3, filepath):
+        # Get file timestamp
+        stat = os.stat(filepath)
+        file_timestamps = (stat.st_atime_ns, stat.st_mtime_ns)
+
+        # Save file metadata. This will modify the timestamp of the file
+        # and set it to current time and date
+        tags.save(filepath)
+
+        # If we set the ENV variable to keep the old timestamp,
+        # then set the timestamp back to the time it was before editing the metadata
+        if (KEEP_FILE_MODIFIED_TIMESTAMP):
+            os.utime(filepath, ns=file_timestamps)
 
 # Global instance
 mutagen_handler = MutagenHandler()

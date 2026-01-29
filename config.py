@@ -88,6 +88,9 @@ FIELD_THRESHOLDS = {
     'composer': 70
 }
 
+# Keep file access and modified timestamp
+KEEP_FILE_MODIFIED_TIMESTAMP = os.environ.get('KEEP_FILE_MODIFIED_TIMESTAMP', 'false').lower() in ['true', '1', 'yes']
+
 # Logging configuration
 import logging
 logging.basicConfig(level=logging.INFO)
