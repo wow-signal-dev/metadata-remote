@@ -44,9 +44,14 @@
         init(selectTreeItem, loadFiles) {
             selectTreeItemCallback = selectTreeItem;
             loadFilesCallback = loadFiles;
+
+            this.selectedFolderPaths = new Set();
+            this.selectionAnchorPath = null;
             
             // Set up the new folder controls
             this.setupFolderControls();
+
+            UIUtils.setupActionsMenuGlobalClose();
         },
         
         /**
@@ -164,13 +169,79 @@
                 document.getElementById('folder-count').textContent = '(loading...)';
                 
                 const data = await API.loadTree();
-                State.treeData[''] = data.items;
+                State.treeData = { '': data.items };
                 this.buildTreeFromData();
                 this.updateSortUI(); // Initialize sort UI
+
+                if (this.updateSelectedFolderStats) {
+                    await this.updateSelectedFolderStats();
+                }
             } catch (err) {
                 console.error('Error loading tree:', err);
                 UIUtils.showStatus('Error loading folders', 'error');
                 // Set error state
+                document.getElementById('folder-count').textContent = '(error)';
+            }
+        },
+
+        /**
+         * Reload tree while preserving expanded and selected state.
+         * @param {Object} state - State to preserve
+         * @param {Array<string>} state.expandedPaths - Expanded folder paths
+         * @param {string|null} state.selectedPath - Selected folder path
+         */
+        async reloadTreePreservingState({ expandedPaths = [], selectedPath = null } = {}) {
+            try {
+                document.getElementById('folder-count').textContent = '(loading...)';
+
+                const data = await API.loadTree();
+                State.treeData = { '': data.items };
+
+                const expandedSet = new Set();
+
+                const addAncestors = (path) => {
+                    for (let current = path; current; ) {
+                        expandedSet.add(current);
+                        const idx = current.lastIndexOf('/');
+                        current = idx === -1 ? '' : current.substring(0, idx);
+                    }
+                };
+
+                expandedPaths.filter(Boolean).forEach(addAncestors);
+                if (selectedPath) addAncestors(selectedPath);
+
+                State.expandedFolders = expandedSet;
+                State.selectedTreeItem = selectedPath ? { dataset: { path: selectedPath } } : null;
+
+                // Tree rebuild recreates DOM nodes; keep multi-selection consistent.
+                this.selectedFolderPaths = selectedPath ? new Set([selectedPath]) : new Set();
+                this.selectionAnchorPath = selectedPath || null;
+
+                const pathsToLoad = Array.from(State.expandedFolders).sort((a, b) => this.getLevel(a) - this.getLevel(b));
+
+                for (const path of pathsToLoad) {
+                    try {
+                        const children = await API.loadTreeChildren(path);
+                        State.treeData[path] = children.items;
+                    } catch (err) {
+                        // Ignore missing/invalid paths during reload
+                    }
+                }
+
+                this.rebuildTree();
+                this.updateSortUI();
+
+                if (selectedPath) {
+                    const selectedEl = document.querySelector(`[data-path="${selectedPath}"]`);
+                    if (!selectedEl) {
+                        State.selectedTreeItem = null;
+                    }
+                }
+
+                this.syncFolderMultiSelection({ updateStats: true });
+            } catch (err) {
+                console.error('Error reloading tree:', err);
+                UIUtils.showStatus('Error loading folders', 'error');
                 document.getElementById('folder-count').textContent = '(error)';
             }
         },
@@ -200,8 +271,15 @@
             // Auto-select the first folder on initial load
             const firstTreeItem = tree.querySelector('.tree-item');
             if (firstTreeItem && !State.selectedTreeItem) {
+                // Keep multi-select state consistent even on initial auto-select.
+                this.selectedFolderPaths = new Set([firstTreeItem.dataset.path]);
+                firstTreeItem.classList.add('multi-selected');
+                this.selectionAnchorPath = firstTreeItem.dataset.path;
+                this.updateSelectedFolderStats();
+
                 // Use the callback to select with keyboard focus
                 selectTreeItemCallback(firstTreeItem, true);
+
                 // Also set the focused pane to folders
                 State.focusedPane = 'folders';
             }
@@ -236,6 +314,57 @@
                     newSelected.classList.add('selected');
                     State.selectedTreeItem = newSelected;
                 }
+            }
+
+            this.syncFolderMultiSelection();
+        },
+
+        syncFolderMultiSelection({ updateStats = false } = {}) {
+            const escapePath = (path) => {
+                if (window.CSS && typeof CSS.escape === 'function') {
+                    return CSS.escape(path);
+                }
+                return path.replace(/"/g, '\\"');
+            };
+
+            const previous = Array.from(this.selectedFolderPaths || []);
+            const visibleItems = this.getVisibleFolderItems();
+
+            visibleItems.forEach(item => item.classList.remove('multi-selected'));
+
+            const isVisible = (el) => {
+                const content = el.querySelector('.tree-item-content');
+                return content && content.offsetParent !== null;
+            };
+
+            const newSet = new Set();
+
+            previous.forEach(path => {
+                const el = document.querySelector(`[data-path="${escapePath(path)}"]`);
+                if (el && isVisible(el)) {
+                    el.classList.add('multi-selected');
+                    newSet.add(path);
+                }
+            });
+
+            const statePath = State.selectedTreeItem && State.selectedTreeItem.dataset ? State.selectedTreeItem.dataset.path : null;
+            if (newSet.size === 0 && statePath) {
+                const el = document.querySelector(`[data-path="${escapePath(statePath)}"]`);
+                if (el && isVisible(el)) {
+                    el.classList.add('multi-selected');
+                    newSet.add(statePath);
+                }
+            }
+
+            let changed = previous.length !== newSet.size;
+            if (!changed) {
+                changed = previous.some(p => !newSet.has(p));
+            }
+
+            this.selectedFolderPaths = newSet;
+
+            if (updateStats || changed) {
+                this.updateSelectedFolderStats();
             }
         },
 
@@ -274,6 +403,399 @@
          * @param {number} level - Depth level
          * @returns {HTMLElement} Tree item element
          */
+        getVisibleFolderItems() {
+            return Array.from(document.querySelectorAll('#folder-tree .tree-item')).filter(el => {
+                const content = el.querySelector('.tree-item-content');
+                return content && content.offsetParent !== null;
+            });
+        },
+
+        clearFolderSelection() {
+            this.selectedFolderPaths = new Set();
+            this.getVisibleFolderItems().forEach(item => item.classList.remove('multi-selected'));
+            this.updateSelectedFolderStats();
+        },
+
+        toggleFolderSelected(treeItem, forceSelected = null) {
+            const path = treeItem.dataset.path;
+            const isSelected = this.selectedFolderPaths.has(path);
+            const shouldSelect = forceSelected === null ? !isSelected : Boolean(forceSelected);
+
+            if (shouldSelect) {
+                this.selectedFolderPaths.add(path);
+                treeItem.classList.add('multi-selected');
+            } else {
+                this.selectedFolderPaths.delete(path);
+                treeItem.classList.remove('multi-selected');
+            }
+
+            this.updateSelectedFolderStats();
+        },
+
+        selectFolderRange(targetItem, { additive = false } = {}) {
+            const items = this.getVisibleFolderItems();
+            if (items.length === 0) return;
+
+            const targetIndex = items.indexOf(targetItem);
+            if (targetIndex === -1) return;
+
+            const anchorPath = this.selectionAnchorPath || (State.selectedTreeItem && State.selectedTreeItem.dataset ? State.selectedTreeItem.dataset.path : null);
+            const anchorIndex = anchorPath ? items.findIndex(item => item.dataset.path === anchorPath) : -1;
+
+            const startIndex = Math.min(anchorIndex !== -1 ? anchorIndex : targetIndex, targetIndex);
+            const endIndex = Math.max(anchorIndex !== -1 ? anchorIndex : targetIndex, targetIndex);
+
+            if (!additive) {
+                this.selectedFolderPaths = new Set();
+                this.getVisibleFolderItems().forEach(item => item.classList.remove('multi-selected'));
+            }
+
+            for (let i = startIndex; i <= endIndex; i++) {
+                const path = items[i].dataset.path;
+                this.selectedFolderPaths.add(path);
+                items[i].classList.add('multi-selected');
+            }
+
+            this.updateSelectedFolderStats();
+        },
+
+        selectAllFolders() {
+            const items = this.getVisibleFolderItems();
+            this.selectedFolderPaths = new Set(items.map(item => item.dataset.path));
+            items.forEach(item => item.classList.add('multi-selected'));
+
+            if (items[0]) {
+                this.selectionAnchorPath = items[0].dataset.path;
+            }
+
+            this.updateSelectedFolderStats();
+        },
+
+        async deleteSelectedFolders() {
+            const Dialog = window.MetadataRemote.UI.Dialog;
+
+            const selectedPaths = this.selectedFolderPaths && this.selectedFolderPaths.size
+                ? Array.from(this.selectedFolderPaths)
+                : (State.selectedTreeItem && State.selectedTreeItem.dataset ? [State.selectedTreeItem.dataset.path] : []);
+
+            if (!selectedPaths.length) {
+                return;
+            }
+
+            const roots = selectedPaths.filter(p => !selectedPaths.some(other => other !== p && p.startsWith(other + '/')));
+
+            const items = [];
+            let previewStats = { folderCount: 0, fileCount: 0, truncated: false };
+
+            const loadingTitle = roots.length === 1 ? 'Delete folder' : 'Delete folders';
+            const loadingMessage = roots.length === 1
+                ? 'Building preview…\n\nPress Cancel to stop.'
+                : `Building previews for ${roots.length} folders…\n\nPress Cancel to stop.`;
+
+            const loading = (() => {
+                const shown = Boolean(Dialog && Dialog.showLoading);
+                const throttleMs = 150;
+                let lastUpdate = 0;
+
+                if (shown) {
+                    Dialog.showLoading({
+                        title: loadingTitle,
+                        message: loadingMessage,
+                        cancelText: 'Cancel',
+                        monospace: true
+                    });
+                }
+
+                return {
+                    shown,
+                    abortIfCancelled() {
+                        if (shown && Dialog && !Dialog.isOpen()) {
+                            throw new Error('cancelled');
+                        }
+                    },
+                    isCancelled() {
+                        return shown && Dialog && !Dialog.isOpen();
+                    },
+                    update(bodyText, { force = false } = {}) {
+                        if (!shown || !Dialog || !Dialog.update || !Dialog.isOpen()) {
+                            return;
+                        }
+
+                        const now = Date.now();
+                        if (!force && now - lastUpdate < throttleMs) {
+                            return;
+                        }
+
+                        lastUpdate = now;
+                        Dialog.update({ bodyText, monospace: true });
+                    },
+                    close() {
+                        if (shown && Dialog && Dialog.isOpen()) {
+                            Dialog.close(false);
+                        }
+                    }
+                };
+            })();
+
+            const buildFolderTreeLines = async (rootPath, maxLines = 1500) => {
+                const rootName = rootPath.split('/').filter(Boolean).pop() || rootPath || '(root)';
+                const lines = [`📁 ${rootName}`];
+                let linesAdded = 0;
+                let truncated = false;
+                let folderCount = 0;
+                let fileCount = 0;
+
+                const walk = async (folderPath, prefix) => {
+                    loading.abortIfCancelled();
+
+                    if (truncated) {
+                        return;
+                    }
+
+                    loading.update(
+                        `${loadingMessage}\n\nScanning: ${folderPath}\nFolders: ${previewStats.folderCount + folderCount} | Files: ${previewStats.fileCount + fileCount}`
+                    );
+
+                    let childrenData = null;
+                    let filesData = null;
+
+                    try {
+                        [childrenData, filesData] = await Promise.all([
+                            API.loadTreeChildren(folderPath),
+                            API.loadFiles(folderPath)
+                        ]);
+                    } catch (err) {
+                        return;
+                    }
+
+                    const childFolders = (childrenData && Array.isArray(childrenData.items) ? childrenData.items : [])
+                        .filter(item => item.type === 'folder')
+                        .sort((a, b) => a.name.localeCompare(b.name));
+
+                    const childFiles = (filesData && Array.isArray(filesData.files) ? filesData.files : [])
+                        .slice()
+                        .sort((a, b) => a.name.localeCompare(b.name));
+
+                    const entries = [
+                        ...childFolders.map(f => ({ type: 'folder', name: f.name, path: f.path })),
+                        ...childFiles.map(f => ({ type: 'file', name: f.name, path: f.path }))
+                    ];
+
+                    for (let idx = 0; idx < entries.length; idx++) {
+                        loading.abortIfCancelled();
+
+                        if (truncated) {
+                            return;
+                        }
+
+                        const entry = entries[idx];
+                        const isLast = idx === entries.length - 1;
+                        const connector = isLast ? '└─ ' : '├─ ';
+                        const nextPrefix = prefix + (isLast ? '   ' : '│  ');
+
+                        if (entry.type === 'folder') {
+                            lines.push(`${prefix}${connector}📁 ${entry.name}`);
+                            folderCount += 1;
+                        } else {
+                            lines.push(`${prefix}${connector}${UIUtils.getFormatEmoji(entry.name)} ${entry.name}`);
+                            fileCount += 1;
+                        }
+
+                        linesAdded += 1;
+                        if (linesAdded >= maxLines) {
+                            truncated = true;
+                            return;
+                        }
+
+                        if (entry.type === 'folder') {
+                            await walk(entry.path, nextPrefix);
+                        }
+                    }
+                };
+
+                await walk(rootPath, '');
+
+                if (truncated) {
+                    lines.push('… (more items)');
+                }
+
+                return { lines, folderCount, fileCount, truncated };
+            };
+
+            let cancelled = false;
+
+            try {
+                for (let i = 0; i < roots.length; i++) {
+                    loading.abortIfCancelled();
+
+                    const path = roots[i];
+
+                    try {
+                        loading.update(
+                            `${loadingMessage}\n\nPreparing: ${path}\nFolders: ${previewStats.folderCount} | Files: ${previewStats.fileCount}`,
+                            { force: true }
+                        );
+
+                        const preview = await buildFolderTreeLines(path, 1500);
+                        items.push(...preview.lines);
+                        previewStats.folderCount += preview.folderCount;
+                        previewStats.fileCount += preview.fileCount;
+                        previewStats.truncated = previewStats.truncated || preview.truncated;
+                    } catch (err) {
+                        if (err && err.message === 'cancelled') {
+                            throw err;
+                        }
+                        items.push(`📁 ${path}`);
+                    }
+
+                    if (i < roots.length - 1) {
+                        items.push('');
+                    }
+                }
+            } catch (err) {
+                cancelled = loading.isCancelled();
+                if (!cancelled) {
+                    console.error('Error building delete preview:', err);
+                }
+            } finally {
+                loading.close();
+            }
+
+            if (cancelled) {
+                return;
+            }
+
+            const intro = roots.length === 1
+                ? `Delete this folder and all contents? This cannot be undone.`
+                : `Delete these ${roots.length} folders and all contents? This cannot be undone.`;
+
+            const countsLine = `This includes ${previewStats.folderCount} folders and ${previewStats.fileCount} files.`
+                + (previewStats.truncated ? ' (preview truncated)' : '');
+
+            const ok = Dialog ? await Dialog.confirmList({
+                title: roots.length === 1 ? 'Delete folder' : 'Delete folders',
+                intro: intro + (countsLine ? `\n${countsLine}` : ''),
+                items: items,
+                confirmText: 'Delete',
+                cancelText: 'Cancel',
+                danger: true,
+                icon: '🗑️📁',
+                showCopy: false,
+                monospace: true
+            }) : false;
+
+            if (!ok) {
+                return;
+            }
+
+            try {
+                await UIUtils.runBulkOperation({
+                    label: 'Deleting folders',
+                    items: roots,
+                    onItem: async (path) => {
+                        await API.deleteFolder(path, false);
+
+                        if (State.currentPath && (State.currentPath === path || State.currentPath.startsWith(path + '/'))) {
+                            State.currentPath = '';
+                        }
+
+                        if (State.currentFile && (State.currentFile === path || State.currentFile.startsWith(path + '/'))) {
+                            if (window.MetadataRemote.Audio && window.MetadataRemote.Audio.Player) {
+                                window.MetadataRemote.Audio.Player.stopPlayback();
+                            }
+                            State.currentFile = null;
+                            State.originalFilename = '';
+                            State.selectedListItem = null;
+                            document.getElementById('metadata-section').style.display = 'none';
+                            document.getElementById('no-file-message').style.display = '';
+                            document.getElementById('current-filename').textContent = '';
+                        }
+                    }
+                });
+            } catch (err) {
+                const errorData = err && err.data ? err.data : null;
+                const message = (errorData && errorData.error) ? errorData.error : 'Error deleting folder';
+                UIUtils.showStatus(message, 'error');
+                return;
+            }
+
+            // Preserve expanded state outside deleted roots
+            const expandedPaths = Array.from(State.expandedFolders).filter(p => {
+                return !roots.some(root => p === root || p.startsWith(root + '/'));
+            });
+
+            let preservedSelectedPath = State.selectedTreeItem && State.selectedTreeItem.dataset ? State.selectedTreeItem.dataset.path : null;
+            if (preservedSelectedPath && roots.some(root => preservedSelectedPath === root || preservedSelectedPath.startsWith(root + '/'))) {
+                preservedSelectedPath = null;
+            }
+
+            this.clearFolderSelection();
+
+            await this.reloadTreePreservingState({ expandedPaths, selectedPath: preservedSelectedPath });
+
+            if (loadFilesCallback) {
+                loadFilesCallback(State.currentPath);
+            }
+
+            if (window.MetadataRemote.History && window.MetadataRemote.History.Manager) {
+                window.MetadataRemote.History.Manager.loadHistory();
+            }
+        },
+
+        async updateSelectedFolderStats() {
+            const FilesManager = window.MetadataRemote.Files.Manager;
+            if (!FilesManager || !FilesManager.updateFolderStatsFooter) {
+                return;
+            }
+
+            const selectedPaths = Array.from(this.selectedFolderPaths || []);
+
+            if (selectedPaths.length === 0) {
+                try {
+                    const stats = await API.getFolderStats(State.currentPath || '');
+                    FilesManager.updateFolderStatsFooter(stats);
+                } catch (err) {
+                    FilesManager.updateFolderStatsFooter(null);
+                }
+                return;
+            }
+
+            // Avoid double counting nested selections
+            const uniqueRoots = selectedPaths.filter(p => !selectedPaths.some(other => other !== p && p.startsWith(other + '/')));
+
+            const requestId = (this._statsRequestId || 0) + 1;
+            this._statsRequestId = requestId;
+
+            try {
+                const results = await Promise.all(uniqueRoots.map(p => API.getFolderStats(p)));
+
+                if (this._statsRequestId !== requestId) {
+                    return;
+                }
+
+                const merged = results.reduce((acc, stats) => {
+                    if (!stats || stats.status !== 'success') {
+                        return acc;
+                    }
+
+                    acc.folderCount += stats.folderCount;
+                    acc.fileCount += stats.fileCount;
+                    acc.totalSizeBytes += stats.totalSizeBytes;
+                    return acc;
+                }, { status: 'success', folderCount: 0, fileCount: 0, totalSizeBytes: 0 });
+
+                FilesManager.updateFolderStatsFooter({
+                    ...merged,
+                    selectionCount: uniqueRoots.length
+                });
+            } catch (err) {
+                if (this._statsRequestId !== requestId) {
+                    return;
+                }
+                FilesManager.updateFolderStatsFooter(null);
+            }
+        },
+
         createTreeItem(item, level) {
             const div = document.createElement('div');
             div.className = 'tree-item';
@@ -288,10 +810,239 @@
             icon.innerHTML = State.expandedFolders.has(item.path) ? '📂' : '📁';
             
             const name = document.createElement('span');
+            name.className = 'tree-name';
             name.textContent = item.name;
             
+            name.style.flex = '1';
+            name.style.minWidth = '0';
+
+            name.draggable = true;
+            name.title = 'Drag to move';
+
+            name.ondragstart = (e) => {
+                e.dataTransfer.effectAllowed = 'copyMove';
+                const payload = JSON.stringify({ type: 'folder', path: item.path, name: item.name });
+                e.dataTransfer.setData('application/json', payload);
+                e.dataTransfer.setData('text/plain', payload);
+
+                // Windows-like drag ghost: closed folder icon + name
+                const badge = e.ctrlKey ? '+' : '';
+                UIUtils.setDragImage(e, '📁', item.name, 10, 10, badge);
+                div.classList.add('dragging');
+            };
+
+            name.ondragend = () => {
+                div.classList.remove('dragging');
+            };
+
             content.appendChild(icon);
             content.appendChild(name);
+
+            const actionsButton = document.createElement('button');
+            actionsButton.className = 'item-actions-btn folder-actions-btn';
+            actionsButton.type = 'button';
+            actionsButton.textContent = '⋮';
+            actionsButton.title = 'Folder actions';
+
+            const actionsMenu = document.createElement('div');
+            actionsMenu.className = 'item-actions-menu';
+
+            const renameBtn = document.createElement('button');
+            renameBtn.type = 'button';
+            renameBtn.textContent = 'Rename';
+
+            const deleteBtn = document.createElement('button');
+            deleteBtn.type = 'button';
+            deleteBtn.textContent = 'Delete';
+            deleteBtn.className = 'danger';
+
+            actionsMenu.appendChild(renameBtn);
+            actionsMenu.appendChild(deleteBtn);
+
+            actionsButton.onclick = (e) => {
+                e.stopPropagation();
+                UIUtils.toggleActionsMenu(actionsButton, actionsMenu);
+            };
+
+            renameBtn.onclick = (e) => {
+                e.stopPropagation();
+                actionsMenu.classList.remove('active');
+                this.startFolderRename(div, item);
+            };
+
+            const handleDrop = async (payload, isCopy = false) => {
+                const Dialog = window.MetadataRemote.UI.Dialog;
+
+                if (!payload || !payload.type || !payload.path) {
+                    return;
+                }
+
+                // File drop: move file into this folder
+                if (payload.type === 'file') {
+                    const oldPath = payload.path;
+
+                    try {
+                        const result = await API.moveFile(oldPath, item.path, isCopy);
+
+                        if (State.currentFile === oldPath) {
+                            AudioPlayer.stopPlayback();
+                            State.currentFile = result.newPath;
+                        }
+
+                        if (window.MetadataRemote.History && window.MetadataRemote.History.Manager) {
+                            window.MetadataRemote.History.Manager.loadHistory();
+                        }
+
+                        // Refresh current list if needed
+                        if (loadFilesCallback) {
+                            loadFilesCallback(State.currentPath);
+                        }
+                    } catch (err) {
+                        const errorData = err && err.data ? err.data : null;
+                        const message = (errorData && errorData.error) ? errorData.error : 'Error moving file';
+                        UIUtils.showStatus(message, 'error');
+                    }
+
+                    return;
+                }
+
+                // Folder drop: move folder into this folder
+                if (payload.type === 'folder') {
+                    const oldPath = payload.path;
+
+                    if (oldPath === item.path || oldPath.startsWith(item.path + '/')) {
+                        return;
+                    }
+
+                    let result = null;
+                    try {
+                        result = await API.moveFolder(oldPath, item.path, false, isCopy);
+                    } catch (err) {
+                        result = err && err.data ? err.data : { error: 'Network error' };
+                    }
+
+                    if (result && result.error === 'Folder already exists') {
+                        const ok = Dialog ? await Dialog.confirm({
+                            title: 'Merge folders',
+                            message: `Folder "${payload.name}" already exists. Merge contents into the existing folder?\n\nThis will move all files and then delete the empty source folder.`,
+                            confirmText: 'Merge',
+                            cancelText: 'Cancel',
+                            danger: true
+                        }) : false;
+
+                        if (ok) {
+                            try {
+                                result = await API.moveFolder(oldPath, item.path, true, isCopy);
+                            } catch (err) {
+                                result = err && err.data ? err.data : { error: 'Network error' };
+                            }
+                        }
+                    }
+
+                    if (result && result.error) {
+                        if (result.error === 'Merge conflicts') {
+                            const conflicts = Array.isArray(result.conflicts) ? result.conflicts : [];
+                            if (Dialog) {
+                                await Dialog.showConflicts({
+                                    title: 'Merge conflicts',
+                                    intro: `Cannot merge because these paths already exist (${conflicts.length}):`,
+                                    items: conflicts
+                                });
+                            }
+                        }
+
+                        UIUtils.showStatus(result.error, 'error');
+                        return;
+                    }
+
+                    const newPath = result.newPath;
+
+                    // Update current path/file if under moved folder
+                    if (State.currentPath && (State.currentPath === oldPath || State.currentPath.startsWith(oldPath + '/'))) {
+                        State.currentPath = newPath + State.currentPath.slice(oldPath.length);
+                    }
+
+                    if (State.currentFile && (State.currentFile === oldPath || State.currentFile.startsWith(oldPath + '/'))) {
+                        State.currentFile = newPath + State.currentFile.slice(oldPath.length);
+                    }
+
+                    const currentExpanded = Array.from(State.expandedFolders);
+                    const expandedPaths = Array.from(new Set(currentExpanded.map(path => {
+                        if (path === oldPath || path.startsWith(oldPath + '/')) {
+                            return newPath + path.slice(oldPath.length);
+                        }
+                        return path;
+                    })));
+
+                    let selectedPath = State.selectedTreeItem && State.selectedTreeItem.dataset ? State.selectedTreeItem.dataset.path : null;
+                    if (selectedPath && (selectedPath === oldPath || selectedPath.startsWith(oldPath + '/'))) {
+                        selectedPath = newPath;
+                    }
+
+                    await this.reloadTreePreservingState({ expandedPaths, selectedPath });
+
+                    if (loadFilesCallback) {
+                        loadFilesCallback(State.currentPath);
+                    }
+
+                    if (window.MetadataRemote.History && window.MetadataRemote.History.Manager) {
+                        window.MetadataRemote.History.Manager.loadHistory();
+                    }
+                }
+            };
+
+            content.ondragover = (e) => {
+                e.preventDefault();
+                content.classList.add('drag-over');
+
+                const isCopy = e.ctrlKey === true;
+                content.classList.toggle('drag-copy', isCopy);
+                e.dataTransfer.dropEffect = isCopy ? 'copy' : 'move';
+            };
+
+            content.ondragleave = () => {
+                content.classList.remove('drag-over');
+                content.classList.remove('drag-copy');
+            };
+
+            content.ondrop = async (e) => {
+                e.preventDefault();
+                const isCopy = e.ctrlKey === true;
+
+                content.classList.remove('drag-over');
+                content.classList.remove('drag-copy');
+
+                const raw = e.dataTransfer.getData('application/json') || e.dataTransfer.getData('text/plain');
+                let payload = null;
+                try {
+                    payload = JSON.parse(raw);
+                } catch (err) {
+                    payload = null;
+                }
+
+                await handleDrop(payload, isCopy);
+            };
+
+            deleteBtn.onclick = async (e) => {
+                e.stopPropagation();
+                actionsMenu.classList.remove('active');
+
+                if (!this.selectedFolderPaths || !this.selectedFolderPaths.has(item.path)) {
+                    this.clearFolderSelection();
+                    this.toggleFolderSelected(div, true);
+                    this.selectionAnchorPath = div.dataset.path;
+                    selectTreeItemCallback(div, false);
+                }
+
+                await this.deleteSelectedFolders();
+            };
+
+            actionsMenu.oncontextmenu = (e) => {
+                e.preventDefault();
+            };
+
+            content.appendChild(actionsButton);
+            content.appendChild(actionsMenu);
             
             const children = document.createElement('div');
             children.className = 'tree-children';
@@ -299,13 +1050,65 @@
             div.appendChild(content);
             div.appendChild(children);
             
+            content.oncontextmenu = (e) => {
+                e.preventDefault();
+
+                if (!this.selectedFolderPaths || !this.selectedFolderPaths.has(item.path)) {
+                    this.clearFolderSelection();
+                    this.toggleFolderSelected(div, true);
+                    this.selectionAnchorPath = div.dataset.path;
+                    selectTreeItemCallback(div, false);
+                }
+
+                UIUtils.openActionsMenu(actionsMenu, e.clientX, e.clientY);
+            };
+
             content.onclick = (e) => {
                 e.stopPropagation();
+
+                // Close any open item menus (content click stops propagation)
+                UIUtils.closeActionsMenus();
+
+                // Windows-style selection behavior
+                if (e.shiftKey) {
+                    this.selectFolderRange(div, { additive: e.ctrlKey });
+                    this.selectionAnchorPath = div.dataset.path;
+                    selectTreeItemCallback(div, false);
+                    return;
+                }
+
+                if (e.ctrlKey) {
+                    this.toggleFolderSelected(div);
+                    this.selectionAnchorPath = div.dataset.path;
+                    selectTreeItemCallback(div, false);
+                    return;
+                }
+
+                // Normal click selects single item and toggles expand
+                this.clearFolderSelection();
+                this.toggleFolderSelected(div, true);
+                this.selectionAnchorPath = div.dataset.path;
+
+                // When switching folders, collapse the previously selected folder
+                const previousItem = State.selectedTreeItem;
+                if (previousItem && previousItem !== div) {
+                    const previousPath = previousItem.dataset ? previousItem.dataset.path : null;
+                    const isAncestor = previousPath && item.path && item.path.startsWith(previousPath + '/');
+
+                    if (previousPath && !isAncestor && State.expandedFolders.has(previousPath)) {
+                        const previousChildren = previousItem.querySelector('.tree-children');
+                        if (previousChildren) {
+                            previousChildren.classList.remove('expanded');
+                        }
+                        const previousIcon = previousItem.querySelector('.tree-icon');
+                        if (previousIcon) {
+                            previousIcon.innerHTML = '📁';
+                        }
+                        State.expandedFolders.delete(previousPath);
+                    }
+                }
+
                 selectTreeItemCallback(div);
-                
-                // Check if this folder has subfolders
-                const hasSubfolders = State.treeData[item.path] && 
-                                     State.treeData[item.path].some(child => child.type === 'folder');
                 
                 const isExpanded = children.classList.contains('expanded');
                 
@@ -464,7 +1267,7 @@
             }
             
             const content = folderElement.querySelector('.tree-item-content');
-            const nameSpan = content.querySelector('span:last-child');
+            const nameSpan = content.querySelector('.tree-name');
             
             // Hide the name span
             nameSpan.style.display = 'none';
@@ -559,12 +1362,49 @@
                         ButtonStatus.showButtonStatus(saveBtn, '', 'processing');
                     }
                     
-                    const result = await API.renameFolder(item.path, newName);
-                    
-                    if (result.error) {
-                        if (ButtonStatus) {
-                            ButtonStatus.showButtonStatus(saveBtn, result.error, 'error', 3000);
+                    const Dialog = window.MetadataRemote.UI.Dialog;
+
+                    let result = null;
+                    try {
+                        result = await API.renameFolder(item.path, newName);
+                    } catch (err) {
+                        result = err && err.data ? err.data : { error: 'Network error' };
+                    }
+
+                    if (result && result.error === 'Folder already exists') {
+                        const ok = Dialog ? await Dialog.confirm({
+                            title: 'Merge folders',
+                            message: `Folder "${newName}" already exists. Merge contents into the existing folder?\n\nThis will move all files and then delete the empty source folder.`,
+                            confirmText: 'Merge',
+                            cancelText: 'Cancel',
+                            danger: true
+                        }) : false;
+
+                        if (ok) {
+                            try {
+                                result = await API.renameFolder(item.path, newName, true);
+                            } catch (err) {
+                                result = err && err.data ? err.data : { error: 'Network error' };
+                            }
                         }
+                    }
+
+                    if (result && result.error) {
+                        if (result.error === 'Merge conflicts') {
+                            const conflicts = Array.isArray(result.conflicts) ? result.conflicts : [];
+                            if (Dialog) {
+                                await Dialog.showConflicts({
+                                    title: 'Merge conflicts',
+                                    intro: `Cannot merge because these paths already exist (${conflicts.length}):`,
+                                    items: conflicts
+                                });
+                            }
+                        }
+
+                        if (ButtonStatus) {
+                            ButtonStatus.showButtonStatus(saveBtn, result.error === 'Merge conflicts' ? 'Merge conflicts' : result.error, 'error', 3000);
+                        }
+
                         // Re-enable controls
                         input.disabled = false;
                         saveBtn.disabled = false;
@@ -579,15 +1419,19 @@
                     
                     // Update the item data
                     const oldPath = item.path;
-                    item.name = newName;
-                    item.path = result.newPath;
-                    
-                    // Update all UI elements
-                    this.updateFolderReferences(oldPath, result.newPath);
+
+                    // For merges, avoid mutating the current tree item to prevent duplicates.
+                    if (!result.merged) {
+                        item.name = newName;
+                        item.path = result.newPath;
+
+                        // Update all UI elements
+                        this.updateFolderReferences(oldPath, result.newPath);
+                    }
                     
                     // Clean up edit UI after brief delay
                     setTimeout(() => {
-                        nameSpan.textContent = newName;
+                        nameSpan.textContent = result.merged ? item.name : newName;
                         nameSpan.style.display = '';
                         editContainer.remove();
                         
@@ -601,6 +1445,31 @@
                             window.MetadataRemote.Navigation.StateMachine.transition(
                                 window.MetadataRemote.Navigation.StateMachine.States.NORMAL
                             );
+                        }
+
+                        if (result.merged) {
+                            (async () => {
+                                const currentExpanded = Array.from(State.expandedFolders);
+
+                                const expandedPaths = Array.from(new Set(currentExpanded.map(path => {
+                                    if (path === oldPath || path.startsWith(oldPath + '/')) {
+                                        return result.newPath + path.slice(oldPath.length);
+                                    }
+                                    return path;
+                                })));
+
+                                let selectedPath = State.selectedTreeItem && State.selectedTreeItem.dataset ? State.selectedTreeItem.dataset.path : null;
+                                if (selectedPath && (selectedPath === oldPath || selectedPath.startsWith(oldPath + '/'))) {
+                                    selectedPath = result.newPath;
+                                }
+
+                                await this.reloadTreePreservingState({ expandedPaths, selectedPath });
+
+                                const mergedEl = document.querySelector(`[data-path="${result.newPath}"]`);
+                                if (mergedEl) {
+                                    selectTreeItemCallback(mergedEl, false);
+                                }
+                            })();
                         }
                     }, 1000);
                     

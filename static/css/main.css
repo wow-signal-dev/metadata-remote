@@ -1082,6 +1082,120 @@ input:autofill {
     overflow: hidden;
 }
 
+.tree-item-content.drag-over {
+    background: var(--bg-hover);
+}
+
+.tree-item-content.drag-over.drag-copy {
+    outline: 1px solid rgba(74, 127, 255, 0.6);
+    outline-offset: -1px;
+}
+
+.tree-item.dragging .tree-item-content,
+#file-list li.dragging {
+    opacity: 0.6;
+}
+
+.drag-image {
+    position: fixed;
+    top: -9999px;
+    left: -9999px;
+    padding: 0.25rem 0.5rem;
+    border-radius: 6px;
+    background: rgba(30, 30, 30, 0.85);
+    border: 1px solid rgba(74, 127, 255, 0.65);
+    color: var(--text-primary);
+    font-size: 0.85rem;
+    white-space: nowrap;
+    pointer-events: none;
+    box-shadow: 0 8px 22px rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(6px);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.drag-image-badge {
+    margin-left: 0.25rem;
+    padding: 0.05rem 0.35rem;
+    border-radius: 999px;
+    background: rgba(74, 127, 255, 0.25);
+    border: 1px solid rgba(74, 127, 255, 0.55);
+    color: #cfe0ff;
+    font-weight: 600;
+    font-size: 0.8rem;
+    line-height: 1.1;
+}
+
+:root[data-theme="light"] .drag-image {
+    background: rgba(244, 241, 222, 0.95);
+    border: 1px solid rgba(74, 127, 255, 0.45);
+    color: #3a3222;
+}
+
+:root[data-theme="light"] .drag-image-badge {
+    background: rgba(74, 127, 255, 0.12);
+    border: 1px solid rgba(74, 127, 255, 0.35);
+    color: #2b4f9d;
+}
+
+.item-actions-btn {
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    margin-left: 0.35rem;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    flex-shrink: 0;
+    line-height: 1;
+    font-size: 16px;
+}
+
+.item-actions-btn:hover {
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 4px;
+}
+
+.item-actions-menu {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    min-width: 130px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 0.25rem 0;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
+    z-index: 200;
+}
+
+.item-actions-menu.active {
+    display: block;
+}
+
+.item-actions-menu button {
+    width: 100%;
+    border: none;
+    background: transparent;
+    color: var(--text-primary);
+    text-align: left;
+    padding: 0.4rem 0.75rem;
+    font-size: 0.85rem;
+    cursor: pointer;
+}
+
+.item-actions-menu button:hover {
+    background: var(--bg-hover);
+}
+
+.item-actions-menu button.danger {
+    color: #ff6b6b;
+}
+
 .tree-item-content::before {
     content: '';
     position: absolute;
@@ -1100,6 +1214,11 @@ input:autofill {
 
 .tree-item.selected > .tree-item-content {
     background: linear-gradient(90deg, rgba(74, 127, 255, 0.1) 0%, rgba(74, 127, 255, 0.03) 100%);
+    color: var(--text-primary);
+}
+
+.tree-item.multi-selected > .tree-item-content {
+    background: linear-gradient(90deg, rgba(74, 127, 255, 0.08) 0%, rgba(74, 127, 255, 0.02) 100%);
     color: var(--text-primary);
 }
 
@@ -1193,10 +1312,66 @@ input:autofill {
     min-width: 20px;
 }
 
-.tree-rename-save.btn-status.processing,
-.tree-rename-save.btn-status.success,
-.tree-rename-save.btn-status.error {
-    min-width: 80px;
+/* File rename styling (match folder rename) */
+.file-rename-edit {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    flex: 1;
+}
+
+.file-rename-input {
+    flex: 1;
+    padding: 0rem 0.5rem;
+    height: 20px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: var(--bg-input);
+    color: var(--text-primary);
+    font-size: 0.85rem;
+}
+
+.file-rename-input:focus {
+    outline: 1px solid var(--accent-primary);
+    outline-offset: -2px;
+    border-color: var(--border-color);
+}
+
+.file-rename-btn {
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.file-rename-save {
+    background: linear-gradient(135deg, #2d5a2d 0%, #3a7a3a 100%);
+    color: white;
+    margin-left: auto;
+}
+
+.file-rename-save:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(45, 90, 45, 0.4);
+}
+
+.file-rename-cancel {
+    background: linear-gradient(135deg, #5a2a2a 0%, #7a3a3a 100%);
+    color: white;
+}
+
+.file-rename-cancel:hover {
+    transform: rotate(90deg);
+}
+
+.file-rename-save.btn-status {
+    min-width: 20px;
 }
 
 .tree-children {
@@ -1225,6 +1400,21 @@ input:autofill {
     flex: 1;
     overflow-y: auto;
     overflow-x: hidden;
+}
+
+.pane-footer {
+    padding: 0.35rem 1.25rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    background: var(--bg-tertiary);
+    user-select: none;
+}
+
+:root[data-theme="light"] .pane-footer {
+    border-top: 1px solid rgba(58, 50, 34, 0.12);
+    background: rgba(244, 241, 222, 0.8);
+    color: rgba(58, 50, 34, 0.75);
 }
 
 /* File count styling update */
@@ -1272,6 +1462,15 @@ input:autofill {
     color: var(--text-primary);
 }
 
+#file-list li.multi-selected {
+    background: linear-gradient(90deg, rgba(74, 127, 255, 0.08) 0%, rgba(74, 127, 255, 0.02) 100%);
+    color: var(--text-primary);
+}
+
+#file-list li.multi-selected::before {
+    transform: translateX(0);
+}
+
 #file-list li.selected.keyboard-focus {
     background: linear-gradient(90deg, rgba(74, 127, 255, 0.15) 0%, rgba(74, 127, 255, 0.05) 100%);
     outline: 1px solid var(--accent-primary);
@@ -1294,6 +1493,17 @@ input:autofill {
 .file-info {
     flex: 1;
     min-width: 0;
+}
+
+.file-row-controls {
+    display: flex;
+    align-items: center;
+    margin-left: auto;
+    gap: 0.35rem;
+}
+
+.file-row-controls .play-button {
+    margin-left: 0;
 }
 
 .file-folder {
@@ -2816,6 +3026,108 @@ button:disabled {
         max-width: none;
     }
 }
+
+/* App Dialog Modal (reuses Field Edit Modal styling) */
+.app-dialog-overlay {
+    z-index: 1001;
+}
+
+/*
+ * Use a more specific selector than `.field-edit-box` so these
+ * overrides win even though Field Edit styles appear later.
+ */
+.field-edit-box.app-dialog-box {
+    width: min(92vw, 680px);
+    min-width: 320px;
+    max-width: 92vw;
+    z-index: 1002;
+}
+
+.app-dialog-title {
+    color: var(--text-primary);
+    font-weight: 600;
+}
+
+.field-edit-content.app-dialog-content {
+    min-height: 0;
+    max-height: 60vh;
+}
+
+.app-dialog-body {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    white-space: pre-wrap;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+.app-dialog-body.monospace {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size: 0.85rem;
+}
+
+.app-dialog-confirm {
+    background: var(--accent-primary);
+    border-color: var(--accent-primary);
+    color: white;
+}
+
+.app-dialog-confirm:hover:not(:disabled) {
+    background: var(--accent-hover);
+    border-color: var(--accent-hover);
+}
+
+.app-dialog-confirm.danger {
+    background: rgba(255, 107, 107, 0.12);
+    border-color: var(--error);
+    color: var(--error);
+}
+
+.app-dialog-confirm.danger:hover:not(:disabled) {
+    background: rgba(255, 107, 107, 0.2);
+}
+
+.bulk-progress {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    padding: 0.35rem 1.25rem 0.5rem;
+    background: var(--bg-tertiary);
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    z-index: 900;
+}
+
+.bulk-progress-text {
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    margin-bottom: 0.25rem;
+}
+
+.bulk-progress-bar {
+    height: 6px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.bulk-progress-bar-fill {
+    height: 100%;
+    width: 0%;
+    background: var(--accent-primary);
+    transition: width 120ms linear;
+}
+
+:root[data-theme="light"] .bulk-progress {
+    background: rgba(244, 241, 222, 0.92);
+    border-top: 1px solid rgba(58, 50, 34, 0.12);
+}
+
+:root[data-theme="light"] .bulk-progress-bar {
+    background: rgba(58, 50, 34, 0.10);
+}
+
 
 /* Field Edit Modal */
 .field-edit-overlay {

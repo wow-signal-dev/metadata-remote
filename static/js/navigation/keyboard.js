@@ -560,6 +560,33 @@
                 }
             );
             
+            // DELETE for file/folder deletion (Windows-style)
+            Router.register(
+                {
+                    key: 'Delete',
+                    state: '*',
+                    context: { pane: ['folders', 'files'] }
+                },
+                (event) => {
+                    // Don't activate if in input/textarea
+                    if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA') {
+                        return;
+                    }
+
+                    const FilesManager = window.MetadataRemote.Files.Manager;
+                    const TreeNav = window.MetadataRemote.Navigation.Tree;
+
+                    (async () => {
+                        if (State.focusedPane === 'files' && FilesManager && FilesManager.deleteSelectedFiles) {
+                            await FilesManager.deleteSelectedFiles();
+                        } else if (State.focusedPane === 'folders' && TreeNav && TreeNav.deleteSelectedFolders) {
+                            await TreeNav.deleteSelectedFolders();
+                        }
+                    })();
+                },
+                { priority: 79 }
+            );
+
             // SHIFT+DELETE for metadata field deletion
             Router.register(
                 { 

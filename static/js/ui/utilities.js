@@ -40,9 +40,16 @@
                 status.className = `status ${type}`;
             }
             
-            // For errors, also show an alert since the status element is hidden
+            // For errors, also show a dialog since the status element is hidden
             if (type === 'error') {
-                alert(`Error: ${message}`);
+                const Dialog = window.MetadataRemote.UI.Dialog;
+                if (Dialog && !Dialog.isOpen()) {
+                    Dialog.alert({
+                        title: 'Error',
+                        message: message,
+                        confirmText: 'OK'
+                    });
+                }
             }
         },
     
@@ -149,6 +156,167 @@
             }
             
             return badgeHtml;
+        },
+
+        setupActionsMenuGlobalClose() {
+            if (this._actionsMenuListenerAdded) {
+                return;
+            }
+
+            document.addEventListener('click', () => {
+                this.closeActionsMenus();
+            });
+
+            this._actionsMenuListenerAdded = true;
+        },
+
+        closeActionsMenus(exceptMenu = null) {
+            document.querySelectorAll('.item-actions-menu.active').forEach(menu => {
+                if (!exceptMenu || menu !== exceptMenu) {
+                    menu.classList.remove('active');
+                }
+            });
+        },
+
+        positionActionsMenu(menuEl, x, y) {
+            menuEl.style.top = `${y}px`;
+            menuEl.style.left = `${Math.max(8, x - 140)}px`;
+
+            requestAnimationFrame(() => {
+                const menuRect = menuEl.getBoundingClientRect();
+
+                const maxLeft = window.innerWidth - menuRect.width - 8;
+                const maxTop = window.innerHeight - menuRect.height - 8;
+
+                const finalLeft = Math.min(Math.max(8, x - menuRect.width), maxLeft);
+                const finalTop = Math.min(Math.max(8, y), maxTop);
+
+                menuEl.style.left = `${finalLeft}px`;
+                menuEl.style.top = `${finalTop}px`;
+            });
+        },
+
+        openActionsMenu(menuEl, x, y) {
+            this.closeActionsMenus(menuEl);
+            menuEl.classList.add('active');
+            this.positionActionsMenu(menuEl, x, y);
+        },
+
+        toggleActionsMenu(buttonEl, menuEl) {
+            const shouldOpen = !menuEl.classList.contains('active');
+
+            this.closeActionsMenus(menuEl);
+            menuEl.classList.toggle('active');
+
+            if (!shouldOpen) {
+                return;
+            }
+
+            const rect = buttonEl.getBoundingClientRect();
+            this.positionActionsMenu(menuEl, rect.right, rect.bottom - 2);
+        },
+
+        showBulkProgress({ label, done, total }) {
+            const container = document.getElementById('bulk-progress');
+            const textEl = document.getElementById('bulk-progress-text');
+            const barEl = document.getElementById('bulk-progress-bar-fill');
+
+            if (!container || !textEl || !barEl) {
+                return;
+            }
+
+            container.style.display = '';
+            textEl.textContent = `${label} (${done}/${total})`;
+            barEl.style.width = `${Math.floor((done / Math.max(1, total)) * 100)}%`;
+
+            // Prevent the fixed bar from covering bottom content.
+            document.body.style.paddingBottom = '44px';
+        },
+
+        hideBulkProgress() {
+            const container = document.getElementById('bulk-progress');
+            const textEl = document.getElementById('bulk-progress-text');
+            const barEl = document.getElementById('bulk-progress-bar-fill');
+
+            if (container) {
+                container.style.display = 'none';
+            }
+
+            if (textEl) {
+                textEl.textContent = '';
+            }
+
+            if (barEl) {
+                barEl.style.width = '0%';
+            }
+
+            document.body.style.paddingBottom = '';
+        },
+
+        async runBulkOperation({ label, items, onItem }) {
+            const total = Array.isArray(items) ? items.length : 0;
+            if (total === 0) {
+                return;
+            }
+
+            const isBulk = total > 1;
+            let progressShown = false;
+
+            try {
+                if (isBulk) {
+                    this.showBulkProgress({ label, done: 0, total });
+                    progressShown = true;
+                }
+
+                for (let i = 0; i < total; i++) {
+                    await onItem(items[i], i);
+
+                    if (isBulk) {
+                        this.showBulkProgress({ label, done: i + 1, total });
+                    }
+                }
+            } finally {
+                if (progressShown) {
+                    this.hideBulkProgress();
+                }
+            }
+        },
+
+        setDragImage(event, icon, text, offsetX = 10, offsetY = 10, badgeText = '') {
+            if (!event || !event.dataTransfer || !event.dataTransfer.setDragImage) {
+                return;
+            }
+
+            const el = document.createElement('div');
+            el.className = 'drag-image';
+
+            const iconSpan = document.createElement('span');
+            iconSpan.className = 'drag-image-icon';
+            iconSpan.textContent = icon;
+
+            const textSpan = document.createElement('span');
+            textSpan.className = 'drag-image-text';
+            textSpan.textContent = text;
+
+            el.appendChild(iconSpan);
+            el.appendChild(textSpan);
+
+            if (badgeText) {
+                const badgeSpan = document.createElement('span');
+                badgeSpan.className = 'drag-image-badge';
+                badgeSpan.textContent = badgeText;
+                el.appendChild(badgeSpan);
+            }
+
+            document.body.appendChild(el);
+
+            event.dataTransfer.setDragImage(el, offsetX, offsetY);
+
+            requestAnimationFrame(() => {
+                if (el.parentNode) {
+                    el.remove();
+                }
+            });
         }
     };
 })();

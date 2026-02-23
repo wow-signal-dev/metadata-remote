@@ -532,7 +532,16 @@
          * Clear all history
          */
         async clearHistory() {
-            if (!confirm('Are you sure you want to clear all editing history? This action cannot be undone.')) {
+            const Dialog = window.MetadataRemote.UI.Dialog;
+            const ok = Dialog ? await Dialog.confirm({
+                title: 'Clear history',
+                message: 'Are you sure you want to clear all editing history? This action cannot be undone.',
+                confirmText: 'Clear',
+                cancelText: 'Cancel',
+                danger: true
+            }) : false;
+
+            if (!ok) {
                 return;
             }
             

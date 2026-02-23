@@ -89,6 +89,34 @@
                 );
             });
             
+            // Ctrl+A selects all files (Windows-style)
+            ['div', 'li'].forEach(target => {
+                Router.register(
+                    { key: 'a', state: 'normal', context: { pane: ['files'] }, target: target, modifiers: { ctrl: true } },
+                    (event) => {
+                        const FilesManager = window.MetadataRemote.Files.Manager;
+                        if (FilesManager && FilesManager.selectAllFiles) {
+                            FilesManager.selectAllFiles();
+                        }
+                    },
+                    { priority: 75 }
+                );
+            });
+
+            // Ctrl+A selects all folders (Windows-style)
+            ['div', 'li'].forEach(target => {
+                Router.register(
+                    { key: 'a', state: 'normal', context: { pane: ['folders'] }, target: target, modifiers: { ctrl: true } },
+                    (event) => {
+                        const TreeNav = window.MetadataRemote.Navigation.Tree;
+                        if (TreeNav && TreeNav.selectAllFolders) {
+                            TreeNav.selectAllFolders();
+                        }
+                    },
+                    { priority: 75 }
+                );
+            });
+
             // Enter key
             Router.register(
                 { key: 'Enter', state: 'normal', context: { pane: ['folders', 'files'] } },

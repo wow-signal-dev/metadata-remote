@@ -43,6 +43,13 @@
         <button class="help-button" id="help-button" title="Show keyboard shortcuts" tabindex="0"><b>?</b></button>
     </div>
     
+    <div class="bulk-progress" id="bulk-progress" style="display: none;" aria-live="polite">
+        <div class="bulk-progress-text" id="bulk-progress-text"></div>
+        <div class="bulk-progress-bar">
+            <div class="bulk-progress-bar-fill" id="bulk-progress-bar-fill"></div>
+        </div>
+    </div>
+
     <div class="container">
         <div class="folders" tabindex="0" id="folders-pane">
             <div class="pane-header">
@@ -72,6 +79,7 @@
             <div class="folders-scroll-area">
                 <div id="folder-tree" class="tree"></div>
             </div>
+            <div class="pane-footer" id="folders-footer">Folders: 0 | Files: 0 | Size: 0 GB</div>
         </div>
         
         <div class="divider" id="divider1"></div>
@@ -105,6 +113,7 @@
             <div class="files-scroll-area">
                 <ul id="file-list"></ul>
             </div>
+            <div class="pane-footer" id="files-footer">Folders: 0 | Files: 0 | Size: 0 GB</div>
         </div>
         
         <div class="divider" id="divider2"></div>
@@ -336,6 +345,46 @@
                 </div>
                 
                 <div class="help-section">
+                    <h3 class="help-section-title">Selection</h3>
+                    <div class="help-shortcut-list">
+                        <div class="help-shortcut-item">
+                            <span class="help-description">Toggle selection</span>
+                            <span class="help-keys"><span class="help-key">Ctrl</span>+<span class="help-key">Click</span></span>
+                        </div>
+                        <div class="help-shortcut-item">
+                            <span class="help-description">Select range</span>
+                            <span class="help-keys"><span class="help-key">Shift</span>+<span class="help-key">Click</span></span>
+                        </div>
+                        <div class="help-shortcut-item">
+                            <span class="help-description">Add range</span>
+                            <span class="help-keys"><span class="help-key">Ctrl</span><span class="help-key-plus">+</span><span class="help-key">Shift</span>+<span class="help-key">Click</span></span>
+                        </div>
+                        <div class="help-shortcut-item">
+                            <span class="help-description">Select all (pane)</span>
+                            <span class="help-keys"><span class="help-key">Ctrl</span><span class="help-key-plus">+</span><span class="help-key">A</span></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="help-section">
+                    <h3 class="help-section-title">File management</h3>
+                    <div class="help-shortcut-list">
+                        <div class="help-shortcut-item">
+                            <span class="help-description">Delete selected</span>
+                            <span class="help-keys"><span class="help-key">Delete</span></span>
+                        </div>
+                        <div class="help-shortcut-item">
+                            <span class="help-description">Drag to move</span>
+                            <span class="help-keys"><span class="help-key">Drag</span></span>
+                        </div>
+                        <div class="help-shortcut-item">
+                            <span class="help-description">Drag to copy</span>
+                            <span class="help-keys"><span class="help-key">Ctrl</span><span class="help-key-plus">+</span><span class="help-key">Drag</span></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="help-section">
                     <h3 class="help-section-title">Sorting</h3>
                     <div class="help-shortcut-list">
                         <div class="help-shortcut-item">
@@ -419,6 +468,27 @@
             </button>
         </div>
     </div>
+
+    <!-- App Dialog Modal (reuses Field Edit Modal styling) -->
+    <div class="field-edit-overlay app-dialog-overlay" id="app-dialog-overlay" role="presentation"></div>
+    <div class="field-edit-box app-dialog-box" id="app-dialog-box" role="dialog" aria-modal="true" aria-labelledby="app-dialog-title">
+        <div class="field-edit-header app-dialog-header">
+            <span class="app-dialog-title" id="app-dialog-title"></span>
+        </div>
+
+        <div class="field-edit-content app-dialog-content">
+            <div class="app-dialog-body" id="app-dialog-body"></div>
+        </div>
+
+        <div class="field-edit-actions app-dialog-actions" id="app-dialog-actions">
+            <button class="field-edit-btn app-dialog-copy btn-status" id="app-dialog-copy" type="button" style="display: none;">
+                <span class="btn-status-content">Copy</span>
+                <span class="btn-status-message"></span>
+            </button>
+            <button class="field-edit-btn app-dialog-cancel" id="app-dialog-cancel" type="button">Cancel</button>
+            <button class="field-edit-btn app-dialog-confirm" id="app-dialog-confirm" type="button">OK</button>
+        </div>
+    </div>
   
     <!-- Core modules -->
     <script src="{{ url_for('static', filename='js/state.js') }}"></script>
@@ -427,6 +497,7 @@
     <!-- UI modules -->
     <script src="{{ url_for('static', filename='js/ui/button-status.js') }}"></script>
     <script src="{{ url_for('static', filename='js/ui/utilities.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/ui/dialog.js') }}"></script>
     <script src="{{ url_for('static', filename='js/ui/pane-resize.js') }}"></script>
     <script src="{{ url_for('static', filename='js/ui/filter-sort.js') }}"></script>
     <script src="{{ url_for('static', filename='js/ui/theme-toggle.js') }}"></script>

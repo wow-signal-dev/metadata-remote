@@ -46,6 +46,9 @@
             selectFileItemCallback = callbacks.selectFileItem;
             showInferenceSuggestionsCallback = callbacks.showInferenceSuggestions;
             hideInferenceSuggestionsCallback = callbacks.hideInferenceSuggestions;
+
+            this.selectedFilePaths = new Set();
+            this.selectionAnchorPath = null;
             
             // Set up the new file controls instead of the old filter box
             this.setupFileControls();
@@ -196,6 +199,38 @@
             const date = new Date(timestamp * 1000);
             return date.toLocaleDateString();
         },
+
+        formatTotalSize(bytes) {
+            const gbThreshold = 1024 * 1024 * 1024;
+
+            if (bytes < gbThreshold) {
+                const mb = bytes / (1024 * 1024);
+                return `${mb.toFixed(mb >= 100 ? 0 : 1)} MB`;
+            }
+
+            const gb = bytes / gbThreshold;
+            return `${gb.toFixed(gb >= 10 ? 0 : 2)} GB`;
+        },
+
+        updateFolderStatsFooter(stats) {
+            const selectionPrefix = stats && stats.selectionCount
+                ? `Selection: ${stats.selectionCount} | `
+                : '';
+
+            const text = stats && stats.status === 'success'
+                ? `${selectionPrefix}Folders: ${stats.folderCount} | Files: ${stats.fileCount} | Size: ${this.formatTotalSize(stats.totalSizeBytes)}`
+                : 'Folders: - | Files: - | Size: -';
+
+            const filesFooter = document.getElementById('files-footer');
+            if (filesFooter) {
+                filesFooter.textContent = text;
+            }
+
+            const foldersFooter = document.getElementById('folders-footer');
+            if (foldersFooter) {
+                foldersFooter.textContent = text;
+            }
+        },
         
         /**
          * Load and display files in a folder
@@ -221,6 +256,20 @@
                 
                 // Update sort UI to reflect current state
                 this.updateSortUI();
+
+                const TreeNav = window.MetadataRemote.Navigation.Tree;
+
+                // Footer stats should reflect selected folder(s) when present.
+                if (TreeNav && TreeNav.updateSelectedFolderStats) {
+                    await TreeNav.updateSelectedFolderStats();
+                } else {
+                    try {
+                        const stats = await API.getFolderStats(folderPath);
+                        this.updateFolderStatsFooter(stats);
+                    } catch (err) {
+                        this.updateFolderStatsFooter(null);
+                    }
+                }
                 
             } catch (err) {
                 console.error('Error loading files:', err);
@@ -287,6 +336,8 @@
         renderFileList() {
             const list = document.getElementById('file-list');
             list.innerHTML = '';
+
+            UIUtils.setupActionsMenuGlobalClose();
             
             if (!State.currentFiles || State.currentFiles.length === 0) {
                 const li = document.createElement('li');
@@ -331,6 +382,25 @@
                 const badgeHtml = UIUtils.getFormatBadge(file.name);
                 nameDiv.insertAdjacentHTML('beforeend', badgeHtml);
                 
+                nameDiv.draggable = true;
+                nameDiv.title = 'Drag to move';
+
+                nameDiv.ondragstart = (e) => {
+                    e.dataTransfer.effectAllowed = 'copyMove';
+                    const payload = JSON.stringify({ type: 'file', path: file.path, name: file.name });
+                    e.dataTransfer.setData('application/json', payload);
+                    e.dataTransfer.setData('text/plain', payload);
+
+                    // Windows-like drag ghost: file icon + name
+                    const badge = e.ctrlKey ? '+' : '';
+                    UIUtils.setDragImage(e, UIUtils.getFormatEmoji(file.name), file.name, 10, 10, badge);
+                    li.classList.add('dragging');
+                };
+
+                nameDiv.ondragend = () => {
+                    li.classList.remove('dragging');
+                };
+
                 fileInfo.appendChild(nameDiv);
 
                 // Show date or size when sorted by those fields
@@ -373,15 +443,471 @@
                         AudioPlayer.togglePlayback(file.path, playButton);
                     };
                 }
-                li.appendChild(playButton);
-                
-                li.onclick = (e) => {
-                    if (!e.target.closest('.play-button')) {
-                        this.loadFile(file.path, li);
+                const actionsButton = document.createElement('button');
+                actionsButton.className = 'item-actions-btn file-actions-btn';
+                actionsButton.type = 'button';
+                actionsButton.textContent = '⋮';
+                actionsButton.title = 'File actions';
+
+                const rowControls = document.createElement('div');
+                rowControls.className = 'file-row-controls';
+                rowControls.appendChild(playButton);
+                rowControls.appendChild(actionsButton);
+                li.appendChild(rowControls);
+
+                const actionsMenu = document.createElement('div');
+                actionsMenu.className = 'item-actions-menu';
+
+                const renameBtn = document.createElement('button');
+                renameBtn.type = 'button';
+                renameBtn.textContent = 'Rename';
+
+                const deleteBtn = document.createElement('button');
+                deleteBtn.type = 'button';
+                deleteBtn.textContent = 'Delete';
+                deleteBtn.className = 'danger';
+
+                actionsMenu.appendChild(renameBtn);
+                actionsMenu.appendChild(deleteBtn);
+
+                actionsButton.onclick = (e) => {
+                    e.stopPropagation();
+                    UIUtils.toggleActionsMenu(actionsButton, actionsMenu);
+                };
+
+                renameBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    actionsMenu.classList.remove('active');
+                    this.startFileRename(li, file, nameDiv);
+                };
+
+                deleteBtn.onclick = async (e) => {
+                    e.stopPropagation();
+                    actionsMenu.classList.remove('active');
+
+                    // If right-click/delete is on a non-selected item, select it first
+                    if (!this.selectedFilePaths || !this.selectedFilePaths.has(file.path)) {
+                        this.clearFileSelection();
+                        this.toggleFileSelected(li, true);
+                        this.selectionAnchorPath = li.dataset.filepath;
+                        selectFileItemCallback(li, false);
                     }
+
+                    await this.deleteSelectedFiles();
+                };
+
+                actionsMenu.oncontextmenu = (e) => {
+                    e.preventDefault();
+                };
+
+                li.appendChild(actionsMenu);
+
+                li.oncontextmenu = (e) => {
+                    e.preventDefault();
+
+                    if (e.target.closest('.play-button') || e.target.closest('.item-actions-menu')) {
+                        return;
+                    }
+
+                    if (!this.selectedFilePaths || !this.selectedFilePaths.has(file.path)) {
+                        this.clearFileSelection();
+                        this.toggleFileSelected(li, true);
+                        this.selectionAnchorPath = li.dataset.filepath;
+                        selectFileItemCallback(li, false);
+                    }
+
+                    UIUtils.openActionsMenu(actionsMenu, e.clientX, e.clientY);
+                };
+
+                li.onclick = (e) => {
+                    if (e.target.closest('.play-button') || e.target.closest('.item-actions-btn') || e.target.closest('.item-actions-menu')) {
+                        return;
+                    }
+
+                    // Windows-style selection behavior
+                    if (e.shiftKey) {
+                        this.selectFileRange(li, { additive: e.ctrlKey });
+                        selectFileItemCallback(li, false);
+                        return;
+                    }
+
+                    if (e.ctrlKey) {
+                        this.toggleFileSelected(li);
+                        this.selectionAnchorPath = li.dataset.filepath;
+                        selectFileItemCallback(li, false);
+                        return;
+                    }
+
+                    // Normal click selects single item and loads metadata
+                    this.clearFileSelection();
+                    this.toggleFileSelected(li, true);
+                    this.selectionAnchorPath = li.dataset.filepath;
+                    this.loadFile(file.path, li);
                 };
                 list.appendChild(li);
             });
+        },
+
+        getVisibleFileItems() {
+            return Array.from(document.querySelectorAll('#file-list li:not([aria-hidden="true"])')).filter(item => item.dataset.filepath);
+        },
+
+        clearFileSelection() {
+            this.selectedFilePaths = new Set();
+            this.getVisibleFileItems().forEach(item => item.classList.remove('multi-selected'));
+        },
+
+        toggleFileSelected(listItem, forceSelected = null) {
+            const path = listItem.dataset.filepath;
+            const isSelected = this.selectedFilePaths.has(path);
+            const shouldSelect = forceSelected === null ? !isSelected : Boolean(forceSelected);
+
+            if (shouldSelect) {
+                this.selectedFilePaths.add(path);
+                listItem.classList.add('multi-selected');
+            } else {
+                this.selectedFilePaths.delete(path);
+                listItem.classList.remove('multi-selected');
+            }
+        },
+
+        selectFileRange(targetItem, { additive = false } = {}) {
+            const items = this.getVisibleFileItems();
+            if (items.length === 0) return;
+
+            const targetIndex = items.indexOf(targetItem);
+            if (targetIndex === -1) return;
+
+            const anchorPath = this.selectionAnchorPath || (State.selectedListItem && State.selectedListItem.dataset ? State.selectedListItem.dataset.filepath : null);
+            const anchorIndex = anchorPath ? items.findIndex(item => item.dataset.filepath === anchorPath) : -1;
+            const startIndex = Math.min(anchorIndex !== -1 ? anchorIndex : targetIndex, targetIndex);
+            const endIndex = Math.max(anchorIndex !== -1 ? anchorIndex : targetIndex, targetIndex);
+
+            if (!additive) {
+                this.clearFileSelection();
+            }
+
+            for (let i = startIndex; i <= endIndex; i++) {
+                this.toggleFileSelected(items[i], true);
+            }
+        },
+
+        selectAllFiles() {
+            const items = this.getVisibleFileItems();
+            this.selectedFilePaths = new Set(items.map(item => item.dataset.filepath));
+            items.forEach(item => item.classList.add('multi-selected'));
+
+            if (items[0]) {
+                this.selectionAnchorPath = items[0].dataset.filepath;
+            }
+        },
+
+        async deleteSelectedFiles() {
+            const Dialog = window.MetadataRemote.UI.Dialog;
+
+            const selectedPaths = this.selectedFilePaths && this.selectedFilePaths.size
+                ? Array.from(this.selectedFilePaths)
+                : (State.selectedListItem && State.selectedListItem.dataset ? [State.selectedListItem.dataset.filepath] : []);
+
+            if (!selectedPaths.length) {
+                return;
+            }
+
+            const pathsByFolder = selectedPaths.reduce((acc, p) => {
+                const parts = p.split('/');
+                const folder = parts.length > 1 ? parts[0] : '(root)';
+                const name = parts[parts.length - 1];
+
+                if (!acc[folder]) {
+                    acc[folder] = [];
+                }
+
+                acc[folder].push({ name, path: p });
+                return acc;
+            }, {});
+
+            const folderNames = Object.keys(pathsByFolder).sort((a, b) => a.localeCompare(b));
+
+            const items = [];
+            folderNames.forEach(folder => {
+                items.push(`📁 ${folder}`);
+                pathsByFolder[folder]
+                    .sort((a, b) => a.name.localeCompare(b.name))
+                    .forEach(f => {
+                        const showPath = f.path.includes('/');
+                        const display = showPath ? f.path : f.name;
+                        items.push(`  ${UIUtils.getFormatEmoji(f.name)} ${display}`);
+                    });
+            });
+
+            const intro = selectedPaths.length === 1
+                ? `Delete "${items[items.length - 1].trim()}"? This cannot be undone.`
+                : `Delete these ${selectedPaths.length} files? This cannot be undone.`;
+
+            const ok = Dialog ? await Dialog.confirmList({
+                title: selectedPaths.length === 1 ? 'Delete file' : 'Delete files',
+                intro: intro,
+                items: items,
+                confirmText: 'Delete',
+                cancelText: 'Cancel',
+                danger: true,
+                icon: '🗑️🎵',
+                showCopy: false
+            }) : false;
+
+            if (!ok) {
+                return;
+            }
+
+            try {
+                await UIUtils.runBulkOperation({
+                    label: 'Deleting files',
+                    items: selectedPaths,
+                    onItem: async (path) => {
+                        await API.deleteFile(path);
+
+                        if (State.currentFile === path) {
+                            AudioPlayer.stopPlayback();
+                            State.currentFile = null;
+                            State.originalFilename = '';
+                            State.selectedListItem = null;
+
+                            document.getElementById('metadata-section').style.display = 'none';
+                            document.getElementById('no-file-message').style.display = '';
+                            document.getElementById('current-filename').textContent = '';
+                        }
+                    }
+                });
+            } catch (err) {
+                const errorData = err && err.data ? err.data : null;
+                const message = (errorData && errorData.error) ? errorData.error : 'Error deleting file';
+                UIUtils.showStatus(message, 'error');
+                return;
+            }
+
+            this.clearFileSelection();
+
+            await this.loadFiles(State.currentPath);
+            if (window.MetadataRemote.History && window.MetadataRemote.History.Manager) {
+                window.MetadataRemote.History.Manager.loadHistory();
+            }
+        },
+
+        /**
+         * Start inline rename for a file without reloading metadata.
+         * @param {HTMLElement} listItem - The list item element
+         * @param {Object} file - File info object
+         * @param {HTMLElement} nameDiv - Name container element
+         */
+        startFileRename(listItem, file, nameDiv) {
+            // Prevent concurrent editing (match folder rename behavior)
+            if (this.editingFileElement && this.editingFileElement !== listItem) {
+                return;
+            }
+
+            if (this.editingFileElement === listItem) {
+                return;
+            }
+
+            const fileInfo = listItem.querySelector('.file-info');
+            if (!fileInfo) {
+                return;
+            }
+
+            this.editingFileElement = listItem;
+
+            nameDiv.style.display = 'none';
+
+            const editContainer = document.createElement('div');
+            editContainer.className = 'file-rename-edit';
+
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'file-rename-input';
+            input.value = file.name;
+            input.style.minWidth = '100px';
+            input.maxLength = 255;
+
+            const saveBtn = document.createElement('button');
+            saveBtn.className = 'file-rename-save file-rename-btn btn-status';
+            saveBtn.innerHTML = '<span class="btn-status-content">✓</span><span class="btn-status-message"></span>';
+            saveBtn.title = 'Save file name';
+
+            const cancelBtn = document.createElement('button');
+            cancelBtn.className = 'file-rename-cancel file-rename-btn';
+            cancelBtn.innerHTML = '✕';
+            cancelBtn.title = 'Cancel rename';
+
+            editContainer.appendChild(input);
+            editContainer.appendChild(saveBtn);
+            editContainer.appendChild(cancelBtn);
+
+            fileInfo.insertBefore(editContainer, nameDiv);
+
+            this.editingFileData = {
+                nameDiv,
+                editContainer,
+                input,
+                file
+            };
+
+            const ButtonStatus = window.MetadataRemote.UI.ButtonStatus;
+            const showStatus = (message, type = 'processing', duration = 3000) => {
+                if (ButtonStatus) {
+                    ButtonStatus.showButtonStatus(saveBtn, message, type, duration);
+                }
+            };
+
+            const setDisabled = (disabled) => {
+                input.disabled = disabled;
+                saveBtn.disabled = disabled;
+                cancelBtn.disabled = disabled;
+            };
+
+            const saveFileName = async () => {
+                const newName = input.value.trim();
+                if (!newName || newName === file.name) {
+                    this.cancelFileRename();
+                    return;
+                }
+
+                if (newName.includes('/') || newName.includes('\\')) {
+                    showStatus('Invalid name', 'error', 3000);
+                    return;
+                }
+
+                AudioPlayer.stopPlayback();
+                setDisabled(true);
+
+                try {
+                    showStatus('', 'processing');
+
+                    const oldPath = file.path;
+                    const result = await API.renameFile(file.path, newName);
+
+                    if (!result || result.status !== 'success') {
+                        showStatus(result && result.error ? result.error : 'Error', 'error', 3000);
+                        setDisabled(false);
+                        return;
+                    }
+
+                    const newFilename = result.newPath.split('/').pop();
+
+                    file.name = newFilename;
+                    file.path = result.newPath;
+                    listItem.dataset.filepath = result.newPath;
+
+                    const formatEmoji = UIUtils.getFormatEmoji(newFilename);
+                    nameDiv.innerHTML = '';
+                    nameDiv.appendChild(document.createTextNode(formatEmoji + ' '));
+                    nameDiv.appendChild(document.createTextNode(newFilename));
+                    nameDiv.insertAdjacentHTML('beforeend', UIUtils.getFormatBadge(newFilename));
+
+                    if (State.currentFile === oldPath) {
+                        State.currentFile = result.newPath;
+                        State.originalFilename = newFilename;
+                        document.getElementById('current-filename').textContent = newFilename;
+                        this.cancelFilenameEdit();
+                    }
+
+                    showStatus('✓', 'success', 1000);
+
+                    setTimeout(async () => {
+                        this.cancelFileRename();
+
+                        try {
+                            await this.loadFiles(State.currentPath);
+
+                            if (State.currentFile) {
+                                const list = document.getElementById('file-list');
+                                const items = list ? Array.from(list.querySelectorAll('li[data-filepath]')) : [];
+                                const currentItem = items.find(el => el.dataset.filepath === State.currentFile);
+                                if (currentItem) {
+                                    selectFileItemCallback(currentItem, false);
+                                }
+                            }
+
+                            if (window.MetadataRemote.History && window.MetadataRemote.History.Manager) {
+                                window.MetadataRemote.History.Manager.loadHistory();
+                            }
+                        } catch (err) {
+                            console.error('Error refreshing after rename:', err);
+                        }
+                    }, 300);
+                } catch (err) {
+                    console.error('Error renaming file:', err);
+                    showStatus('Error', 'error', 3000);
+                    setDisabled(false);
+                }
+            };
+
+            const cancelRename = () => {
+                this.cancelFileRename();
+            };
+
+            const handleBlur = (e) => {
+                if (e.relatedTarget === saveBtn || e.relatedTarget === cancelBtn) {
+                    return;
+                }
+
+                setTimeout(() => {
+                    if (this.editingFileElement === listItem) {
+                        this.cancelFileRename();
+                    }
+                }, 200);
+            };
+
+            editContainer.onclick = (e) => {
+                e.stopPropagation();
+            };
+
+            saveBtn.onclick = (e) => {
+                e.stopPropagation();
+                saveFileName();
+            };
+
+            cancelBtn.onclick = (e) => {
+                e.stopPropagation();
+                cancelRename();
+            };
+
+            input.onblur = handleBlur;
+
+            input.onkeydown = (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    saveFileName();
+                } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    cancelRename();
+                }
+            };
+
+            input.focus();
+            input.select();
+        },
+
+        /**
+         * Cancel active inline file rename
+         */
+        cancelFileRename() {
+            if (!this.editingFileData) {
+                this.editingFileElement = null;
+                return;
+            }
+
+            const { nameDiv, editContainer } = this.editingFileData;
+
+            if (nameDiv) {
+                nameDiv.style.display = '';
+            }
+
+            if (editContainer && editContainer.parentNode) {
+                editContainer.remove();
+            }
+
+            this.editingFileElement = null;
+            this.editingFileData = null;
         },
 
         /**

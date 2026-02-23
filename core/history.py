@@ -238,6 +238,30 @@ class EditingHistory:
                 
         logger.info(f"Updated file references from {old_path} to {new_path} in history")
 
+    def remove_file_references(self, file_paths: List[str]):
+        """Remove deleted files from history actions"""
+        if not file_paths:
+            return
+
+        files_to_remove = set(file_paths)
+
+        with self.lock:
+            updated_actions = []
+            for action in self.actions:
+                action.files = [f for f in action.files if f not in files_to_remove]
+                action.old_values = {k: v for k, v in action.old_values.items() if k not in files_to_remove}
+                action.new_values = {k: v for k, v in action.new_values.items() if k not in files_to_remove}
+
+                if not action.files:
+                    self._cleanup_action_files(action)
+                    continue
+
+                updated_actions.append(action)
+
+            self.actions = updated_actions
+
+        logger.info(f"Removed deleted file references from history: {len(files_to_remove)} files")
+
 # =====================================
 # HELPER FUNCTIONS FOR HISTORY TRACKING
 # =====================================

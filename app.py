@@ -36,6 +36,7 @@ import uuid
 from dataclasses import dataclass, asdict
 from enum import Enum
 import subprocess
+import shutil
 from werkzeug.middleware.proxy_fix import ProxyFix
 import signal
 import sys
@@ -367,6 +368,46 @@ def get_files(folder_path):
         logger.error(f"Error getting files: {e}")
         return jsonify({'error': str(e)}), 500
 
+@app.route('/folder-stats/')
+@app.route('/folder-stats/<path:folder_path>')
+def get_folder_stats(folder_path=''):
+    """Get recursive folder stats (audio files only)"""
+    try:
+        current_path = validate_path(os.path.join(MUSIC_DIR, folder_path))
+
+        if not os.path.exists(current_path):
+            return jsonify({'error': 'Path not found'}), 404
+
+        if not os.path.isdir(current_path):
+            return jsonify({'error': 'Path is not a folder'}), 400
+
+        folder_count = 0
+        file_count = 0
+        total_size = 0
+
+        for root, dirs, files in os.walk(current_path):
+            folder_count += len(dirs)
+            for filename in files:
+                if filename.lower().endswith(AUDIO_EXTENSIONS):
+                    file_count += 1
+                    try:
+                        total_size += os.path.getsize(os.path.join(root, filename))
+                    except OSError:
+                        pass
+
+        return jsonify({
+            'status': 'success',
+            'folderCount': folder_count,
+            'fileCount': file_count,
+            'totalSizeBytes': total_size
+        })
+
+    except ValueError:
+        return jsonify({'error': 'Invalid path'}), 403
+    except Exception as e:
+        logger.error(f"Error getting folder stats: {e}")
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/rename', methods=['POST'])
 def rename_file():
     """Rename a file"""
@@ -418,6 +459,7 @@ def rename_folder():
         data = request.json
         old_path = validate_path(os.path.join(MUSIC_DIR, data['oldPath']))
         new_name = data['newName']
+        merge = bool(data.get('merge', False))
         
         if not os.path.exists(old_path):
             return jsonify({'error': 'Folder not found'}), 404
@@ -451,7 +493,50 @@ def rename_folder():
         
         # Check if target exists
         if os.path.exists(new_path) and new_path != old_path:
-            return jsonify({'error': 'Folder already exists'}), 400
+            if not merge:
+                return jsonify({'error': 'Folder already exists'}), 400
+
+            if not os.path.isdir(new_path):
+                return jsonify({'error': 'Target path is not a folder'}), 400
+
+            conflicts = []
+            move_pairs = []
+
+            for root, dirs, files in os.walk(old_path):
+                rel_root = os.path.relpath(root, old_path)
+                dest_root = new_path if rel_root == '.' else os.path.join(new_path, rel_root)
+
+                for dirname in dirs:
+                    dest_dir = os.path.join(dest_root, dirname)
+                    if os.path.exists(dest_dir) and not os.path.isdir(dest_dir):
+                        conflicts.append(os.path.relpath(dest_dir, MUSIC_DIR))
+
+                for filename in files:
+                    src_path = os.path.join(root, filename)
+                    dest_path = os.path.join(dest_root, filename)
+
+                    if os.path.exists(dest_path):
+                        conflicts.append(os.path.relpath(dest_path, MUSIC_DIR))
+                        continue
+
+                    move_pairs.append((src_path, dest_path))
+
+            if conflicts:
+                return jsonify({'error': 'Merge conflicts', 'conflicts': conflicts}), 400
+
+            for src_path, dest_path in move_pairs:
+                os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+                shutil.move(src_path, dest_path)
+                fix_file_ownership(dest_path)
+
+                if src_path.lower().endswith(AUDIO_EXTENSIONS):
+                    history.update_file_references(src_path, dest_path)
+
+            shutil.rmtree(old_path)
+            fix_file_ownership(new_path)
+
+            new_rel_path = os.path.relpath(new_path, MUSIC_DIR)
+            return jsonify({'status': 'success', 'newPath': new_rel_path, 'merged': True})
         
         # Get all files in the folder recursively before rename
         old_files = []
@@ -487,6 +572,245 @@ def rename_folder():
     except Exception as e:
         logger.error(f"Error renaming folder: {e}")
         return jsonify({'error': 'Internal server error'}), 500
+
+@app.route('/delete-file', methods=['POST'])
+def delete_file():
+    """Delete an audio file and remove its history references"""
+    try:
+        data = request.json
+        file_path = validate_path(os.path.join(MUSIC_DIR, data['path']))
+
+        if not os.path.exists(file_path):
+            return jsonify({'error': 'File not found'}), 404
+
+        if not os.path.isfile(file_path):
+            return jsonify({'error': 'Path is not a file'}), 400
+
+        if not file_path.lower().endswith(AUDIO_EXTENSIONS):
+            return jsonify({'error': 'Not an audio file'}), 400
+
+        os.remove(file_path)
+        history.remove_file_references([file_path])
+
+        return jsonify({'status': 'success'})
+
+    except ValueError:
+        return jsonify({'error': 'Invalid path'}), 403
+    except Exception as e:
+        logger.error(f"Error deleting file: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/delete-folder', methods=['POST'])
+def delete_folder():
+    """Delete a folder and remove history references"""
+    try:
+        data = request.json
+        folder_path = validate_path(os.path.join(MUSIC_DIR, data['path']))
+        dry_run = bool(data.get('dryRun', False))
+
+        if os.path.abspath(folder_path) == os.path.abspath(MUSIC_DIR):
+            return jsonify({'error': 'Cannot delete root folder'}), 400
+
+        if not os.path.exists(folder_path):
+            return jsonify({'error': 'Folder not found'}), 404
+
+        if not os.path.isdir(folder_path):
+            return jsonify({'error': 'Path is not a folder'}), 400
+
+        folder_count = 0
+        file_count = 0
+        audio_files = []
+
+        for root, dirs, files in os.walk(folder_path):
+            folder_count += len(dirs)
+            file_count += len(files)
+            for filename in files:
+                if filename.lower().endswith(AUDIO_EXTENSIONS):
+                    audio_files.append(os.path.join(root, filename))
+
+        is_empty = folder_count == 0 and file_count == 0
+
+        if dry_run:
+            return jsonify({
+                'status': 'success',
+                'isEmpty': is_empty,
+                'fileCount': file_count,
+                'folderCount': folder_count,
+                'audioFileCount': len(audio_files)
+            })
+
+        shutil.rmtree(folder_path)
+        history.remove_file_references(audio_files)
+
+        return jsonify({
+            'status': 'success',
+            'isEmpty': is_empty,
+            'fileCount': file_count,
+            'folderCount': folder_count,
+            'audioFileCount': len(audio_files)
+        })
+
+    except ValueError:
+        return jsonify({'error': 'Invalid path'}), 403
+    except Exception as e:
+        logger.error(f"Error deleting folder: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/move-file', methods=['POST'])
+def move_file():
+    """Move a file to another folder"""
+    try:
+        data = request.json
+        file_path = validate_path(os.path.join(MUSIC_DIR, data['path']))
+        target_folder = validate_path(os.path.join(MUSIC_DIR, data['targetFolder']))
+        copy = bool(data.get('copy', False))
+
+        if not os.path.exists(file_path):
+            return jsonify({'error': 'File not found'}), 404
+
+        if not os.path.isfile(file_path):
+            return jsonify({'error': 'Path is not a file'}), 400
+
+        if not os.path.isdir(target_folder):
+            return jsonify({'error': 'Target path is not a folder'}), 400
+
+        if not file_path.lower().endswith(AUDIO_EXTENSIONS):
+            return jsonify({'error': 'Not an audio file'}), 400
+
+        new_path = os.path.join(target_folder, os.path.basename(file_path))
+
+        if os.path.exists(new_path):
+            return jsonify({'error': 'File already exists'}), 400
+
+        if copy:
+            shutil.copy2(file_path, new_path)
+        else:
+            shutil.move(file_path, new_path)
+
+        fix_file_ownership(new_path)
+
+        if not copy:
+            history.update_file_references(file_path, new_path)
+
+        new_rel_path = os.path.relpath(new_path, MUSIC_DIR)
+        return jsonify({'status': 'success', 'newPath': new_rel_path})
+
+    except ValueError:
+        return jsonify({'error': 'Invalid path'}), 403
+    except Exception as e:
+        logger.error(f"Error moving file: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/move-folder', methods=['POST'])
+def move_folder():
+    """Move a folder into another folder"""
+    try:
+        data = request.json
+        folder_path = validate_path(os.path.join(MUSIC_DIR, data['path']))
+        target_folder = validate_path(os.path.join(MUSIC_DIR, data['targetFolder']))
+        merge = bool(data.get('merge', False))
+        copy = bool(data.get('copy', False))
+
+        if not os.path.exists(folder_path):
+            return jsonify({'error': 'Folder not found'}), 404
+
+        if not os.path.isdir(folder_path):
+            return jsonify({'error': 'Path is not a folder'}), 400
+
+        if not os.path.isdir(target_folder):
+            return jsonify({'error': 'Target path is not a folder'}), 400
+
+        if os.path.abspath(folder_path) == os.path.abspath(MUSIC_DIR):
+            return jsonify({'error': 'Cannot move root folder'}), 400
+
+        target_abs = os.path.abspath(target_folder)
+        folder_abs = os.path.abspath(folder_path)
+        if target_abs == folder_abs or target_abs.startswith(folder_abs + os.sep):
+            return jsonify({'error': 'Invalid move target'}), 400
+
+        new_path = os.path.join(target_folder, os.path.basename(folder_path))
+
+        if os.path.exists(new_path) and new_path != folder_path:
+            if not merge:
+                return jsonify({'error': 'Folder already exists'}), 400
+
+            if not os.path.isdir(new_path):
+                return jsonify({'error': 'Target path is not a folder'}), 400
+
+            conflicts = []
+            move_pairs = []
+
+            for root, dirs, files in os.walk(folder_path):
+                rel_root = os.path.relpath(root, folder_path)
+                dest_root = new_path if rel_root == '.' else os.path.join(new_path, rel_root)
+
+                for dirname in dirs:
+                    dest_dir = os.path.join(dest_root, dirname)
+                    if os.path.exists(dest_dir) and not os.path.isdir(dest_dir):
+                        conflicts.append(os.path.relpath(dest_dir, MUSIC_DIR))
+
+                for filename in files:
+                    src_path = os.path.join(root, filename)
+                    dest_path = os.path.join(dest_root, filename)
+
+                    if os.path.exists(dest_path):
+                        conflicts.append(os.path.relpath(dest_path, MUSIC_DIR))
+                        continue
+
+                    move_pairs.append((src_path, dest_path))
+
+            if conflicts:
+                return jsonify({'error': 'Merge conflicts', 'conflicts': conflicts}), 400
+
+            for src_path, dest_path in move_pairs:
+                os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+                if copy:
+                    shutil.copy2(src_path, dest_path)
+                else:
+                    shutil.move(src_path, dest_path)
+                fix_file_ownership(dest_path)
+
+                if (not copy) and src_path.lower().endswith(AUDIO_EXTENSIONS):
+                    history.update_file_references(src_path, dest_path)
+
+            if not copy:
+                shutil.rmtree(folder_path)
+            fix_file_ownership(new_path)
+
+            new_rel_path = os.path.relpath(new_path, MUSIC_DIR)
+            return jsonify({'status': 'success', 'newPath': new_rel_path, 'merged': True})
+
+        old_files = []
+        for root, dirs, files in os.walk(folder_path):
+            for file in files:
+                if file.lower().endswith(AUDIO_EXTENSIONS):
+                    old_files.append(os.path.join(root, file))
+
+        if copy:
+            shutil.copytree(folder_path, new_path)
+        else:
+            shutil.move(folder_path, new_path)
+
+        fix_file_ownership(new_path)
+
+        if not copy:
+            for old_file_path in old_files:
+                rel_path = os.path.relpath(old_file_path, folder_path)
+                new_file_path = os.path.join(new_path, rel_path)
+                history.update_file_references(old_file_path, new_file_path)
+
+        new_rel_path = os.path.relpath(new_path, MUSIC_DIR)
+        return jsonify({'status': 'success', 'newPath': new_rel_path})
+
+    except ValueError:
+        return jsonify({'error': 'Invalid path'}), 403
+    except Exception as e:
+        logger.error(f"Error moving folder: {e}")
+        return jsonify({'error': str(e)}), 500
+
 
 @app.route('/metadata/<path:filename>')
 def get_metadata(filename):

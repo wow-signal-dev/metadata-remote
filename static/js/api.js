@@ -35,11 +35,22 @@ window.MetadataRemote.API = {
     async call(url, options = {}) {
         try {
             const response = await fetch(url, options);
-            if (!response.ok) {
-                const data = await response.json();
-                throw new Error(data.message || data.error || 'Request failed');
+            let data = null;
+            try {
+                data = await response.json();
+            } catch (err) {
+                data = null;
             }
-            return await response.json();
+
+            if (!response.ok) {
+                const fallbackMessage = response.status === 404 ? 'Endpoint not found' : 'Request failed';
+                const apiError = new Error((data && (data.message || data.error)) ? (data.message || data.error) : fallbackMessage);
+                apiError.status = response.status;
+                apiError.data = data;
+                throw apiError;
+            }
+
+            return data;
         } catch (error) {
             console.error(`API error for ${url}:`, error);
             throw error;
@@ -58,6 +69,13 @@ window.MetadataRemote.API = {
     async loadFiles(folderPath) {
         return this.call(`/files/${encodeURIComponent(folderPath)}`);
     },
+
+    async getFolderStats(folderPath = '') {
+        if (!folderPath) {
+            return this.call('/folder-stats/');
+        }
+        return this.call(`/folder-stats/${encodeURIComponent(folderPath)}`);
+    },
     
     // File operations
     async renameFile(oldPath, newName) {
@@ -71,13 +89,60 @@ window.MetadataRemote.API = {
         });
     },
     
-    async renameFolder(oldPath, newName) {
+    async renameFolder(oldPath, newName, merge = false) {
         return this.call('/rename-folder', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({
                 oldPath: oldPath,
-                newName: newName
+                newName: newName,
+                merge: merge
+            })
+        });
+    },
+
+    async deleteFile(path) {
+        return this.call('/delete-file', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                path: path
+            })
+        });
+    },
+
+    async deleteFolder(path, dryRun = false) {
+        return this.call('/delete-folder', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                path: path,
+                dryRun: dryRun
+            })
+        });
+    },
+
+    async moveFile(path, targetFolder, copy = false) {
+        return this.call('/move-file', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                path: path,
+                targetFolder: targetFolder,
+                copy: copy
+            })
+        });
+    },
+
+    async moveFolder(path, targetFolder, merge = false, copy = false) {
+        return this.call('/move-folder', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                path: path,
+                targetFolder: targetFolder,
+                merge: merge,
+                copy: copy
             })
         });
     },
