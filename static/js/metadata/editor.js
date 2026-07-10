@@ -76,8 +76,12 @@
         'track title': 'title',
         
         // Artist variations
+        // Note: "performer" is deliberately NOT mapped to artist here. Many taggers (and the
+        // Vorbis Comment spec used by FLAC/OGG) treat PERFORMER as a distinct field from ARTIST -
+        // crediting individual musicians/roles rather than the overall artist. Typing "Performer"
+        // as a field name should create/edit that custom field rather than silently redirecting
+        // into the Artist field.
         'artist': 'artist',
-        'performer': 'artist',
         'track artist': 'artist',
         
         // Album variations

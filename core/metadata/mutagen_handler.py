@@ -181,7 +181,13 @@ class MutagenHandler:
             "TPE1": {
                 "primary_name": "artist",
                 "display_name": "Artist",
-                "variations": ["artist", "artists", "performer", "performers", "lead performer", "lead artist", "main artist"],
+                # Note: TPE1 is officially "Lead performer(s)/Soloist(s)" per the ID3v2 spec, but
+                # "performer" is deliberately NOT listed as a variation here. Many taggers (and the
+                # Vorbis Comment spec used by FLAC/OGG) treat PERFORMER as a distinct field from
+                # ARTIST - crediting individual musicians/roles rather than the overall artist. A
+                # custom field named "Performer" should create its own TXXX:PERFORMER frame, not
+                # collapse into TPE1/Artist.
+                "variations": ["artist", "artists", "lead artist", "main artist"],
                 "versions": ["2.3", "2.4"],
                 "category": "essential"
             },
