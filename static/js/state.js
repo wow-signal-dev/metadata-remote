@@ -31,6 +31,7 @@ window.MetadataRemote.State = {
     currentPath: '',
     selectedListItem: null,
     selectedTreeItem: null,
+    selectedTreeItems: [],
     originalFilename: '',
     currentAlbumArt: null,
     pendingAlbumArt: null,
@@ -120,6 +121,7 @@ window.MetadataRemote.State = {
         this.currentPath = '';
         this.selectedListItem = null;
         this.selectedTreeItem = null;
+        this.selectedTreeItems = [];
         this.originalFilename = '';
         this.currentAlbumArt = null;
         this.pendingAlbumArt = null;
