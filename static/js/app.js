@@ -264,7 +264,6 @@ const AudioMetadataEditor = {
         document.querySelectorAll('.tree .tree-item').forEach(el => {
             const checkbox = el.querySelector('[type="checkbox"]');
             checkbox.checked = false;
-            // todo исключить из списка State.selectedTreeItems
             if (State.selectedTreeItems !== undefined && !State.selectedTreeItems.includes(el)) {
                 const index = State.selectedTreeItems.indexOf(el);
                 State.selectedTreeItems.splice(index, 1);

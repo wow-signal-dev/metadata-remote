@@ -803,6 +803,7 @@
             if (State.currentPath === newPath || 
                 (State.currentPath && State.currentPath.startsWith(newPath + '/'))) {
                 if (loadFilesCallback) {
+                    // Изменить
                     loadFilesCallback(State.currentPath);
                 }
             }

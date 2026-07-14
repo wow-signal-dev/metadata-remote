@@ -1160,22 +1160,22 @@ input:autofill {
     background-size: 50% 50%;
 }
 
-:root[data-theme="light"] .tree-checkbox +label::before {
-    border: 1px solid #2b2b2b;
-}
-
 .tree-checkbox:checked+label::before {
     border-color: var(--accent-primary);
     background-color: var(--accent-primary);
     background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8'%3e%3cpath fill='%23fff' d='M6.564.75l-3.59 3.612-1.538-1.55L0 4.26 2.974 7.25 8 2.193z'/%3e%3c/svg%3e");
 }
 
+:root[data-theme="light"] .tree-checkbox+label::before {
+    border: 1px solid #2b2b2b;
+}
+
 .tree-checkbox:not(:disabled):not(:checked)+label:hover::before {
-    border-color: rgba(0, 0, 255, 0.33);
+    border-color: var(--accent-primary);
 }
 
 .tree-checkbox:not(:disabled):active+label::before {
-    background-color: rgba(0, 0, 255, 0.66);
+    background-color: var(--accent-primary);
 }
 
 .tree-checkbox:focus+label::before {
