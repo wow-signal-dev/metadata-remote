@@ -261,6 +261,20 @@ const AudioMetadataEditor = {
         document.querySelectorAll('.files .keyboard-focus').forEach(el => {
             el.classList.remove('keyboard-focus');
         });
+        document.querySelectorAll('.tree .tree-item').forEach(el => {
+            const checkbox = el.querySelector('[type="checkbox"]');
+            checkbox.checked = false;
+            // todo исключить из списка State.selectedTreeItems
+            if (State.selectedTreeItems !== undefined && !State.selectedTreeItems.includes(el)) {
+                const index = State.selectedTreeItems.indexOf(el);
+                State.selectedTreeItems.splice(index, 1);
+            }
+        });
+        const current_checkbox = item.querySelector('[type="checkbox"]');
+        current_checkbox.checked = true;
+        if (State.selectedTreeItems !== undefined && !State.selectedTreeItems.includes(item)) {
+            State.selectedTreeItems.push(item);
+        }
         
         // When called from keyboard navigation, ensure the item has DOM focus
         if (isKeyboard) {

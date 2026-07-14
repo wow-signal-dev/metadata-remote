@@ -285,12 +285,17 @@
             
             const checkbox = document.createElement('input');
             checkbox.className = "tree-checkbox";
-            checkbox.id = "tree-checkbox-" + item.name;
+            checkbox.id = "tree-checkbox-" + item.name + "-" + level;
             checkbox.type = "checkbox";
+            if (State.selectedTreeItems.includes(item)) {
+                checkbox.checked = true;
+            } else {
+                checkbox.checked = false;
+            }
 
             const label = document.createElement("label");
             label.className = "tree-checkbox-label";
-            label.htmlFor = "tree-checkbox-" + item.name
+            label.htmlFor = "tree-checkbox-" + item.name + "-" + level;
             label.innerHTML = "";
 
             const icon = document.createElement('span');
@@ -311,21 +316,11 @@
             div.appendChild(content);
             div.appendChild(children);
 
-            console.log(item);
-
-            // todo: поменять на что то рабочее
-            if (level != 0) {
-                checkbox.checked = true;
-                if (State.selectedTreeItems !== undefined && !State.selectedTreeItems.includes(item)) {
-                    State.selectedTreeItems.push(item);
-                }
-            }
-
             label.onclick = (e) => {
                 e.stopPropagation();
                 e.preventDefault();
-                console.log(checkbox.checked);
                 checkbox.checked = !checkbox.checked;
+                this.modifyCheckRecursivly(item, level, checkbox.checked);
                 if (!checkbox.checked) {
                     if (State.selectedTreeItems !== undefined && State.selectedTreeItems.includes(item)) {
                         const index = State.selectedTreeItems.indexOf(item);
@@ -336,7 +331,6 @@
                         State.selectedTreeItems.push(item);
                     }
                 }
-                console.log(State.selectedTreeItems);
             };
             
             content.onclick = (e) => {
@@ -367,8 +361,6 @@
                     State.expandedFolders.delete(item.path);
                     icon.innerHTML = '📁';
                 }
-
-                console.log(State.selectedTreeItems);
             };
             
             // Add double-click handler for rename
@@ -392,6 +384,36 @@
             }
             
             return div;
+        },
+
+        /**
+         * Load children for a tree node
+         * @param {Object} item - Item to modify
+         * @param {boolean} value - check value to assign
+         */
+        async modifyCheckRecursivly(item, level, value) {
+            const data = await API.loadTreeChildren(item.path);
+            const filteredItems = this.filterTreeItems(data.items, State.foldersFilter);
+            const sortedItems = this.sortItems(filteredItems);
+            for (const inner_item of sortedItems) {
+                if (inner_item.type === 'folder') {
+                    const checkbox = document.querySelector(`[id=tree-checkbox-${inner_item.name}-${level+1}]`);
+                    if (checkbox !== null) {
+                        checkbox.checked = value;
+                    }
+                    if (value) {
+                        if (State.selectedTreeItems !== undefined && !State.selectedTreeItems.includes(inner_item)) {
+                            State.selectedTreeItems.push(inner_item);
+                        }
+                    } else {
+                        if (State.selectedTreeItems !== undefined && State.selectedTreeItems.includes(inner_item)) {
+                            const index = State.selectTreeItems.indexOf(inner_item);
+                            State.selectedTreeItems.splice(index, 1);
+                        }
+                    }
+                    await this.modifyCheckRecursivly(inner_item, level+1, value);
+                }
+            };
         },
 
         /**
