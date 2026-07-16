@@ -336,11 +336,6 @@
             content.onclick = (e) => {
                 e.stopPropagation();
                 selectTreeItemCallback(div);
-                
-                checkbox.checked = true;
-                if (State.selectedTreeItems !== undefined && !State.selectedTreeItems.includes(item.path)) {
-                    State.selectedTreeItems.push(item.path);
-                }
 
                 // Check if this folder has subfolders
                 const hasSubfolders = State.treeData[item.path] && 

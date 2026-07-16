@@ -202,7 +202,6 @@
          * @param {Array} folderPaths - List of paths to the folders
          */
         async loadFiles(folderPaths) {
-            State.currentPath = folderPaths[0]; // todo fix
             document.getElementById('file-count').textContent = '(loading...)';
             
             AudioPlayer.stopPlayback();
