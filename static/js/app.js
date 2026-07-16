@@ -294,11 +294,9 @@ const AudioMetadataEditor = {
         State.selectedTreeItems.forEach((path) => {
             folderPaths.push(path);
         })
-        if (folderPaths.length !== 0) {
-            State.loadFileDebounceTimer = setTimeout(() => {
-                this.loadFiles(folderPaths);
-            }, 150);
-        }
+        State.loadFileDebounceTimer = setTimeout(() => {
+            this.loadFiles(folderPaths);
+        }, 150);
     },
 
     selectFileItem(item, isKeyboard = false) {

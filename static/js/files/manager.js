@@ -645,7 +645,7 @@
                     document.getElementById('current-filename').textContent = newName;
                     this.cancelFilenameEdit();
                     showButtonStatus(button, 'Renamed!', 'success');
-                    loadFilesCallback(State.currentPath);
+                    loadFilesCallback(State.selectedFileItems);
                     loadHistoryCallback();
                     
                     // Restore focus to filename display after successful save

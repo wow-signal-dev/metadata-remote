@@ -366,7 +366,7 @@
                 
                 // Remember current state
                 const currentFileBefore = State.currentFile;
-                const currentPathBefore = State.currentPath;
+                const currentPathsBefore = [...State.selectedFileItems];
                 
                 
                 // Perform the undo
@@ -376,7 +376,7 @@
                     showStatusCallback(`Undo successful! ${result.filesUpdated} file(s) reverted.`, 'success');
                     
                     // Always reload the file list
-                    await loadFilesCallback([currentPathBefore]);
+                    await loadFilesCallback(currentPathsBefore);
                     
                     // Handle file updates based on action type
                     if (result.newPath && actionDetails.action_type === 'file_rename') {
@@ -455,7 +455,7 @@
                 
                 // Remember current state
                 const currentFileBefore = State.currentFile;
-                const currentPathBefore = State.currentPath;
+                const currentPathsBefore = [...State.selectedFileItems];
                 
                 
                 // Perform the redo
@@ -465,7 +465,7 @@
                     showStatusCallback(`Redo successful! ${result.filesUpdated} file(s) updated.`, 'success');
                     
                     // Always reload the file list
-                    await loadFilesCallback([currentPathBefore]);
+                    await loadFilesCallback(currentPathsBefore);
                     
                     // Handle file updates based on action type
                     if (result.newPath && actionDetails.action_type === 'file_rename') {

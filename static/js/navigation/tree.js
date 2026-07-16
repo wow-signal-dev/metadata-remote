@@ -316,34 +316,21 @@
             div.appendChild(content);
             div.appendChild(children);
 
-            label.onclick = (e) => {
+            label.onclick = async (e) => {
                 e.stopPropagation();
                 e.preventDefault();
                 checkbox.checked = !checkbox.checked;
-                this.modifyCheckRecursivly(item, level, checkbox.checked);
-                if (!checkbox.checked) {
-                    if (State.selectedTreeItems !== undefined && State.selectedTreeItems.includes(item.path)) {
-                        const index = State.selectedTreeItems.indexOf(item.path);
-                        State.selectedTreeItems.splice(index, 1);
-                    }
-                } else {
-                    if (State.selectedTreeItems !== undefined && !State.selectedTreeItems.includes(item.path)) {
-                        State.selectedTreeItems.push(item.path);
-                    }
-                }
+                await this.modifyCheckRecursivly(item, level, checkbox.checked);
 
                 const folderPaths = [];
                 State.selectedTreeItems.forEach((path) => {
-
+                    folderPaths.push(path);
                 })
-                if (folderPaths.length !== 0) {
-                    State.loadFileDebounceTimer = setTimeout(() => {
-                        if (loadFilesCallback) {
-                            loadFilesCallback(folderPaths);
-                        }
-                    }, 150);
-                }
-                console.log(State.selectedTreeItems);
+                State.loadFileDebounceTimer = setTimeout(() => {
+                    if (loadFilesCallback) {
+                        loadFilesCallback(folderPaths);
+                    }
+                }, 150);
             };
             
             content.onclick = (e) => {
@@ -374,7 +361,6 @@
                     State.expandedFolders.delete(item.path);
                     icon.innerHTML = '📁';
                 }
-                console.log(State.selectedTreeItems);
             };
             
             // Add double-click handler for rename
@@ -409,22 +395,22 @@
             const data = await API.loadTreeChildren(item.path);
             const filteredItems = this.filterTreeItems(data.items, State.foldersFilter);
             const sortedItems = this.sortItems(filteredItems);
+            const checkbox = document.querySelector(`[id=tree-checkbox-${item.name}-${level}]`);
+            if (checkbox !== null) {
+                checkbox.checked = value;
+            }
+            if (value) {
+                if (State.selectedTreeItems !== undefined && !State.selectedTreeItems.includes(item.path)) {
+                    State.selectedTreeItems.push(item.path);
+                }
+            } else {
+                if (State.selectedTreeItems !== undefined && State.selectedTreeItems.includes(item.path)) {
+                    const index = State.selectedTreeItems.indexOf(item.path);
+                    State.selectedTreeItems.splice(index, 1);
+                }
+            }
             for (const inner_item of sortedItems) {
                 if (inner_item.type === 'folder') {
-                    const checkbox = document.querySelector(`[id=tree-checkbox-${inner_item.name}-${level+1}]`);
-                    if (checkbox !== null) {
-                        checkbox.checked = value;
-                    }
-                    if (value) {
-                        if (State.selectedTreeItems !== undefined && !State.selectedTreeItems.includes(inner_item.path)) {
-                            State.selectedTreeItems.push(inner_item.path);
-                        }
-                    } else {
-                        if (State.selectedTreeItems !== undefined && State.selectedTreeItems.includes(inner_item.path)) {
-                            const index = State.selectedTreeItems.indexOf(inner_item.path);
-                            State.selectedTreeItems.splice(index, 1);
-                        }
-                    }
                     await this.modifyCheckRecursivly(inner_item, level+1, value);
                 }
             };
@@ -817,7 +803,7 @@
             if (State.currentPath === newPath || 
                 (State.currentPath && State.currentPath.startsWith(newPath + '/'))) {
                 if (loadFilesCallback) {
-                    loadFilesCallback([State.currentPath]);
+                    loadFilesCallback(State.selectedTreeItems);
                 }
             }
         },
