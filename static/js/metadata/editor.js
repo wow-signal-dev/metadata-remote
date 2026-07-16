@@ -1098,19 +1098,14 @@
         toggleNewFieldForm() {
             const form = document.getElementById('new-field-form');
             const header = document.querySelector('.new-field-header');
-            const icon = document.querySelector('.new-field-header .expand-icon');
-            
-            if (form.style.display === 'none') {
+
+            if (form.style.display === 'none' || form.style.display === '') {
                 form.style.display = 'block';
-                icon.textContent = '▼';
-                header.setAttribute('aria-expanded', 'true');
-                header.classList.add('expanded');
+                header.style.display = 'none';
                 document.getElementById('new-field-name').focus();
             } else {
                 form.style.display = 'none';
-                icon.textContent = '▶';
-                header.setAttribute('aria-expanded', 'false');
-                header.classList.remove('expanded');
+                header.style.display = 'block';
                 header.focus();
             }
         },

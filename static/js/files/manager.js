@@ -199,29 +199,31 @@
         
         /**
          * Load and display files in a folder
-         * @param {string} folderPath - Path to the folder
+         * @param {Array} folderPaths - List of paths to the folders
          */
-        async loadFiles(folderPath) {
-            State.currentPath = folderPath;
+        async loadFiles(folderPaths) {
             document.getElementById('file-count').textContent = '(loading...)';
             
             AudioPlayer.stopPlayback();
             
             try {
-                const data = await API.loadFiles(folderPath);
-                
-                // Store the raw file data
-                State.currentFiles = data.files;
-                
+                const files = [];
+                for (const folderPath of folderPaths) {
+                    const data = await API.loadFiles(folderPath);
+                    files.push(...data.files);
+                }
+
                 // Update count before filtering
-                document.getElementById('file-count').textContent = `(${data.files.length})`;
-                
+                document.getElementById('file-count').textContent = `(${files.length})`;
+
+                // Store the raw file data
+                State.currentFiles = files;
+
                 // Render the file list (which will apply filtering and sorting)
                 this.renderFileList();
-                
+
                 // Update sort UI to reflect current state
                 this.updateSortUI();
-                
             } catch (err) {
                 console.error('Error loading files:', err);
                 UIUtils.showStatus('Error loading files', 'error');
@@ -642,7 +644,7 @@
                     document.getElementById('current-filename').textContent = newName;
                     this.cancelFilenameEdit();
                     showButtonStatus(button, 'Renamed!', 'success');
-                    loadFilesCallback(State.currentPath);
+                    loadFilesCallback(State.selectedFileItems);
                     loadHistoryCallback();
                     
                     // Restore focus to filename display after successful save

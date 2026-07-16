@@ -176,6 +176,37 @@
                         </div>
                         
                     </form>
+
+                    <!-- Add new metadata field section -->
+                    <div class="new-field-header" tabindex="0" role="button" aria-expanded="false" aria-controls="new-field-form"
+                        onclick="window.MetadataRemote.Metadata.Editor.toggleNewFieldForm()">
+                        <span class="add-icon">✚</span>
+                        <span>Add new metadata field</span>
+                    </div>
+                    <div class="new-field-form" id="new-field-form" style="display: none;">
+                        <div class="new-field-inputs-box">
+                            <button type="button" class="cancel-btn" onclick="window.MetadataRemote.Metadata.Editor.cancelNewField()">
+                                X
+                            </button>
+                            <div class="new-field-inputs">
+                                <input type="text" id="new-field-name" placeholder="Field name" pattern="[A-Za-z0-9_]+"
+                                    title="Only letters, numbers, and underscores allowed" maxlength="50">
+                                <span class="new-field-divider">:</span>
+                                <input type="text" id="new-field-value" placeholder="Content"
+                                    title="Enter initial value">
+                            </div>
+                        </div>
+                        <div class="new-field-actions">
+                            <button type="button" class="btn btn-primary"
+                                onclick="window.MetadataRemote.Metadata.Editor.createNewField(false)">
+                                Save to File
+                            </button>
+                            <button type="button" class="btn btn-secondary"
+                                onclick="window.MetadataRemote.Metadata.Editor.createNewField(true)">
+                                Save to Folder
+                            </button>
+                        </div>
+                    </div>
                     
                     <!-- Extended fields toggle -->
                     <div class="extended-fields-toggle" tabindex="0" role="button" aria-expanded="false" aria-controls="extended-fields-wrapper" onclick="window.MetadataRemote.Metadata.Editor.toggleExtendedFields()">
@@ -186,46 +217,6 @@
                     <!-- Container for extended fields -->
                     <div id="extended-fields-wrapper" style="display: none;">
                         <div id="dynamic-fields-container"></div>
-                    </div>
-                    
-                    <!-- Add new metadata field section -->
-                    <div class="new-field-header" tabindex="0" role="button" aria-expanded="false" aria-controls="new-field-form" onclick="window.MetadataRemote.Metadata.Editor.toggleNewFieldForm()">
-                        <span class="expand-icon">▶</span>
-                        <span>Add new metadata field</span>
-                    </div>
-                    <div class="new-field-form" id="new-field-form" style="display: none;">
-                        <div class="form-group">
-                            <label for="new-field-name">Field name</label>
-                            <input type="text" 
-                                   id="new-field-name" 
-                                   placeholder="e.g., RATING, MOOD"
-                                   pattern="[A-Za-z0-9_]+"
-                                   title="Only letters, numbers, and underscores allowed"
-                                   maxlength="50">
-                        </div>
-                        <div class="form-group">
-                            <label for="new-field-value">Content</label>
-                            <input type="text" 
-                                   id="new-field-value" 
-                                   placeholder="Enter initial value">
-                        </div>
-                        <div class="new-field-actions">
-                            <button type="button" 
-                                    class="btn btn-primary" 
-                                    onclick="window.MetadataRemote.Metadata.Editor.createNewField(false)">
-                                Save to File
-                            </button>
-                            <button type="button" 
-                                    class="btn btn-secondary" 
-                                    onclick="window.MetadataRemote.Metadata.Editor.createNewField(true)">
-                                Save to Folder
-                            </button>
-                            <button type="button" 
-                                    class="btn btn-cancel" 
-                                    onclick="window.MetadataRemote.Metadata.Editor.cancelNewField()">
-                                Cancel
-                            </button>
-                        </div>
                     </div>
                     
                     <!-- Save and Reset buttons at the bottom -->

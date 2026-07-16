@@ -283,6 +283,21 @@
             content.className = 'tree-item-content';
             content.style.paddingLeft = `${level * 1.5 + 1.25}rem`;
             
+            const checkbox = document.createElement('input');
+            checkbox.className = "tree-checkbox";
+            checkbox.id = "tree-checkbox-" + item.name + "-" + level;
+            checkbox.type = "checkbox";
+            if (State.selectedTreeItems.includes(item.path)) {
+                checkbox.checked = true;
+            } else {
+                checkbox.checked = false;
+            }
+
+            const label = document.createElement("label");
+            label.className = "tree-checkbox-label";
+            label.htmlFor = "tree-checkbox-" + item.name + "-" + level;
+            label.innerHTML = "";
+
             const icon = document.createElement('span');
             icon.className = 'tree-icon';
             icon.innerHTML = State.expandedFolders.has(item.path) ? '📂' : '📁';
@@ -290,23 +305,43 @@
             const name = document.createElement('span');
             name.textContent = item.name;
             
-            content.appendChild(icon);
-            content.appendChild(name);
+            label.appendChild(icon);
+            label.appendChild(name);
+            content.appendChild(checkbox);
+            content.appendChild(label);
             
             const children = document.createElement('div');
             children.className = 'tree-children';
             
             div.appendChild(content);
             div.appendChild(children);
+
+            label.onclick = async (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                checkbox.checked = !checkbox.checked;
+                await this.modifyCheckRecursivly(item, level, checkbox.checked);
+
+                const folderPaths = [];
+                State.selectedTreeItems.forEach((path) => {
+                    folderPaths.push(path);
+                })
+                State.loadFileDebounceTimer = setTimeout(() => {
+                    if (loadFilesCallback) {
+                        loadFilesCallback(folderPaths);
+                    }
+                }, 150);
+            };
             
             content.onclick = (e) => {
                 e.stopPropagation();
                 selectTreeItemCallback(div);
-                
+
                 // Check if this folder has subfolders
                 const hasSubfolders = State.treeData[item.path] && 
                                      State.treeData[item.path].some(child => child.type === 'folder');
                 
+
                 const isExpanded = children.classList.contains('expanded');
                 
                 if (!isExpanded) {
@@ -324,7 +359,7 @@
             };
             
             // Add double-click handler for rename
-            content.ondblclick = (e) => {
+            name.ondblclick = (e) => {
                 e.stopPropagation();
                 e.preventDefault();
                 this.startFolderRename(div, item);
@@ -344,6 +379,36 @@
             }
             
             return div;
+        },
+
+        /**
+         * Load children for a tree node
+         * @param {Object} item - Item to modify
+         * @param {boolean} value - check value to assign
+         */
+        async modifyCheckRecursivly(item, level, value) {
+            const data = await API.loadTreeChildren(item.path);
+            const filteredItems = this.filterTreeItems(data.items, State.foldersFilter);
+            const sortedItems = this.sortItems(filteredItems);
+            const checkbox = document.querySelector(`[id=tree-checkbox-${item.name}-${level}]`);
+            if (checkbox !== null) {
+                checkbox.checked = value;
+            }
+            if (value) {
+                if (State.selectedTreeItems !== undefined && !State.selectedTreeItems.includes(item.path)) {
+                    State.selectedTreeItems.push(item.path);
+                }
+            } else {
+                if (State.selectedTreeItems !== undefined && State.selectedTreeItems.includes(item.path)) {
+                    const index = State.selectedTreeItems.indexOf(item.path);
+                    State.selectedTreeItems.splice(index, 1);
+                }
+            }
+            for (const inner_item of sortedItems) {
+                if (inner_item.type === 'folder') {
+                    await this.modifyCheckRecursivly(inner_item, level+1, value);
+                }
+            };
         },
 
         /**
@@ -733,7 +798,7 @@
             if (State.currentPath === newPath || 
                 (State.currentPath && State.currentPath.startsWith(newPath + '/'))) {
                 if (loadFilesCallback) {
-                    loadFilesCallback(State.currentPath);
+                    loadFilesCallback(State.selectedTreeItems);
                 }
             }
         },

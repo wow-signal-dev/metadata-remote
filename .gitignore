@@ -2,3 +2,9 @@ venv/
 __pycache__/
 *.pyc
 .env
+.idea/metadata-remote.iml
+.idea/misc.xml
+.idea/modules.xml
+.idea/vcs.xml
+.idea/inspectionProfiles/profiles_settings.xml
+.idea/inspectionProfiles/Project_Default.xml

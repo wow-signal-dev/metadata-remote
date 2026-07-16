@@ -261,6 +261,19 @@ const AudioMetadataEditor = {
         document.querySelectorAll('.files .keyboard-focus').forEach(el => {
             el.classList.remove('keyboard-focus');
         });
+        document.querySelectorAll('.tree .tree-item').forEach(el => {
+            const checkbox = el.querySelector('[type="checkbox"]');
+            checkbox.checked = false;
+            if (State.selectedTreeItems !== undefined && !State.selectedTreeItems.includes(el.dataset.path)) {
+                const index = State.selectedTreeItems.indexOf(el.dataset.path);
+                State.selectedTreeItems.splice(index, 1);
+            }
+        });
+        const current_checkbox = item.querySelector('[type="checkbox"]');
+        current_checkbox.checked = true;
+        if (State.selectedTreeItems !== undefined && !State.selectedTreeItems.includes(item.dataset.path)) {
+            State.selectedTreeItems.push(item.dataset.path);
+        }
         
         // When called from keyboard navigation, ensure the item has DOM focus
         if (isKeyboard) {
@@ -277,12 +290,13 @@ const AudioMetadataEditor = {
             clearTimeout(State.loadFileDebounceTimer);
         }
         
-        const folderPath = item.dataset.path;
-        if (folderPath !== undefined) {
-            State.loadFileDebounceTimer = setTimeout(() => {
-                this.loadFiles(folderPath);
-            }, 150);
-        }
+        const folderPaths = [];
+        State.selectedTreeItems.forEach((path) => {
+            folderPaths.push(path);
+        })
+        State.loadFileDebounceTimer = setTimeout(() => {
+            this.loadFiles(folderPaths);
+        }, 150);
     },
 
     selectFileItem(item, isKeyboard = false) {
@@ -322,8 +336,8 @@ const AudioMetadataEditor = {
     // File Operations
     // =============================
     
-    async loadFiles(folderPath) {
-        await FilesManager.loadFiles(folderPath);
+    async loadFiles(folderPaths) {
+        await FilesManager.loadFiles(folderPaths);
     },
 
     async loadFile(filepath, listItem) {

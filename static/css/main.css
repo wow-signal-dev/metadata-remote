@@ -1129,6 +1129,71 @@ input:autofill {
     transform: scale(1.1);
 }
 
+.tree-checkbox {
+    position: absolute;
+    z-index: -1;
+    opacity: 0;
+}
+
+.tree-checkbox + label {
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+
+.tree-checkbox +label::before {
+    content: '';
+    display: inline-block;
+    width: 1em;
+    height: 1em;
+    flex-shrink: 0;
+    flex-grow: 0;
+    border: 1px solid #c3c3c3;
+    border-radius: 0.25em;
+    margin-right: 0.5em;
+    background-repeat: no-repeat;
+    background-position: center center;
+    background-size: 50% 50%;
+}
+
+.tree-checkbox:checked+label::before {
+    border-color: var(--accent-primary);
+    background-color: var(--accent-primary);
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8'%3e%3cpath fill='%23fff' d='M6.564.75l-3.59 3.612-1.538-1.55L0 4.26 2.974 7.25 8 2.193z'/%3e%3c/svg%3e");
+}
+
+:root[data-theme="light"] .tree-checkbox+label::before {
+    border: 1px solid #2b2b2b;
+}
+
+.tree-checkbox:not(:disabled):not(:checked)+label:hover::before {
+    border-color: var(--accent-primary);
+}
+
+.tree-checkbox:not(:disabled):active+label::before {
+    background-color: var(--accent-primary);
+}
+
+.tree-checkbox:focus+label::before {
+    box-shadow: 0 0 0 0.2rem rgba(0, 0, 255, 0.125);
+}
+
+.tree-checkbox:focus:not(:checked)+label::before {
+    border-color: #c3c3c3;
+}
+
+.tree-checkbox:disabled+label::before {
+    background-color: black;
+}
+
+.tree-checkbox-label {
+    all: unset;
+}
+
 /* Tree folder rename specific styling */
 .tree-rename-edit {
     display: inline-flex;
@@ -1758,6 +1823,7 @@ input[type="file"] {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
+    padding-bottom: 0.5rem;
 }
 
 .form-group {
@@ -2810,7 +2876,7 @@ button:disabled {
         grid-template-columns: 1fr;
         gap: 0.5rem;
     }
-    
+
     .help-box {
         width: 95%;
         max-width: none;
@@ -3071,11 +3137,11 @@ button:disabled {
         width: 95%;
         max-height: 90vh;
     }
-    
+
     .field-edit-actions {
         flex-wrap: wrap;
     }
-    
+
     .field-edit-btn {
         flex: 1;
         min-width: 120px;
@@ -3346,6 +3412,11 @@ button:disabled {
 :root[data-theme="light"] .extended-fields-toggle.expanded .expand-icon,
 :root[data-theme="light"] .new-field-header.expanded .expand-icon {
     color: white;
+}
+
+/* specify for both themes*/
+.new-field-header .add-icon {
+    color: rgba(255, 255, 255, 0.8);
 }
 
 /* Save to Folder button in new field form */
@@ -3847,9 +3918,7 @@ button:focus:not(:active):not(.processing):not(.success):not(.error):not(.warnin
 
 .new-field-form {
     display: none;
-    padding: 0.75rem;
     background: var(--bg-secondary);
-    border-top: 1px solid rgba(74, 127, 255, 0.1);
 }
 
 .new-field-form.expanded {
@@ -3872,6 +3941,10 @@ button:focus:not(:active):not(.processing):not(.success):not(.error):not(.warnin
 .new-field-form label {
     font-size: 0.75rem;
     margin-bottom: 0.25rem;
+}
+
+.new-field-divider {
+    color: var(--text-secondary);
 }
 
 .new-field-actions {
@@ -3930,12 +4003,32 @@ button:focus:not(:active):not(.processing):not(.success):not(.error):not(.warnin
     box-shadow: 0 4px 12px rgba(58, 58, 58, 0.4);
 }
 
-.new-field-actions .btn-cancel {
-    background: linear-gradient(135deg, #5a2a2a 0%, #7a3a3a 100%);
-    color: white;
+.new-field-inputs {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
 }
 
-.new-field-actions .btn-cancel:hover {
+.new-field-inputs-box {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.new-field-inputs-box .cancel-btn {
+    width: 31.8px;
+    height: 31.8px;
+    background: linear-gradient(135deg, #5a2a2a 0%, #7a3a3a 100%);
+    color: white;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 13px;
+    padding: 3px;
+}
+
+.new-field-inputs-box .cancel-btn:hover {
     transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(90, 45, 45, 0.4);
 }
