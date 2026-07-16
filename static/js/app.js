@@ -264,15 +264,15 @@ const AudioMetadataEditor = {
         document.querySelectorAll('.tree .tree-item').forEach(el => {
             const checkbox = el.querySelector('[type="checkbox"]');
             checkbox.checked = false;
-            if (State.selectedTreeItems !== undefined && !State.selectedTreeItems.includes(el)) {
-                const index = State.selectedTreeItems.indexOf(el);
+            if (State.selectedTreeItems !== undefined && !State.selectedTreeItems.includes(el.dataset.path)) {
+                const index = State.selectedTreeItems.indexOf(el.dataset.path);
                 State.selectedTreeItems.splice(index, 1);
             }
         });
         const current_checkbox = item.querySelector('[type="checkbox"]');
         current_checkbox.checked = true;
-        if (State.selectedTreeItems !== undefined && !State.selectedTreeItems.includes(item)) {
-            State.selectedTreeItems.push(item);
+        if (State.selectedTreeItems !== undefined && !State.selectedTreeItems.includes(item.dataset.path)) {
+            State.selectedTreeItems.push(item.dataset.path);
         }
         
         // When called from keyboard navigation, ensure the item has DOM focus
@@ -290,8 +290,11 @@ const AudioMetadataEditor = {
             clearTimeout(State.loadFileDebounceTimer);
         }
         
-        const folderPaths = [item.dataset.path];
-        if (item.dataset.path !== undefined) {
+        const folderPaths = [];
+        State.selectedTreeItems.forEach((path) => {
+            folderPaths.push(path);
+        })
+        if (folderPaths.length !== 0) {
             State.loadFileDebounceTimer = setTimeout(() => {
                 this.loadFiles(folderPaths);
             }, 150);

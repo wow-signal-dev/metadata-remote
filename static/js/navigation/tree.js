@@ -287,7 +287,7 @@
             checkbox.className = "tree-checkbox";
             checkbox.id = "tree-checkbox-" + item.name + "-" + level;
             checkbox.type = "checkbox";
-            if (State.selectedTreeItems.includes(item)) {
+            if (State.selectedTreeItems.includes(item.path)) {
                 checkbox.checked = true;
             } else {
                 checkbox.checked = false;
@@ -322,15 +322,28 @@
                 checkbox.checked = !checkbox.checked;
                 this.modifyCheckRecursivly(item, level, checkbox.checked);
                 if (!checkbox.checked) {
-                    if (State.selectedTreeItems !== undefined && State.selectedTreeItems.includes(item)) {
-                        const index = State.selectedTreeItems.indexOf(item);
+                    if (State.selectedTreeItems !== undefined && State.selectedTreeItems.includes(item.path)) {
+                        const index = State.selectedTreeItems.indexOf(item.path);
                         State.selectedTreeItems.splice(index, 1);
                     }
                 } else {
-                    if (State.selectedTreeItems !== undefined && !State.selectedTreeItems.includes(item)) {
-                        State.selectedTreeItems.push(item);
+                    if (State.selectedTreeItems !== undefined && !State.selectedTreeItems.includes(item.path)) {
+                        State.selectedTreeItems.push(item.path);
                     }
                 }
+
+                const folderPaths = [];
+                State.selectedTreeItems.forEach((path) => {
+
+                })
+                if (folderPaths.length !== 0) {
+                    State.loadFileDebounceTimer = setTimeout(() => {
+                        if (loadFilesCallback) {
+                            loadFilesCallback(folderPaths);
+                        }
+                    }, 150);
+                }
+                console.log(State.selectedTreeItems);
             };
             
             content.onclick = (e) => {
@@ -338,8 +351,8 @@
                 selectTreeItemCallback(div);
                 
                 checkbox.checked = true;
-                if (State.selectedTreeItems !== undefined && !State.selectedTreeItems.includes(item)) {
-                    State.selectedTreeItems.push(item);
+                if (State.selectedTreeItems !== undefined && !State.selectedTreeItems.includes(item.path)) {
+                    State.selectedTreeItems.push(item.path);
                 }
 
                 // Check if this folder has subfolders
@@ -361,6 +374,7 @@
                     State.expandedFolders.delete(item.path);
                     icon.innerHTML = '📁';
                 }
+                console.log(State.selectedTreeItems);
             };
             
             // Add double-click handler for rename
@@ -402,12 +416,12 @@
                         checkbox.checked = value;
                     }
                     if (value) {
-                        if (State.selectedTreeItems !== undefined && !State.selectedTreeItems.includes(inner_item)) {
-                            State.selectedTreeItems.push(inner_item);
+                        if (State.selectedTreeItems !== undefined && !State.selectedTreeItems.includes(inner_item.path)) {
+                            State.selectedTreeItems.push(inner_item.path);
                         }
                     } else {
-                        if (State.selectedTreeItems !== undefined && State.selectedTreeItems.includes(inner_item)) {
-                            const index = State.selectTreeItems.indexOf(inner_item);
+                        if (State.selectedTreeItems !== undefined && State.selectedTreeItems.includes(inner_item.path)) {
+                            const index = State.selectedTreeItems.indexOf(inner_item.path);
                             State.selectedTreeItems.splice(index, 1);
                         }
                     }
