@@ -290,10 +290,10 @@ const AudioMetadataEditor = {
             clearTimeout(State.loadFileDebounceTimer);
         }
         
-        const folderPath = item.dataset.path;
-        if (folderPath !== undefined) {
+        const folderPaths = [item.dataset.path];
+        if (item.dataset.path !== undefined) {
             State.loadFileDebounceTimer = setTimeout(() => {
-                this.loadFiles(folderPath);
+                this.loadFiles(folderPaths);
             }, 150);
         }
     },
@@ -335,8 +335,8 @@ const AudioMetadataEditor = {
     // File Operations
     // =============================
     
-    async loadFiles(folderPath) {
-        await FilesManager.loadFiles(folderPath);
+    async loadFiles(folderPaths) {
+        await FilesManager.loadFiles(folderPaths);
     },
 
     async loadFile(filepath, listItem) {

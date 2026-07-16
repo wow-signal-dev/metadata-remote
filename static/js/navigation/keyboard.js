@@ -903,7 +903,7 @@
                     
                     // Reload files and history
                     if (window.AudioMetadataEditor && window.AudioMetadataEditor.loadFiles) {
-                        window.AudioMetadataEditor.loadFiles(State.currentPath);
+                        window.AudioMetadataEditor.loadFiles([State.currentPath]);
                     }
                     if (window.MetadataRemote.History && window.MetadataRemote.History.Manager) {
                         window.MetadataRemote.History.Manager.loadHistory();
