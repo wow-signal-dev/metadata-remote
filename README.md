@@ -175,6 +175,10 @@ docker run -d \
   ghcr.io/wow-signal-dev/metadata-remote:latest
 ```
 
+## One-Click Deploy
+
+[![Deploy on RepoCloud](https://d16t0pc4846x52.cloudfront.net/deploylobe.svg)](https://repocloud.io/details/Metadata%20Remote/)
+
 ## Use Cases
 
 ### Headless Media Servers
